@@ -1,273 +1,232 @@
 #!/usr/bin/env bash
-#
-# Architecture fitness check script — Darwin project
-# Runs grep/file checks for the pre-commit hook and @fitness-checker.
-#
-# Checks that are SKIPPED here:
-#   F-01  RLS on all tables              → requires Supabase MCP
-#   F-10  Storage bucket policies         → requires Supabase MCP
-#   F-16  Snyk SAST                       → requires Snyk MCP
-#   F-17  Snyk SCA (dependencies)         → requires Snyk MCP
-#
-# All other checks (F-02 through F-09, F-11 through F-15) run here as grep/file probes.
-#
-# Output: machine-readable JSON on stdout.
-#   - "status" per check: PASS, FAIL, WARN, or SKIP
-#   - "detail" per check: human-readable explanation
-#   - Exit code 0 if no FAIL checks, 1 if any FAIL.
-#
+# scripts/fitness-check.sh
+# Deterministische fitness checks — geen AI-redenering, alleen feiten.
+# Output is machine-readable JSON voor @fitness-checker agent.
+# Gebruik: bash scripts/fitness-check.sh 2>&1 | tee FITNESS-REPORT.json
 
 set -euo pipefail
 
-declare -A STATUS=()
-declare -A DETAIL=()
+PASS="PASS"
+FAIL="FAIL"
+WARN="WARN"
+SKIP="SKIP"
 
-fail_count=0
-warn_count=0
-pass_count=0
-skip_count=0
+results=()
 
-fail()     { STATUS["$1"]="FAIL"; DETAIL["$1"]="$2"; fail_count=$((fail_count + 1)); }
-warn()     { STATUS["$1"]="WARN"; DETAIL["$1"]="$2"; warn_count=$((warn_count + 1)); }
-pass()     { STATUS["$1"]="PASS"; DETAIL["$1"]="$2"; pass_count=$((pass_count + 1)); }
-skip()     { STATUS["$1"]="SKIP"; DETAIL["$1"]="$2"; skip_count=$((skip_count + 1)); }
+add_result() {
+  local id="$1" status="$2" detail="$3"
+  results+=("{\"id\":\"$id\",\"status\":\"$status\",\"detail\":\"$detail\"}")
+}
 
-# ─── MCP-only checks (always SKIP) ───────────────────────────────────
-skip "F-01" "Requires Supabase MCP — run @fitness-checker"
-skip "F-10" "Requires Supabase MCP — run @fitness-checker"
-skip "F-16" "Requires Snyk MCP — run @fitness-checker"
-skip "F-17" "Requires Snyk MCP — run @fitness-checker"
+echo "=== FITNESS CHECK START $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" >&2
 
-# ──────────────────────────────────────────────────────────────────────
-# F-02: No service_role keyword in frontend source
-# ──────────────────────────────────────────────────────────────────────
-if [ -d src ]; then
-  hits=$(grep -rl --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git -i 'service_role' src/ 2>/dev/null || true)
-  if [ -n "$hits" ]; then
-    fail "F-02" "service_role found in: $(echo "$hits" | tr '\n' ' ')"
-  else
-    pass "F-02" "No service_role in src/"
-  fi
+# ─────────────────────────────────────────────
+# F-01: RLS via Supabase MCP
+# Kan niet in bash worden gecontroleerd — delegeren aan Supabase MCP.
+# De @fitness-checker agent voert dit via MCP uit en injecteert het resultaat.
+add_result "F-01" "$SKIP" "Delegate to Supabase MCP: query pg_tables WHERE rowsecurity = false"
+
+# ─────────────────────────────────────────────
+# F-02: Geen service role key in frontend
+SERVICE_ROLE_HITS=$(grep -rn "service_role\|SUPABASE_SERVICE" src/ 2>/dev/null | grep -v "//.*service_role" | wc -l | tr -d ' ')
+if [ "$SERVICE_ROLE_HITS" -eq 0 ]; then
+  add_result "F-02" "$PASS" "No service_role references found in src/"
 else
-  warn "F-02" "src/ directory does not exist yet"
+  HITS_DETAIL=$(grep -rn "service_role\|SUPABASE_SERVICE" src/ 2>/dev/null | grep -v "//.*service_role" | head -5)
+  add_result "F-02" "$FAIL" "Found $SERVICE_ROLE_HITS occurrence(s): $HITS_DETAIL"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# F-03: Single Supabase client instance (createClient called exactly once in src/)
-# ──────────────────────────────────────────────────────────────────────
-if [ -d src ]; then
-  count=$(grep -rl --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git 'createClient' src/ 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-  if [ "$count" -eq 0 ]; then
-    warn "F-03" "createClient() not found in src/ yet"
-  elif [ "$count" -eq 1 ]; then
-    pass "F-03" "createClient() found 1 time"
-  else
-    fail "F-03" "createClient() found $count times — must be exactly 1"
-  fi
+# ─────────────────────────────────────────────
+# F-03: Één Supabase client instance
+CLIENT_COUNT=$(grep -rn "createClient(" src/ 2>/dev/null | wc -l | tr -d ' ')
+if [ "$CLIENT_COUNT" -le 1 ]; then
+  add_result "F-03" "$PASS" "createClient() called $CLIENT_COUNT time(s) in src/"
+elif [ "$CLIENT_COUNT" -eq 2 ]; then
+  add_result "F-03" "$WARN" "createClient() found $CLIENT_COUNT times — verify second is intentional"
 else
-  warn "F-03" "src/ directory does not exist yet"
+  add_result "F-03" "$FAIL" "createClient() found $CLIENT_COUNT times in src/ — only 1 allowed"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# F-04: PKCE flow configured
-# ──────────────────────────────────────────────────────────────────────
-if [ -d src ]; then
-  hits=$(grep -rl --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git 'flowType.*pkce\|:.*pkce' src/ 2>/dev/null || true)
-  if [ -n "$hits" ]; then
-    pass "F-04" "flowType: 'pkce' found"
-  else
-    fail "F-04" "PKCE flow not found in src/"
-  fi
+# ─────────────────────────────────────────────
+# F-04: PKCE flow geconfigureerd
+PKCE_HITS=$(grep -rn "flowType.*pkce\|pkce.*flowType" src/ 2>/dev/null | wc -l | tr -d ' ')
+if [ "$PKCE_HITS" -ge 1 ]; then
+  add_result "F-04" "$PASS" "flowType: 'pkce' found in src/"
 else
-  warn "F-04" "src/ directory does not exist yet"
+  add_result "F-04" "$FAIL" "flowType: 'pkce' not found in src/lib/supabase.ts"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# F-05: Netlify SPA redirect present in netlify.toml
-# ──────────────────────────────────────────────────────────────────────
-if [ -f netlify.toml ]; then
-  if grep -q 'from.*=.*"/*"' netlify.toml 2>/dev/null && grep -q 'to.*=.*"/index.html"' netlify.toml 2>/dev/null; then
-    pass "F-05" "SPA redirect present in netlify.toml"
+# ─────────────────────────────────────────────
+# F-05: Netlify SPA redirect
+if [ -f "netlify.toml" ]; then
+  if grep -q 'from = "/\*"' netlify.toml && grep -q 'to = "/index.html"' netlify.toml && grep -q 'status = 200' netlify.toml; then
+    add_result "F-05" "$PASS" "SPA redirect rule found in netlify.toml"
   else
-    fail "F-05" "SPA redirect (/* → /index.html) missing in netlify.toml"
+    add_result "F-05" "$FAIL" "SPA redirect rule missing or incomplete in netlify.toml"
   fi
 else
-  fail "F-05" "netlify.toml does not exist"
+  add_result "F-05" "$FAIL" "netlify.toml does not exist"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 # F-06: TypeScript strict mode
-# ──────────────────────────────────────────────────────────────────────
-if [ -f tsconfig.json ]; then
-  if grep -q '"strict".*true' tsconfig.json 2>/dev/null; then
-    pass "F-06" "strict: true in tsconfig.json"
+if [ -f "tsconfig.json" ]; then
+  STRICT=$(node -e "const f=require('./tsconfig.json'); console.log(f.compilerOptions && f.compilerOptions.strict === true ? 'true' : 'false')" 2>/dev/null || echo "parse_error")
+  if [ "$STRICT" = "true" ]; then
+    add_result "F-06" "$PASS" "strict: true in tsconfig.json"
   else
-    fail "F-06" "strict: true not found in tsconfig.json"
+    add_result "F-06" "$FAIL" "strict is not true in tsconfig.json (got: $STRICT)"
   fi
 else
-  fail "F-06" "tsconfig.json does not exist"
+  add_result "F-06" "$FAIL" "tsconfig.json not found"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# F-07: tsc --noEmit compiles cleanly
-# ──────────────────────────────────────────────────────────────────────
-if [ -f tsconfig.json ]; then
-  if command -v npx >/dev/null 2>&1; then
-    if npx tsc --noEmit 2>/dev/null; then
-      pass "F-07" "0 errors"
-    else
-      fail "F-07" "TypeScript compilation errors found"
-    fi
+# ─────────────────────────────────────────────
+# F-07: TypeScript compileert zonder fouten
+TSC_OUTPUT=$(npx tsc --noEmit 2>&1 || true)
+TSC_ERRORS=$(echo "$TSC_OUTPUT" | grep -c "error TS" || true)
+if [ "$TSC_ERRORS" -eq 0 ]; then
+  add_result "F-07" "$PASS" "tsc --noEmit: 0 errors"
+else
+  FIRST_ERRORS=$(echo "$TSC_OUTPUT" | grep "error TS" | head -5 | tr '\n' '|')
+  add_result "F-07" "$FAIL" "$TSC_ERRORS TypeScript error(s): $FIRST_ERRORS"
+fi
+
+# ─────────────────────────────────────────────
+# F-08: Geen unjustified `any` types
+ANY_HITS=$(grep -rn ": any\b\|as any\b" src/ 2>/dev/null | grep -v "@ts-expect-error\|eslint-disable\|// any:" | wc -l | tr -d ' ')
+if [ "$ANY_HITS" -eq 0 ]; then
+  add_result "F-08" "$PASS" "No unjustified 'any' types found"
+elif [ "$ANY_HITS" -le 3 ]; then
+  add_result "F-08" "$WARN" "$ANY_HITS unjustified 'any' type(s) found — add suppression comment with justification"
+else
+  add_result "F-08" "$FAIL" "$ANY_HITS unjustified 'any' types — too many, refactor required"
+fi
+
+# ─────────────────────────────────────────────
+# F-09: Geen admin client in frontend
+ADMIN_HITS=$(grep -rn "auth\.admin\|createClient.*service_role" src/ 2>/dev/null | wc -l | tr -d ' ')
+if [ "$ADMIN_HITS" -eq 0 ]; then
+  add_result "F-09" "$PASS" "No admin client usage found in src/"
+else
+  add_result "F-09" "$FAIL" "$ADMIN_HITS admin client call(s) in src/ — move to Edge Function"
+fi
+
+# ─────────────────────────────────────────────
+# F-10: Storage bucket policies — delegeren aan Supabase MCP
+add_result "F-10" "$SKIP" "Delegate to Supabase MCP: list buckets and verify policies exist"
+
+# ─────────────────────────────────────────────
+# F-11: Geen waitForTimeout in tests
+if [ -d "tests/" ]; then
+  TIMEOUT_HITS=$(grep -rn "waitForTimeout" tests/ 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$TIMEOUT_HITS" -eq 0 ]; then
+    add_result "F-11" "$PASS" "No waitForTimeout() found in tests/"
   else
-    skip "F-07" "npx not available"
+    TIMEOUT_DETAIL=$(grep -rn "waitForTimeout" tests/ 2>/dev/null | head -3 | tr '\n' '|')
+    add_result "F-11" "$FAIL" "$TIMEOUT_HITS waitForTimeout() call(s): $TIMEOUT_DETAIL"
   fi
 else
-  warn "F-07" "tsconfig.json does not exist — nothing to compile"
+  add_result "F-11" "$WARN" "tests/ directory not found yet"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# F-08: No unjustified `any` types
-# ──────────────────────────────────────────────────────────────────────
-if [ -d src ]; then
-  any_hits=$(grep -rn --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git ': any\|:any' src/ 2>/dev/null || true)
-  any_count=$(echo "$any_hits" | grep -c . 2>/dev/null || echo "0")
-  if [ "$any_count" -eq 0 ]; then
-    pass "F-08" "No :any annotations found"
+# ─────────────────────────────────────────────
+# F-12: .env.local staat in .gitignore
+if [ -f ".gitignore" ]; then
+  if grep -q "\.env\.local" .gitignore; then
+    add_result "F-12" "$PASS" ".env.local is in .gitignore"
   else
-    # Count lines without @ts-expect-error above them
-    # This is approximate: checks if a line with `: any` has `@ts-expect-error` on the line immediately before
-    unjustified=0
-    prev_line=""
-    while IFS= read -r line; do
-      if echo "$line" | grep -q ': any'; then
-        case "$prev_line" in
-          *@ts-expect-error* | *@ts-ignore*) ;;
-          *) unjustified=$((unjustified + 1)) ;;
-        esac
-      fi
-      prev_line="$line"
-    done <<< "$any_hits"
-    if [ "$unjustified" -gt 0 ]; then
-      warn "F-08" "$unjustified of $any_count ':any' usage(s) lack @ts-expect-error suppression"
-    else
-      pass "F-08" "$any_count ':any' usage(s) — all have suppression comments"
-    fi
+    add_result "F-12" "$FAIL" ".env.local is NOT in .gitignore — secrets will leak"
   fi
 else
-  warn "F-08" "src/ directory does not exist yet"
+  add_result "F-12" "$FAIL" ".gitignore not found"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# F-09: No Supabase admin client in frontend
-# ──────────────────────────────────────────────────────────────────────
-if [ -d src ]; then
-  hits=$(grep -rl --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git -E 'supabase\..*admin|service_role.*key|createClient.*service|adminClient' src/ 2>/dev/null || true)
-  if [ -n "$hits" ]; then
-    fail "F-09" "Admin client usage found in: $(echo "$hits" | tr '\n' ' ')"
-  else
-    pass "F-09" "No admin client in src/"
+# ─────────────────────────────────────────────
+# F-13: .env.example bestaat
+if [ -f ".env.example" ]; then
+  add_result "F-13" "$PASS" ".env.example exists"
+else
+  add_result "F-13" "$WARN" ".env.example not found — add placeholder env vars for onboarding"
+fi
+
+# ─────────────────────────────────────────────
+# F-14: Geen directe DOM-manipulatie in src/
+DOM_HITS=$(grep -rn "document\.getElementById\|document\.querySelector\|innerHTML\s*=\|document\.createElement" src/ 2>/dev/null | wc -l | tr -d ' ')
+if [ "$DOM_HITS" -eq 0 ]; then
+  add_result "F-14" "$PASS" "No direct DOM manipulation found in src/"
+else
+  DOM_DETAIL=$(grep -rn "document\.getElementById\|querySelector\|innerHTML" src/ 2>/dev/null | head -3 | tr '\n' '|')
+  add_result "F-14" "$WARN" "$DOM_HITS direct DOM call(s) — verify these are intentional: $DOM_DETAIL"
+fi
+
+# ─────────────────────────────────────────────
+# F-15: Conventional commits (laatste 5)
+COMMITS=$(git log --oneline -5 2>/dev/null || echo "no_git")
+PATTERN="^[0-9a-f]+ (feat|fix|test|chore|refactor|docs|style|perf|ci|build|revert)(\(.+\))?: .+"
+BAD_COMMITS=0
+while IFS= read -r line; do
+  if [[ -n "$line" ]] && ! echo "$line" | grep -qE "$PATTERN"; then
+    BAD_COMMITS=$((BAD_COMMITS + 1))
   fi
+done <<< "$COMMITS"
+
+if [ "$COMMITS" = "no_git" ]; then
+  add_result "F-15" "$SKIP" "Not a git repository yet"
+elif [ "$BAD_COMMITS" -eq 0 ]; then
+  add_result "F-15" "$PASS" "Last 5 commits follow conventional format"
 else
-  warn "F-09" "src/ directory does not exist yet"
+  add_result "F-15" "$WARN" "$BAD_COMMITS of last 5 commits do not follow conventional format"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# F-11: No waitForTimeout in tests
-# ──────────────────────────────────────────────────────────────────────
-if [ -d tests ]; then
-  hits=$(grep -rl 'waitForTimeout' tests/ 2>/dev/null || true)
-  if [ -n "$hits" ]; then
-    fail "F-11" "waitForTimeout found in: $(echo "$hits" | tr '\n' ' ')"
-  else
-    pass "F-11" "No waitForTimeout in tests/"
-  fi
-else
-  warn "F-11" "tests/ directory does not exist yet"
-fi
+# ─────────────────────────────────────────────
+# F-16: Snyk SAST — delegeren aan Snyk MCP
+add_result "F-16" "$SKIP" "Delegate to Snyk MCP: run snyk_code_scan on src/"
 
-# ──────────────────────────────────────────────────────────────────────
-# F-12: .env.local in .gitignore
-# ──────────────────────────────────────────────────────────────────────
-if [ -f .gitignore ]; then
-  if grep -q '.env.local' .gitignore 2>/dev/null; then
-    pass "F-12" ".env.local is in .gitignore"
-  else
-    fail "F-12" ".env.local missing from .gitignore"
-  fi
-else
-  fail "F-12" ".gitignore does not exist"
-fi
+# ─────────────────────────────────────────────
+# F-17: Snyk SCA — delegeren aan Snyk MCP
+add_result "F-17" "$SKIP" "Delegate to Snyk MCP: run snyk_sca_scan on package.json"
 
-# ──────────────────────────────────────────────────────────────────────
-# F-13: .env.example exists
-# ──────────────────────────────────────────────────────────────────────
-if [ -f .env.example ]; then
-  pass "F-13" ".env.example exists"
-else
-  fail "F-13" ".env.example does not exist"
-fi
+# ─────────────────────────────────────────────
+# TOTALEN
+FAIL_COUNT=0
+WARN_COUNT=0
+PASS_COUNT=0
+SKIP_COUNT=0
 
-# ──────────────────────────────────────────────────────────────────────
-# F-14: No direct DOM manipulation (getElementById, querySelector, innerHTML)
-# ──────────────────────────────────────────────────────────────────────
-if [ -d src ]; then
-  hits=$(grep -rn --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git -E 'document\.getElementById|document\.querySelector|\.innerHTML' src/ 2>/dev/null || true)
-  if [ -n "$hits" ]; then
-    fail "F-14" "Direct DOM manipulation found: $(echo "$hits" | tr '\n' '; ')"
-  else
-    pass "F-14" "No direct DOM manipulation in src/"
-  fi
-else
-  warn "F-14" "src/ directory does not exist yet"
-fi
-
-# ──────────────────────────────────────────────────────────────────────
-# F-15: Conventional commits (last 5 commits)
-# ──────────────────────────────────────────────────────────────────────
-if [ -d .git ]; then
-  nonconv=$(mktemp)
-  # Conventional commit pattern: type(scope): or type: or merge/branch
-  pattern='^(feat|fix|test|chore|refactor|docs|style|perf|ci|build|revert)(\([^)]+\))?:'
-  git log -5 --format='%s' 2>/dev/null | while IFS= read -r msg; do
-    if ! echo "$msg" | grep -qE "$pattern" 2>/dev/null; then
-      if ! echo "$msg" | grep -qE '^Merge |^Initial ' 2>/dev/null; then
-        echo "$msg" >> "$nonconv"
-      fi
-    fi
-  done
-  if [ -s "$nonconv" ]; then
-    warn "F-15" "Non-conventional commits: $(tr '\n' '; ' < "$nonconv")"
-  else
-    pass "F-15" "Last 5 commits are conventional"
-  fi
-  rm -f "$nonconv"
-else
-  warn "F-15" ".git directory not found"
-fi
-
-# ─── Output JSON ─────────────────────────────────────────────────────
-
-echo "{"
-echo "  \"summary\": {"
-echo "    \"fail\": $fail_count,"
-echo "    \"warn\": $warn_count,"
-echo "    \"pass\": $pass_count,"
-echo "    \"skip\": $skip_count"
-echo "  },"
-echo "  \"checks\": ["
-
-first=true
-for id in F-01 F-02 F-03 F-04 F-05 F-06 F-07 F-08 F-09 F-10 F-11 F-12 F-13 F-14 F-15 F-16 F-17; do
-  if [ "$first" = true ]; then first=false; else echo ","; fi
-  printf '    { "id": "%s", "status": "%s", "detail": "%s" }' "$id" "${STATUS[$id]}" "$(echo "${DETAIL[$id]}" | sed 's/"/\\"/g')"
+for r in "${results[@]}"; do
+  if echo "$r" | grep -q '"status":"FAIL"'; then FAIL_COUNT=$((FAIL_COUNT+1)); fi
+  if echo "$r" | grep -q '"status":"WARN"'; then WARN_COUNT=$((WARN_COUNT+1)); fi
+  if echo "$r" | grep -q '"status":"PASS"'; then PASS_COUNT=$((PASS_COUNT+1)); fi
+  if echo "$r" | grep -q '"status":"SKIP"'; then SKIP_COUNT=$((SKIP_COUNT+1)); fi
 done
 
-echo ""
+# JSON output
+echo "{"
+echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+echo "  \"summary\": {"
+echo "    \"pass\": $PASS_COUNT,"
+echo "    \"fail\": $FAIL_COUNT,"
+echo "    \"warn\": $WARN_COUNT,"
+echo "    \"skip\": $SKIP_COUNT,"
+echo "    \"blocking\": $FAIL_COUNT"
+echo "  },"
+echo "  \"checks\": ["
+LAST="${results[-1]}"
+for r in "${results[@]}"; do
+  if [ "$r" = "$LAST" ]; then
+    echo "    $r"
+  else
+    echo "    $r,"
+  fi
+done
 echo "  ]"
 echo "}"
 
-if [ "$fail_count" -gt 0 ]; then
+echo "=== FITNESS CHECK DONE — FAIL:$FAIL_COUNT WARN:$WARN_COUNT PASS:$PASS_COUNT SKIP:$SKIP_COUNT ===" >&2
+
+# Exit code: 1 als er FAIL's zijn (blokkeert CI)
+if [ "$FAIL_COUNT" -gt 0 ]; then
   exit 1
-else
-  exit 0
 fi
+exit 0

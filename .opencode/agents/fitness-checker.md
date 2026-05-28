@@ -23,7 +23,7 @@ This produces machine-readable JSON with all 17 checks. Read it exactly as retur
 F-01, F-10, F-16, F-17 will appear as `SKIP` — they require live MCP connections.
 
 ### Step 2 — Run Supabase MCP checks for SKIP items
-The script marks F-01, F-10, F-16, F-17 as `SKIP` because they require live connections.
+F-01 and F-10 require live database access.
 For these, you query the Supabase MCP directly:
 
 **F-01 (RLS):**
