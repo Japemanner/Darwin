@@ -1,0 +1,46 @@
+{
+  "mcp": {
+    "context7": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "ctx7sk-4cedea74-5bff-4687-98e8-4464c492822b"
+      ],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "enabled": true
+    },
+    "github": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "enabled": true
+    },
+    "snyk": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@anthropic/fast-agent-mcp"
+      ],
+      "enabled": false,
+      "_comment": "Enable when SNYK_API_KEY is available. Replace command with actual Snyk MCP server config."
+    }
+  }
+}

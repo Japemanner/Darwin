@@ -28,6 +28,23 @@ This file is the single source of truth for every agent. Read it completely befo
 
 ## MCP Tooling Rules
 
+### Context7 MCP (Anti-Hallucination — 🔴 Priority 1)
+- Always use Context7 MCP when generating code that uses any library or framework.
+- Never write Supabase, React, Tailwind, Vite, or TypeScript code without fetching current docs via Context7 first.
+- Use library ID `/supabase/supabase` for all Supabase API calls.
+- Use library ID `/tailwindlabs/tailwindcss` for Tailwind classes.
+- Use library ID `/facebook/react` for React hooks and patterns.
+- Start with `resolve-library-id`, then `query-docs` with the full question — never single words.
+
+### GitHub MCP
+- Read and search actual repository files — never rely on memory or cached code.
+- Open issues, create PRs, and comment on code all from the same chat session.
+- Verify file contents by reading directly from GitHub, not from local assumptions.
+
+### Sequential Thinking MCP
+- Use for: architecture decisions, complex bug investigations, and any fitness check that yields a ❌.
+- Break problems into ranked steps; surface assumptions before acting on them.
+
 ### Supabase MCP
 - ALL database schema changes go through the Supabase MCP — never raw SQL in migrations unless MCP is unavailable.
 - Use the MCP to: create tables, add RLS policies, create storage buckets, deploy edge functions, manage secrets.
@@ -37,6 +54,25 @@ This file is the single source of truth for every agent. Read it completely befo
 - ALL tests are written through the Playwright MCP.
 - Never write Playwright tests by hand — invoke the Playwright MCP agent.
 - After every new test run, invoke `@playwright-tester` to execute the regression suite.
+
+---
+
+## Security & Pre-Commit
+
+### Snyk MCP (🔴 Mandatory for security)
+- Run `snyk_code_scan` on `src/` after every feature (SAST — OWASP Top 10 in React/TypeScript).
+- Run `snyk_sca_scan` on `package.json` after adding dependencies (SCA — CVE scanning).
+- Run `snyk_iac_scan` on `netlify.toml` and Supabase config after infrastructure changes.
+- Configured in `opencode.json` — enable when `SNYK_API_KEY` is available.
+
+### Gitleaks Pre-Commit Hook (🔴 Mandatory)
+- A `.git/hooks/pre-commit` hook runs `npx gitleaks detect --source . --no-git` before every commit.
+- If secrets are detected, the commit is blocked. Never bypass this hook.
+- Fix: rotate the exposed secret immediately, then commit again.
+
+### SonarQube MCP (🟡 Optional)
+- Code quality gates: bugs, code smells, duplication, test coverage, maintainability.
+- Configured separately — enable for additional quality layer beyond Snyk.
 
 ---
 
@@ -198,3 +234,16 @@ A feature is **Done** when:
 - [ ] Regression suite passes
 - [ ] Fitness check passes
 - [ ] Committed with a conventional commit message
+
+<!-- context7 -->
+Use Context7 MCP to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service -- even well-known ones like React, Next.js, Prisma, Express, Tailwind, Django, or Spring Boot. This includes API syntax, configuration, version migration, library-specific debugging, setup instructions, and CLI tool usage. Use even when you think you know the answer -- your training data may not reflect recent changes. Prefer this over web search for library docs.
+
+Do not use for: refactoring, writing scripts from scratch, debugging business logic, code review, or general programming concepts.
+
+## Steps
+
+1. Always start with `resolve-library-id` using the library name and the user's question, unless the user provides an exact library ID in `/org/project` format
+2. Pick the best match (ID format: `/org/project`) by: exact name match, description relevance, code snippet count, source reputation (High/Medium preferred), and benchmark score (higher is better). If results don't look right, try alternate names or queries (e.g., "next.js" not "nextjs", or rephrase the question). Use version-specific IDs when the user mentions a version
+3. `query-docs` with the selected library ID and the user's full question (not single words)
+4. Answer using the fetched docs
+<!-- context7 -->
