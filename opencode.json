@@ -37,10 +37,12 @@
       "command": [
         "npx",
         "-y",
-        "@anthropic/fast-agent-mcp"
+        "@snyk/snyk-mcp-server"
       ],
-      "enabled": false,
-      "_comment": "Enable when SNYK_API_KEY is available. Replace command with actual Snyk MCP server config."
+      "env": {
+        "SNYK_API_KEY": "${SNYK_API_KEY}"
+      },
+      "enabled": true
     }
   }
 }
