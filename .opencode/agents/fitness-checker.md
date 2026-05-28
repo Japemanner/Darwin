@@ -4,6 +4,11 @@
 
 You run `scripts/fitness-check.sh` and interpret its JSON output. You never reason about whether checks pass or fail — you only read and report what the script actually found. The script does the work; you translate the result into `FITNESS.md`.
 
+**Check breakdown:**
+- **Script checks (grep/file):** F-02 through F-09, F-11 through F-15 — these run in the pre-commit hook and here. The script returns PASS/FAIL/WARN for each.
+- **MCP-only checks (live DB):** F-01 (RLS) and F-10 (Storage bucket policies) — the script marks these as SKIP. You fill them in via Supabase MCP.
+- **MCP-only checks (security scan):** F-16 (Snyk SAST) and F-17 (Snyk SCA) — the script marks these as SKIP. You fill them in via Snyk MCP.
+
 **Critical:** Never evaluate a fitness check from memory or from code you have previously read. Always execute the script and read its output. A check that you *think* should pass is not a passed check.
 
 ---
@@ -12,12 +17,13 @@ You run `scripts/fitness-check.sh` and interpret its JSON output. You never reas
 
 ### Step 1 — Run the deterministic script
 ```bash
-bash scripts/fitness-check.sh 2>/dev/null
+bash scripts/fitness-check.sh
 ```
-This produces machine-readable JSON. Read it exactly as returned.
+This produces machine-readable JSON with all 17 checks. Read it exactly as returned.
+F-01, F-10, F-16, F-17 will appear as `SKIP` — they require live MCP connections.
 
 ### Step 2 — Run Supabase MCP checks for SKIP items
-The script marks F-01 and F-10 as `SKIP` because they require live database access.
+The script marks F-01, F-10, F-16, F-17 as `SKIP` because they require live connections.
 For these, you query the Supabase MCP directly:
 
 **F-01 (RLS):**

@@ -26,7 +26,18 @@ This file is the single source of truth for every agent. Read it completely befo
 
 ---
 
-## MCP Tooling Rules
+## Agent Tooling Rules
+
+### 🖊️ Always-On (active while you type)
+These run continuously — no manual trigger needed. Always on.
+
+| Tool                   | Why always on                                                                 |
+|------------------------|------------------------------------------------------------------------------|
+| **Context7 MCP**       | Fetches live docs for every library call. Without this, you're coding from outdated training data. |
+| **Supabase MCP**       | Every table, policy, bucket, or edge function goes through the real DB — never guessed from memory. |
+| **Sequential Thinking MCP** | Used before any architecture choice or complex decision. Prevents picking solutions without considering alternatives. |
+| **TypeScript (IDE)**   | Real-time type feedback — catches hallucinated properties immediately.       |
+| **ESLint (IDE)**       | Catches unsafe patterns inline, not at commit time.                          |
 
 ### Context7 MCP (Anti-Hallucination — 🔴 Priority 1)
 - Always use Context7 MCP when generating code that uses any library or framework.
@@ -41,10 +52,6 @@ This file is the single source of truth for every agent. Read it completely befo
 - Open issues, create PRs, and comment on code all from the same chat session.
 - Verify file contents by reading directly from GitHub, not from local assumptions.
 
-### Sequential Thinking MCP
-- Use for: architecture decisions, complex bug investigations, and any fitness check that yields a ❌.
-- Break problems into ranked steps; surface assumptions before acting on them.
-
 ### Supabase MCP
 - ALL database schema changes go through the Supabase MCP — never raw SQL in migrations unless MCP is unavailable.
 - Use the MCP to: create tables, add RLS policies, create storage buckets, deploy edge functions, manage secrets.
@@ -54,25 +61,6 @@ This file is the single source of truth for every agent. Read it completely befo
 - ALL tests are written through the Playwright MCP.
 - Never write Playwright tests by hand — invoke the Playwright MCP agent.
 - After every new test run, invoke `@playwright-tester` to execute the regression suite.
-
----
-
-## Security & Pre-Commit
-
-### Snyk MCP (🔴 Mandatory for security)
-- Run `snyk_code_scan` on `src/` after every feature (SAST — OWASP Top 10 in React/TypeScript).
-- Run `snyk_sca_scan` on `package.json` after adding dependencies (SCA — CVE scanning).
-- Run `snyk_iac_scan` on `netlify.toml` and Supabase config after infrastructure changes.
-- Configured in `opencode.json` — enable when `SNYK_API_KEY` is available.
-
-### Gitleaks Pre-Commit Hook (🔴 Mandatory)
-- A `.git/hooks/pre-commit` hook runs `npx gitleaks detect --source . --no-git` before every commit.
-- If secrets are detected, the commit is blocked. Never bypass this hook.
-- Fix: rotate the exposed secret immediately, then commit again.
-
-### SonarQube MCP (🟡 Optional)
-- Code quality gates: bugs, code smells, duplication, test coverage, maintainability.
-- Configured separately — enable for additional quality layer beyond Snyk.
 
 ---
 
@@ -88,20 +76,51 @@ This file is the single source of truth for every agent. Read it completely befo
 
 ---
 
-## Mandatory Workflow — After Every Feature
+## 🔒 Pre-Commit Hook (automatic on `git commit`)
 
-After completing any feature (however small), you MUST execute this checklist **in order**:
+The `.git/hooks/pre-commit` hook runs these checks on every commit. Must complete in ~10 seconds.
 
+| Check                    | What it does                                              | Blocks commit? |
+|--------------------------|-----------------------------------------------------------|----------------|
+| `tsc --noEmit`           | TypeScript compiles without errors                        | ✅ Yes         |
+| `bash scripts/fitness-check.sh` | Runs all grep/file checks (F-02, F-03, F-04, F-05, F-06, F-08, F-09, F-11, F-12, F-13, F-14, F-15) | ✅ Yes on FAIL |
+| Gitleaks                 | Secret scanning — no keys in the commit                   | ✅ Yes         |
+| ESLint                   | `npx eslint src/ --max-warnings 0`                        | ✅ Yes         |
+
+**Not in pre-commit hook (too slow / needs live connection):**
+- F-01 (RLS) and F-10 (Storage bucket policies) — run via `@fitness-checker` after each feature using Supabase MCP.
+- F-16 (Snyk SAST) and F-17 (Snyk SCA) — run via `@fitness-checker` after each feature using Snyk MCP.
+
+Pre-commit hook script:
+```bash
+#!/usr/bin/env sh
+npx tsc --noEmit
+bash scripts/fitness-check.sh
+npx gitleaks detect --source . --no-git
+npx eslint src/ --max-warnings 0
 ```
-[ ] 1. Code compiles without TypeScript errors (`tsc --noEmit`)
-[ ] 2. Invoke @feature-tracker → update FEATURES.md with the new feature
-[ ] 3. Invoke @playwright-tester → write test(s) for the new feature
-[ ] 4. Invoke @playwright-tester → run full regression suite
-[ ] 5. Run `bash scripts/fitness-check.sh` → then invoke @fitness-checker to read its JSON output and run Supabase MCP + Snyk checks on top
-[ ] 6. All checks green? Commit with conventional commit message.
-```
 
-**Do not proceed to the next feature until all five steps pass.**
+### Gitleaks (🔴 Mandatory)
+- Detects secrets in the working tree before every commit.
+- If secrets are found, the commit is blocked. Never bypass this hook.
+- Fix: rotate the exposed secret immediately, then commit again.
+
+---
+
+## 🚀 After Every Feature (not every commit)
+
+Heavier checks — runs deliberately after a completed feature, not on every small commit.
+
+| Step | Tool                        | What it does                                |
+|------|-----------------------------|---------------------------------------------|
+| 1    | `tsc --noEmit`              | TypeScript compiles without errors          |
+| 2    | `@feature-tracker`          | Update FEATURES.md with the new feature     |
+| 3    | Playwright MCP (write)      | Write new test(s) for this feature          |
+| 4    | Playwright MCP (regression) | Run the full test suite                     |
+| 5    | `@fitness-checker`          | Run `scripts/fitness-check.sh`, then Supabase MCP (F-01 RLS + F-10 buckets), then Snyk MCP (F-16 SAST + F-17 SCA). Write FITNESS.md. |
+| 6    | All checks green → commit with conventional message |                                              |
+
+**Do not proceed to the next feature until all steps pass.**
 
 ---
 
@@ -113,6 +132,33 @@ After completing any feature (however small), you MUST execute this checklist **
 [ ] 3. Invoke @playwright-tester → run full regression suite
 [ ] 4. All tests green? Commit.
 ```
+
+---
+
+## ☁️ CI/CD (on push to main/develop)
+
+Runs in Netlify or GitHub Actions — not locally.
+
+| Tool                   | Why in CI and not locally                                      |
+|------------------------|----------------------------------------------------------------|
+| Playwright full suite  | Runs against the Netlify preview deploy, not localhost         |
+| Snyk full scan         | Full scan including IaC check on `netlify.toml` + Supabase config |
+| SonarQube              | Code quality gate over the entire codebase — too heavy for local |
+
+---
+
+## Security Tools Summary
+
+### Snyk MCP (🔴 Mandatory for security)
+- Run `snyk_code_scan` on `src/` after every feature (SAST — OWASP Top 10 in React/TypeScript).
+- Run `snyk_sca_scan` on `package.json` after adding dependencies (SCA — CVE scanning).
+- Run `snyk_iac_scan` on `netlify.toml` and Supabase config after infrastructure changes.
+- Configured in `opencode.json` with `SNYK_API_KEY` from `.env.local`.
+
+### SonarQube MCP (🟡 Optional)
+- Code quality gates: bugs, code smells, duplication, test coverage, maintainability.
+- Configured separately — enable for additional quality layer beyond Snyk.
+- Runs in CI only — too heavy for local.
 
 ---
 
