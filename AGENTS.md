@@ -271,3 +271,8 @@ A feature is **Done** when:
 - [ ] Regression suite passes
 - [ ] Fitness check passes
 - [ ] Committed with a conventional commit message
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
