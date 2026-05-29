@@ -146,13 +146,11 @@ function KBMappingModal({
     const payload = { organization_id: organizationId, name, description: description || null, created_by: userId }
     try {
       if (kb) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any).from('knowledge_bases').update(payload).eq('id', kb.id)
+        const { error } = await (supabase as any).from('knowledge_bases').update(payload).eq('id', kb.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         if (error) throw error
         toast({ title: 'Kennisbron bijgewerkt' })
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any).from('knowledge_bases').insert(payload)
+        const { error } = await (supabase as any).from('knowledge_bases').insert(payload) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         if (error) throw error
         toast({ title: 'Kennisbron aangemaakt' })
       }
@@ -216,8 +214,7 @@ function KBSlideOver({
         .order('created_at', { ascending: false })
       if (docs) setDocuments(docs)
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: links } = await (supabase as any)
+      const { data: links } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         .from('assistant_knowledge_bases')
         .select('assistant_id')
         .eq('knowledge_base_id', kbId)

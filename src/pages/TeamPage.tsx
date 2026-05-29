@@ -44,8 +44,7 @@ function TeamPage() {
 
   const handleRevokeInvite = async (invitation: Invitation) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from('invitations').update({ status: 'revoked' }).eq('id', invitation.id)
+      const { error } = await (supabase as any).from('invitations').update({ status: 'revoked' }).eq('id', invitation.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
       if (error) throw error
       toast({ title: 'Uitnodiging ingetrokken' })
       loadTeam()

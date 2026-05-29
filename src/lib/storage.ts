@@ -15,8 +15,7 @@ export const uploadDocument = async (
 
   if (uploadError) throw uploadError
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: document, error: insertError } = await (supabase as any)
+  const { data: document, error: insertError } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
     .from('knowledge_base_documents')
     .insert({
       knowledge_base_id: knowledgeBaseId,

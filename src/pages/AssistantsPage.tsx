@@ -197,13 +197,11 @@ function AssistantModal({
 
     try {
       if (assistant) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any).from('ai_assistants').update(payload).eq('id', assistant.id)
+        const { error } = await (supabase as any).from('ai_assistants').update(payload).eq('id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         if (error) throw error
         toast({ title: 'Assistent bijgewerkt', description: `${name} is succesvol bijgewerkt` })
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any).from('ai_assistants').insert(payload)
+        const { error } = await (supabase as any).from('ai_assistants').insert(payload) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         if (error) throw error
         toast({ title: 'Assistent aangemaakt', description: `${name} is klaar voor gebruik` })
       }
@@ -301,8 +299,7 @@ function ChatWindow({
           .order('created_at', { ascending: true })
         if (msgs) setMessages(msgs)
       } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: created } = await (supabase as any)
+      const { data: created } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
           .from('conversations')
           .insert({
             user_id: userId,
@@ -338,8 +335,7 @@ function ChatWindow({
     setInput('')
     setIsSending(true)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: msgError } = await (supabase as any).from('messages').insert({
+    const { error: msgError } = await (supabase as any).from('messages').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
       conversation_id: conversation.id,
       role: 'user',
       content: userMessage.content,
@@ -375,8 +371,7 @@ function ChatWindow({
 
       setMessages((prev) => [...prev, assistantMessage])
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('messages').insert({
+      await (supabase as any).from('messages').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         conversation_id: conversation.id,
         role: 'assistant',
         content: responseText,

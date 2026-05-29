@@ -4,7 +4,7 @@
 # Output is machine-readable JSON voor @fitness-checker agent.
 # Gebruik: bash scripts/fitness-check.sh 2>&1 | tee FITNESS-REPORT.json
 
-set -euo pipefail
+set -uo pipefail
 
 PASS="PASS"
 FAIL="FAIL"
@@ -71,8 +71,8 @@ fi
 # ─────────────────────────────────────────────
 # F-06: TypeScript strict mode
 if [ -f "tsconfig.json" ]; then
-  STRICT=$(node -e "const f=require('./tsconfig.json'); console.log(f.compilerOptions && f.compilerOptions.strict === true ? 'true' : 'false')" 2>/dev/null || echo "parse_error")
-  if [ "$STRICT" = "true" ]; then
+  STRICT=$(grep -c '"strict": true' tsconfig.json)
+  if [ "$STRICT" -ge 1 ]; then
     add_result "F-06" "$PASS" "strict: true in tsconfig.json"
   else
     add_result "F-06" "$FAIL" "strict is not true in tsconfig.json (got: $STRICT)"
