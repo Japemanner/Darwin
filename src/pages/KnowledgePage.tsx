@@ -234,6 +234,15 @@ function KBSlideOver({
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !kb) return
+
+    const ALLOWED_EXTENSIONS = ['pdf', 'txt', 'docx']
+    const fileExt = file.name.split('.').pop()?.toLowerCase()
+    if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
+      toast({ title: 'Ongeldig bestandstype', description: `Toegestane typen: ${ALLOWED_EXTENSIONS.join(', ').toUpperCase()}`, variant: 'destructive' })
+      e.target.value = ''
+      return
+    }
+
     setIsUploading(true)
     try {
       await uploadDocument(file, kb.id, userId, organizationId)
@@ -244,15 +253,6 @@ function KBSlideOver({
         .eq('knowledge_base_id', kb.id)
         .order('created_at', { ascending: false })
       if (docs) setDocuments(docs)
-
-      const docWebhook = import.meta.env.VITE_N8N_DOCUMENT_WEBHOOK
-      if (docWebhook) {
-        fetch(docWebhook, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ knowledge_base_id: kb.id, document_name: file.name, organization_id: organizationId }),
-        }).catch(() => {})
-      }
     } catch (err) {
       toast({ title: 'Upload mislukt', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
     } finally {
