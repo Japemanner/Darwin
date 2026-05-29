@@ -44,6 +44,19 @@
         "SNYK_API_KEY": "${SNYK_API_KEY}"
       },
       "enabled": true
+    },
+    "supabase": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@supabase/mcp-server-supabase"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
+        "SUPABASE_PROJECT_REF": "ddfjigrjwlfpaljhhogv"
+      },
+      "enabled": true
     }
   }
 }
