@@ -13,8 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { KnowledgeBase, KnowledgeBaseDocument, AIAssistant } from '@/types/database.types'
-import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X } from 'lucide-react'
+import type { KnowledgeBase, KnowledgeBaseDocument, KnowledgeItem, AIAssistant } from '@/types/database.types'
+import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X, FilePlus } from 'lucide-react'
 
 function KnowledgePage() {
   const { profile } = useAuth()
@@ -133,17 +133,25 @@ function KBMappingModal({
   const { toast } = useToast()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [vectorCollectionId, setVectorCollectionId] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    if (kb) { setName(kb.name); setDescription(kb.description ?? '') }
-    else { setName(''); setDescription('') }
+    if (kb) {
+      setName(kb.name)
+      setDescription(kb.description ?? '')
+      setVectorCollectionId(kb.vector_collection_id ?? '')
+    } else {
+      setName('')
+      setDescription('')
+      setVectorCollectionId('')
+    }
   }, [kb, open])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
-    const payload = { organization_id: organizationId, name, description: description || null, created_by: userId }
+    const payload = { organization_id: organizationId, name, description: description || null, vector_collection_id: vectorCollectionId || null, created_by: userId }
     try {
       if (kb) {
         const { error } = await (supabase as any).from('knowledge_bases').update(payload).eq('id', kb.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
@@ -176,6 +184,11 @@ function KBMappingModal({
             <Label htmlFor="kb-desc">Beschrijving</Label>
             <Textarea id="kb-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optionele omschrijving" rows={3} />
           </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="kb-vector">Vector Collection ID</Label>
+            <Input id="kb-vector" value={vectorCollectionId} onChange={(e) => setVectorCollectionId(e.target.value)} placeholder="my-collection-name" />
+            <p className="text-xs text-muted-foreground">Verwijzing naar de collectie in de vector database (Pinecone namespace, Qdrant collection, etc.)</p>
+          </div>
         </DialogContent>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
@@ -198,10 +211,13 @@ function KBSlideOver({
   organizationId: string
 }) {
   const { toast } = useToast()
-  const [tab, setTab] = useState<'documents' | 'assistants'>('documents')
+  const [tab, setTab] = useState<'documents' | 'items' | 'assistants'>('documents')
   const [documents, setDocuments] = useState<KnowledgeBaseDocument[]>([])
+  const [items, setItems] = useState<KnowledgeItem[]>([])
   const [linkedAssistants, setLinkedAssistants] = useState<AIAssistant[]>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [itemForm, setItemForm] = useState({ title: '', content: '', sourceUrl: '' })
+  const [isSavingItem, setIsSavingItem] = useState(false)
 
   useEffect(() => {
     if (!kb) return
@@ -213,6 +229,13 @@ function KBSlideOver({
         .eq('knowledge_base_id', kbId)
         .order('created_at', { ascending: false })
       if (docs) setDocuments(docs)
+
+      const { data: kItems } = await supabase
+        .from('knowledge_items')
+        .select('*')
+        .eq('knowledge_base_id', kbId)
+        .order('created_at', { ascending: false })
+      if (kItems) setItems(kItems)
 
       const { data: links } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         .from('assistant_knowledge_bases')
@@ -234,6 +257,15 @@ function KBSlideOver({
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !kb) return
+
+    const ALLOWED_EXTENSIONS = ['pdf', 'txt', 'docx']
+    const fileExt = file.name.split('.').pop()?.toLowerCase()
+    if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
+      toast({ title: 'Ongeldig bestandstype', description: `Toegestane typen: ${ALLOWED_EXTENSIONS.join(', ').toUpperCase()}`, variant: 'destructive' })
+      e.target.value = ''
+      return
+    }
+
     setIsUploading(true)
     try {
       await uploadDocument(file, kb.id, userId, organizationId)
@@ -244,15 +276,6 @@ function KBSlideOver({
         .eq('knowledge_base_id', kb.id)
         .order('created_at', { ascending: false })
       if (docs) setDocuments(docs)
-
-      const docWebhook = import.meta.env.VITE_N8N_DOCUMENT_WEBHOOK
-      if (docWebhook) {
-        fetch(docWebhook, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ knowledge_base_id: kb.id, document_name: file.name, organization_id: organizationId }),
-        }).catch(() => {})
-      }
     } catch (err) {
       toast({ title: 'Upload mislukt', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
     } finally {
@@ -266,6 +289,49 @@ function KBSlideOver({
       await deleteDocument(doc.id, doc.file_path)
       toast({ title: 'Document verwijderd' })
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id))
+    } catch (err) {
+      toast({ title: 'Fout bij verwijderen', variant: 'destructive' })
+    }
+  }
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!kb || !itemForm.title.trim() || !itemForm.content.trim() || isSavingItem) return
+    setIsSavingItem(true)
+    try {
+      const { error } = await (supabase as any).from('knowledge_items').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+        knowledge_base_id: kb.id,
+        title: itemForm.title.trim(),
+        content: itemForm.content.trim(),
+        source_url: itemForm.sourceUrl.trim() || null,
+        embedding_status: 'pending',
+        created_by: userId,
+      })
+      if (error) throw error
+      toast({ title: 'Kennisitem toegevoegd', description: itemForm.title.trim() })
+      setItemForm({ title: '', content: '', sourceUrl: '' })
+      const { data: kItems } = await supabase
+        .from('knowledge_items')
+        .select('*')
+        .eq('knowledge_base_id', kb.id)
+        .order('created_at', { ascending: false })
+      if (kItems) setItems(kItems)
+    } catch (err) {
+      toast({ title: 'Fout bij toevoegen', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
+    } finally {
+      setIsSavingItem(false)
+    }
+  }
+
+  const handleDeleteItem = async (item: KnowledgeItem) => {
+    try {
+      const { error } = await supabase
+        .from('knowledge_items')
+        .delete()
+        .eq('id', item.id)
+      if (error) throw error
+      toast({ title: 'Kennisitem verwijderd' })
+      setItems((prev) => prev.filter((i) => i.id !== item.id))
     } catch (err) {
       toast({ title: 'Fout bij verwijderen', variant: 'destructive' })
     }
@@ -290,10 +356,16 @@ function KBSlideOver({
             <FileText className="h-4 w-4 inline mr-1" /> Documenten
           </button>
           <button
+            onClick={() => setTab('items')}
+            className={cn("flex-1 py-2 text-sm font-medium border-b-2 transition-colors", tab === 'items' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground')}
+          >
+            <FilePlus className="h-4 w-4 inline mr-1" /> Kennisitems
+          </button>
+          <button
             onClick={() => setTab('assistants')}
             className={cn("flex-1 py-2 text-sm font-medium border-b-2 transition-colors", tab === 'assistants' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground')}
           >
-            <Link2 className="h-4 w-4 inline mr-1" /> Gekoppelde assistenten
+            <Link2 className="h-4 w-4 inline mr-1" /> Gekoppeld
           </button>
         </div>
 
@@ -328,6 +400,72 @@ function KBSlideOver({
                         {doc.status === 'ready' ? 'Klaar' : doc.status === 'processing' ? 'Verwerken' : 'Fout'}
                       </Badge>
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteDoc(doc)}>
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {tab === 'items' && (
+            <div className="space-y-4">
+              <form onSubmit={handleAddItem} className="space-y-3 p-3 border rounded-lg">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-title">Titel</Label>
+                  <Input
+                    id="item-title"
+                    value={itemForm.title}
+                    onChange={(e) => setItemForm((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="Titel van het kennisitem"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-content">Inhoud</Label>
+                  <Textarea
+                    id="item-content"
+                    value={itemForm.content}
+                    onChange={(e) => setItemForm((prev) => ({ ...prev, content: e.target.value }))}
+                    placeholder="De tekst die naar de vector database gestuurd wordt..."
+                    rows={5}
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-source">Bron URL (optioneel)</Label>
+                  <Input
+                    id="item-source"
+                    value={itemForm.sourceUrl}
+                    onChange={(e) => setItemForm((prev) => ({ ...prev, sourceUrl: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                </div>
+                <Button type="submit" size="sm" disabled={isSavingItem}>
+                  <Plus className="h-4 w-4 mr-1" /> {isSavingItem ? 'Toevoegen...' : 'Toevoegen'}
+                </Button>
+              </form>
+
+              {items.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">Nog geen kennisitems toegevoegd</p>
+              ) : (
+                items.map((item) => (
+                  <div key={item.id} className="flex items-start justify-between p-3 rounded-lg border">
+                    <div className="min-w-0 flex-1 mr-2">
+                      <p className="text-sm font-medium truncate">{item.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{item.content}</p>
+                      {item.source_url && (
+                        <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block mt-1">
+                          {item.source_url}
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={item.embedding_status === 'done' ? 'default' : item.embedding_status === 'failed' ? 'destructive' : 'secondary'}>
+                        {item.embedding_status === 'done' ? 'Klaar' : item.embedding_status === 'processing' ? 'Verwerken' : item.embedding_status === 'failed' ? 'Fout' : 'Wachtend'}
+                      </Badge>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item)}>
                         <Trash2 className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     </div>

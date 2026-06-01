@@ -1,11 +1,12 @@
 import { supabase } from './supabase'
+import type { KnowledgeBaseDocument } from '@/types/database.types'
 
 export const uploadDocument = async (
   file: File,
   knowledgeBaseId: string,
   userId: string,
   organizationId: string
-) => {
+): Promise<{ document: KnowledgeBaseDocument; signedUrl: string }> => {
   const fileExt = file.name.split('.').pop()
   const filePath = `${organizationId}/${knowledgeBaseId}/${crypto.randomUUID()}.${fileExt}`
 
@@ -31,7 +32,27 @@ export const uploadDocument = async (
 
   if (insertError) throw insertError
 
-  return document
+  const { data: signedUrlData } = await supabase.storage
+    .from('knowledge-documents')
+    .createSignedUrl(filePath, 900)
+
+  if (!signedUrlData?.signedUrl) throw new Error('Failed to generate signed URL')
+
+  const docWebhook = import.meta.env.VITE_N8N_DOCUMENT_WEBHOOK
+  if (docWebhook) {
+    fetch(docWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_id: organizationId,
+        document_name: file.name,
+        document_type: fileExt?.toLowerCase() || 'unknown',
+        download_url: signedUrlData.signedUrl,
+      }),
+    }).catch(() => {})
+  }
+
+  return { document, signedUrl: signedUrlData.signedUrl }
 }
 
 export const getDocumentPublicUrl = (filePath: string) => {
