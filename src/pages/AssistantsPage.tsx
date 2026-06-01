@@ -16,23 +16,10 @@ import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import type { AIAssistant, Conversation, Message, KnowledgeBase } from '@/types/database.types'
-import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp } from 'lucide-react'
-
-const EMOJI_OPTIONS = [
-  { value: '🤖', label: '🤖 Robot' },
-  { value: '🧠', label: '🧠 Brein' },
-  { value: '💬', label: '💬 Chat' },
-  { value: '📚', label: '📚 Boek' },
-  { value: '⚡', label: '⚡ Bliksem' },
-  { value: '🔍', label: '🔍 Zoeken' },
-  { value: '📊', label: '📊 Data' },
-  { value: '🛡️', label: '🛡️ Schild' },
-]
+import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 
 const ASSISTANT_TYPES = [
   { value: 'chat', label: '💬 Chat' },
-  { value: 'agent', label: '🤖 Agent' },
-  { value: 'voice', label: '🎤 Voice' },
 ]
 
 function AssistantsPage() {
@@ -166,12 +153,11 @@ function AssistantModal({
   const { toast } = useToast()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [systemPrompt, setSystemPrompt] = useState('')
-  const [icon, setIcon] = useState('🤖')
   const [type, setType] = useState('chat')
-  const [webhookUrl, setWebhookUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [availableKBs, setAvailableKBs] = useState<KnowledgeBase[]>([])
   const [selectedKBIds, setSelectedKBIds] = useState<Set<string>>(new Set())
 
@@ -193,10 +179,7 @@ function AssistantModal({
     if (assistant) {
       setName(assistant.name)
       setDescription(assistant.description ?? '')
-      setSystemPrompt(assistant.system_prompt)
-      setIcon(assistant.icon)
       setType(assistant.type ?? 'chat')
-      setWebhookUrl(assistant.n8n_webhook_url ?? '')
       setIsActive(assistant.is_active);
 
       void (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
@@ -209,10 +192,7 @@ function AssistantModal({
     } else {
       setName('')
       setDescription('')
-      setSystemPrompt('')
-      setIcon('🤖')
       setType('chat')
-      setWebhookUrl('')
       setIsActive(true)
       setSelectedKBIds(new Set())
     }
@@ -235,10 +215,10 @@ function AssistantModal({
       organization_id: organizationId,
       name,
       description: description || null,
-      system_prompt: systemPrompt,
-      icon,
+      system_prompt: assistant?.system_prompt ?? '',
+      icon: assistant?.icon ?? '🤖',
       type,
-      n8n_webhook_url: type === 'chat' ? null : webhookUrl || null,
+      n8n_webhook_url: null,
       is_active: isActive,
       created_by: userId,
     }
@@ -288,6 +268,30 @@ function AssistantModal({
     }
   }
 
+  const handleDelete = async () => {
+    if (!assistant) return
+    setIsDeleting(true)
+    try {
+      const { error: convError } = await (supabase as any).from('conversations').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      if (convError) throw convError
+
+      const { error: kbError } = await (supabase as any).from('assistant_knowledge_bases').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      if (kbError) throw kbError
+
+      const { error } = await (supabase as any).from('ai_assistants').delete().eq('id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      if (error) throw error
+
+      toast({ title: 'Assistent verwijderd', description: `${assistant.name} is permanent verwijderd` })
+      setShowDeleteConfirm(false)
+      onSaved()
+      onOpenChange(false)
+    } catch (err) {
+      toast({ title: 'Fout bij verwijderen', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <form onSubmit={handleSave}>
@@ -300,10 +304,6 @@ function AssistantModal({
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mijn assistent" required />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="icon">Icoon</Label>
-            <Select value={icon} onValueChange={setIcon} options={EMOJI_OPTIONS} />
-          </div>
-          <div className="flex flex-col gap-2">
             <Label htmlFor="type">Type</Label>
             <Select value={type} onValueChange={setType} options={ASSISTANT_TYPES} />
           </div>
@@ -312,48 +312,72 @@ function AssistantModal({
             <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Korte omschrijving" rows={2} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="prompt">System prompt</Label>
-            <Textarea id="prompt" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} placeholder="Je bent een behulpzame assistent..." rows={4} required />
+            <Label>Kennisbronnen</Label>
+            <p className="text-xs text-muted-foreground">Selecteer de kennisbronnen die deze assistent mag gebruiken</p>
+            <div className="border rounded-lg max-h-40 overflow-y-auto">
+              {availableKBs.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-3">Geen kennisbronnen beschikbaar</p>
+              ) : (
+                availableKBs.map((kb) => (
+                  <label key={kb.id} className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedKBIds.has(kb.id)}
+                      onChange={() => toggleKB(kb.id)}
+                      className="rounded border-input"
+                    />
+                    <span className="text-sm">{kb.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
           </div>
-          {type !== 'chat' && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="webhook">N8N Webhook URL</Label>
-              <Input id="webhook" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://n8n.example.com/webhook/..." required={type !== 'chat'} />
-            </div>
-          )}
-          {type === 'chat' && (
-            <div className="flex flex-col gap-2">
-              <Label>Kennisbronnen</Label>
-              <p className="text-xs text-muted-foreground">Selecteer de kennisbronnen die deze assistent mag gebruiken</p>
-              <div className="border rounded-lg max-h-40 overflow-y-auto">
-                {availableKBs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-3">Geen kennisbronnen beschikbaar</p>
-                ) : (
-                  availableKBs.map((kb) => (
-                    <label key={kb.id} className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedKBIds.has(kb.id)}
-                        onChange={() => toggleKB(kb.id)}
-                        className="rounded border-input"
-                      />
-                      <span className="text-sm">{kb.name}</span>
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded border-input" />
             <span className="text-sm">Actief</span>
           </label>
         </DialogContent>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
-          <Button type="submit" disabled={isSaving}>{isSaving ? 'Opslaan...' : 'Opslaan'}</Button>
+          <div className="flex gap-2 w-full justify-between">
+            <div>
+              {assistant && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Verwijderen
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
+              <Button type="submit" disabled={isSaving}>{isSaving ? 'Opslaan...' : 'Opslaan'}</Button>
+            </div>
+          </div>
         </DialogFooter>
       </form>
+
+      {showDeleteConfirm && (
+        <Dialog open={showDeleteConfirm} onOpenChange={(open) => { if (!open) setShowDeleteConfirm(false) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assistent verwijderen</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Weet je zeker dat je <strong>{assistant?.name}</strong> wilt verwijderen? Dit verwijdert ook alle gekoppelde conversaties en kennisbronkoppelingen.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>Annuleren</Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
+                {isDeleting ? 'Verwijderen...' : 'Verwijderen'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   )
 }
