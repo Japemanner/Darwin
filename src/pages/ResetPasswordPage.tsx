@@ -17,25 +17,14 @@ function ResetPasswordPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    let cancelled = false
-
-    async function check() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (cancelled) return
-
-      if (session) {
-        if (session.user?.app_metadata?.provider === 'email') {
-          setHasSession(true)
-        } else {
-          navigate('/login', { replace: true })
-          return
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setHasSession(true)
       }
       setIsCheckingSession(false)
-    }
+    })
 
-    check()
-    return () => { cancelled = true }
+    return () => subscription.unsubscribe()
   }, [])
 
   const handleReset = async (e: React.FormEvent) => {
