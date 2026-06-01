@@ -11,6 +11,7 @@ const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const AssistantsPage = lazy(() => import('@/pages/AssistantsPage'))
 const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'))
 const TeamPage = lazy(() => import('@/pages/TeamPage'))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 
 const queryClient = new QueryClient()
 
@@ -51,6 +52,7 @@ function App() {
                   <Route path="/assistants" element={<AssistantsPage />} />
                   <Route path="/knowledge" element={<KnowledgePage />} />
                   <Route path="/team" element={<TeamPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

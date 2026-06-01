@@ -9,6 +9,7 @@ import {
   Bot,
   BookOpen,
   Users,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -19,6 +20,7 @@ const navItems = [
   { href: '/assistants', label: 'Assistenten', icon: Bot },
   { href: '/knowledge', label: 'Kennisbronnen', icon: BookOpen },
   { href: '/team', label: 'Team', icon: Users },
+  { href: '/settings', label: 'Instellingen', icon: Settings },
 ]
 
 function AppShell() {
@@ -49,7 +51,10 @@ function AppShell() {
             </div>
             <nav className="flex-1 flex flex-col gap-1">
               {navItems
-                .filter((item) => item.href !== '/team' || isAdmin)
+                .filter((item) => {
+                  if (item.href === '/team' || item.href === '/settings') return isAdmin
+                  return true
+                })
                 .map((item) => (
                   <Link
                     key={item.href}
@@ -85,7 +90,10 @@ function AppShell() {
         <h1 className="text-xl font-bold mb-8">Darwin</h1>
         <nav className="flex-1 flex flex-col gap-1">
           {navItems
-            .filter((item) => item.href !== '/team' || isAdmin)
+            .filter((item) => {
+              if (item.href === '/team' || item.href === '/settings') return isAdmin
+              return true
+            })
             .map((item) => (
               <Link
                 key={item.href}

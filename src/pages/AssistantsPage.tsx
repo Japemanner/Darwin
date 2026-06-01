@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import { callRagWebhook } from '@/lib/webhook'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,8 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import type { AIAssistant, Conversation, Message } from '@/types/database.types'
-import { Bot, Plus, Pencil, MessagesSquare, X, Send } from 'lucide-react'
+import type { AIAssistant, Conversation, Message, KnowledgeBase } from '@/types/database.types'
+import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp } from 'lucide-react'
 
 const EMOJI_OPTIONS = [
   { value: '🤖', label: '🤖 Robot' },
@@ -26,6 +27,12 @@ const EMOJI_OPTIONS = [
   { value: '🔍', label: '🔍 Zoeken' },
   { value: '📊', label: '📊 Data' },
   { value: '🛡️', label: '🛡️ Schild' },
+]
+
+const ASSISTANT_TYPES = [
+  { value: 'chat', label: '💬 Chat' },
+  { value: 'agent', label: '🤖 Agent' },
+  { value: 'voice', label: '🎤 Voice' },
 ]
 
 function AssistantsPage() {
@@ -98,7 +105,10 @@ function AssistantsPage() {
                     <span className="text-2xl">{a.icon}</span>
                     <CardTitle className="text-lg">{a.name}</CardTitle>
                   </div>
-                  {!a.is_active && <Badge variant="secondary">Inactief</Badge>}
+                  <div className="flex items-center gap-1">
+                    {!a.is_active && <Badge variant="secondary">Inactief</Badge>}
+                    <Badge variant="outline" className="text-xs">{a.type}</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
@@ -158,9 +168,26 @@ function AssistantModal({
   const [description, setDescription] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [icon, setIcon] = useState('🤖')
+  const [type, setType] = useState('chat')
   const [webhookUrl, setWebhookUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [availableKBs, setAvailableKBs] = useState<KnowledgeBase[]>([])
+  const [selectedKBIds, setSelectedKBIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (open && organizationId) {
+      const loadKBs = async () => {
+        const { data } = await supabase
+          .from('knowledge_bases')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .order('name', { ascending: true })
+        if (data) setAvailableKBs(data)
+      }
+      loadKBs()
+    }
+  }, [open, organizationId])
 
   useEffect(() => {
     if (assistant) {
@@ -168,17 +195,37 @@ function AssistantModal({
       setDescription(assistant.description ?? '')
       setSystemPrompt(assistant.system_prompt)
       setIcon(assistant.icon)
-      setWebhookUrl(assistant.n8n_webhook_url)
-      setIsActive(assistant.is_active)
+      setType(assistant.type ?? 'chat')
+      setWebhookUrl(assistant.n8n_webhook_url ?? '')
+      setIsActive(assistant.is_active);
+
+      void (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+        .select('knowledge_base_id')
+        .eq('assistant_id', assistant.id)
+        .then(({ data }: { data: Array<{ knowledge_base_id: string }> | null }) => {
+          if (data) setSelectedKBIds(new Set(data.map((d) => d.knowledge_base_id)))
+          else setSelectedKBIds(new Set())
+        })
     } else {
       setName('')
       setDescription('')
       setSystemPrompt('')
       setIcon('🤖')
+      setType('chat')
       setWebhookUrl('')
       setIsActive(true)
+      setSelectedKBIds(new Set())
     }
   }, [assistant, open])
+
+  const toggleKB = (id: string) => {
+    setSelectedKBIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -190,21 +237,48 @@ function AssistantModal({
       description: description || null,
       system_prompt: systemPrompt,
       icon,
-      n8n_webhook_url: webhookUrl,
+      type,
+      n8n_webhook_url: type === 'chat' ? null : webhookUrl || null,
       is_active: isActive,
       created_by: userId,
     }
 
     try {
+      let assistantId: string
+
       if (assistant) {
         const { error } = await (supabase as any).from('ai_assistants').update(payload).eq('id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         if (error) throw error
+        assistantId = assistant.id
         toast({ title: 'Assistent bijgewerkt', description: `${name} is succesvol bijgewerkt` })
       } else {
-        const { error } = await (supabase as any).from('ai_assistants').insert(payload) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+        const { data: created, error } = await (supabase as any).from('ai_assistants').insert(payload).select().single() // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         if (error) throw error
+        assistantId = created.id
         toast({ title: 'Assistent aangemaakt', description: `${name} is klaar voor gebruik` })
       }
+
+      const { data: existingLinks } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+        .from('assistant_knowledge_bases')
+        .select('knowledge_base_id')
+        .eq('assistant_id', assistantId)
+
+      const existingIds = new Set(((existingLinks ?? []) as Array<{ knowledge_base_id: string }>).map((l) => l.knowledge_base_id))
+      const toAdd = [...selectedKBIds].filter((id) => !existingIds.has(id))
+      const toRemove = [...existingIds].filter((id) => !selectedKBIds.has(id))
+
+      if (toRemove.length > 0) {
+        await (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+          .delete()
+          .eq('assistant_id', assistantId)
+          .in('knowledge_base_id', toRemove)
+      }
+
+      if (toAdd.length > 0) {
+        await (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+          .insert(toAdd.map((kbId) => ({ assistant_id: assistantId, knowledge_base_id: kbId })))
+      }
+
       onSaved()
       onOpenChange(false)
     } catch (err) {
@@ -220,7 +294,7 @@ function AssistantModal({
         <DialogHeader>
           <DialogTitle>{assistant ? 'Assistent bewerken' : 'Nieuwe assistent'}</DialogTitle>
         </DialogHeader>
-        <DialogContent className="flex flex-col gap-4">
+        <DialogContent className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Naam</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mijn assistent" required />
@@ -230,6 +304,10 @@ function AssistantModal({
             <Select value={icon} onValueChange={setIcon} options={EMOJI_OPTIONS} />
           </div>
           <div className="flex flex-col gap-2">
+            <Label htmlFor="type">Type</Label>
+            <Select value={type} onValueChange={setType} options={ASSISTANT_TYPES} />
+          </div>
+          <div className="flex flex-col gap-2">
             <Label htmlFor="desc">Beschrijving</Label>
             <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Korte omschrijving" rows={2} />
           </div>
@@ -237,10 +315,35 @@ function AssistantModal({
             <Label htmlFor="prompt">System prompt</Label>
             <Textarea id="prompt" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} placeholder="Je bent een behulpzame assistent..." rows={4} required />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="webhook">N8N Webhook URL</Label>
-            <Input id="webhook" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://n8n.example.com/webhook/..." required />
-          </div>
+          {type !== 'chat' && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="webhook">N8N Webhook URL</Label>
+              <Input id="webhook" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://n8n.example.com/webhook/..." required={type !== 'chat'} />
+            </div>
+          )}
+          {type === 'chat' && (
+            <div className="flex flex-col gap-2">
+              <Label>Kennisbronnen</Label>
+              <p className="text-xs text-muted-foreground">Selecteer de kennisbronnen die deze assistent mag gebruiken</p>
+              <div className="border rounded-lg max-h-40 overflow-y-auto">
+                {availableKBs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-3">Geen kennisbronnen beschikbaar</p>
+                ) : (
+                  availableKBs.map((kb) => (
+                    <label key={kb.id} className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedKBIds.has(kb.id)}
+                        onChange={() => toggleKB(kb.id)}
+                        className="rounded border-input"
+                      />
+                      <span className="text-sm">{kb.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded border-input" />
             <span className="text-sm">Actief</span>
@@ -253,6 +356,13 @@ function AssistantModal({
       </form>
     </Dialog>
   )
+}
+
+interface Source {
+  knowledge_item_id?: string
+  title?: string
+  excerpt?: string
+  score?: number
 }
 
 function ChatWindow({
@@ -271,6 +381,7 @@ function ChatWindow({
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -319,6 +430,15 @@ function ChatWindow({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
+  const toggleSources = (messageId: string) => {
+    setExpandedSources((prev) => {
+      const next = new Set(prev)
+      if (next.has(messageId)) next.delete(messageId)
+      else next.add(messageId)
+      return next
+    })
+  }
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || !conversation || !assistant || isSending) return
@@ -329,6 +449,7 @@ function ChatWindow({
       role: 'user',
       content: input.trim(),
       created_at: new Date().toISOString(),
+      sources: null,
     }
 
     setMessages((prev) => [...prev, userMessage])
@@ -345,28 +466,15 @@ function ChatWindow({
     }
 
     try {
-      const res = await fetch(assistant.n8n_webhook_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage.content,
-          conversation_id: conversation.id,
-          assistant_id: assistant.id,
-          organization_id: organizationId,
-          user_id: userId,
-        }),
-      })
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      const responseText: string = data?.response ?? 'Geen antwoord ontvangen'
+      const result = await callRagWebhook(assistant, conversation, userMessage.content, organizationId)
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         conversation_id: conversation.id,
         role: 'assistant',
-        content: responseText,
+        content: result.answer,
         created_at: new Date().toISOString(),
+        sources: result.sources as Record<string, unknown> | null,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
@@ -374,7 +482,8 @@ function ChatWindow({
       await (supabase as any).from('messages').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
         conversation_id: conversation.id,
         role: 'assistant',
-        content: responseText,
+        content: result.answer,
+        sources: result.sources,
       })
     } catch (err) {
       toast({
@@ -412,13 +521,43 @@ function ChatWindow({
         )}
         {messages.map((msg) => (
           <div key={msg.id} className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-            <div className={cn(
-              "max-w-[80%] rounded-lg px-4 py-2 text-sm",
-              msg.role === 'user'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted'
-            )}>
-              {msg.content}
+            <div className="flex flex-col gap-1 max-w-[80%]">
+              <div className={cn(
+                "rounded-lg px-4 py-2 text-sm",
+                msg.role === 'user'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted'
+              )}>
+                {msg.content}
+              </div>
+              {msg.role === 'assistant' && msg.sources && Array.isArray(msg.sources) && (msg.sources as Source[]).length > 0 && (
+                <div className="text-xs">
+                  <button
+                    onClick={() => toggleSources(msg.id)}
+                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {expandedSources.has(msg.id) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    Bronnen ({(msg.sources as Source[]).length})
+                  </button>
+                  {expandedSources.has(msg.id) && (
+                    <div className="mt-2 space-y-2">
+                      {(msg.sources as Source[]).map((source, idx) => (
+                        <div key={idx} className="bg-accent/50 rounded p-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-foreground">{source.title ?? 'Zonder titel'}</span>
+                            {source.score !== undefined && (
+                              <Badge variant="secondary" className="text-xs">{Math.round(source.score * 100)}%</Badge>
+                            )}
+                          </div>
+                          {source.excerpt && (
+                            <p className="text-muted-foreground line-clamp-3">{source.excerpt}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
