@@ -57,7 +57,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
       })
 
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<{ data: { session: null } }>((resolve) =>
+          setTimeout(() => resolve({ data: { session: null } }), 5000)
+        ),
+      ])
       if (session?.user) {
         set({ user: session.user, isAuthenticated: true })
         const profile = await fetchProfile(session.user.id)
