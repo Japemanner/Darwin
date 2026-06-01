@@ -12,6 +12,8 @@ const AssistantsPage = lazy(() => import('@/pages/AssistantsPage'))
 const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'))
 const TeamPage = lazy(() => import('@/pages/TeamPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 
 const queryClient = new QueryClient()
 
@@ -46,6 +48,8 @@ function App() {
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
                   <Route path="/dashboard" element={<DashboardPage />} />

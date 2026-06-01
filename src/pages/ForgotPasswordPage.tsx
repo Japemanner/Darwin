@@ -7,25 +7,29 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/toast'
 
-function LoginPage() {
+function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleReset = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
       if (error) throw error
-      toast({ title: 'Ingelogd', description: 'Welkom terug!' })
-      navigate('/dashboard')
+      toast({
+        title: 'E-mail verstuurd',
+        description: 'Controleer je inbox voor de reset-link. Ook in je spamfolder kijken.',
+      })
+      navigate('/login')
     } catch (err) {
       toast({
-        title: 'Inloggen mislukt',
+        title: 'Fout bij versturen',
         description: err instanceof Error ? err.message : 'Onbekende fout',
         variant: 'destructive',
       })
@@ -38,11 +42,13 @@ function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Darwin</CardTitle>
-          <CardDescription>Log in met je e-mailadres en wachtwoord</CardDescription>
+          <CardTitle className="text-2xl">Wachtwoord vergeten</CardTitle>
+          <CardDescription>
+            Vul je e-mailadres in en we sturen je een link om je wachtwoord te resetten.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+          <form onSubmit={handleReset} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
@@ -54,23 +60,13 @@ function LoginPage() {
                 required
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Wachtwoord</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Inloggen...' : 'Inloggen'}
+              {isLoading ? 'Versturen...' : 'Stuur reset-link'}
             </Button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-4">
-            <Link to="/forgot-password" className="hover:text-primary">
-              Wachtwoord vergeten?
+            <Link to="/login" className="hover:text-primary">
+              Terug naar inloggen
             </Link>
           </p>
         </CardContent>
@@ -79,4 +75,4 @@ function LoginPage() {
   )
 }
 
-export default LoginPage
+export default ForgotPasswordPage
