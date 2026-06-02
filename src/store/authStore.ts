@@ -40,7 +40,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   setProfile: (profile) => set({ profile }),
 
   signOut: async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // session already invalid — clean up locally
+    }
     set({ user: null, profile: null, isAuthenticated: false })
   },
 

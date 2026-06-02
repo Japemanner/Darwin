@@ -17,14 +17,39 @@ function ResetPasswordPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        setHasSession(true)
+    let cancelled = false
+
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<{ data: { session: null } }>((resolve) =>
+            setTimeout(() => resolve({ data: { session: null } }), 5000)
+          ),
+        ])
+        if (!cancelled) {
+          setHasSession(!!session?.user)
+        }
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setIsCheckingSession(false)
       }
-      setIsCheckingSession(false)
+    }
+
+    checkSession()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setHasSession(true)
+        setIsCheckingSession(false)
+      }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   const handleReset = async (e: React.FormEvent) => {
@@ -51,8 +76,13 @@ function ResetPasswordPage() {
     setIsLoading(true)
 
     try {
-      const { error } = await supabase.auth.updateUser({ password })
-      if (error) throw error
+      const result = await Promise.race([
+        supabase.auth.updateUser({ password }),
+        new Promise<{ error: Error }>((_, reject) =>
+          setTimeout(() => reject(new Error('Aanvraag duurt te lang, probeer opnieuw')), 10000)
+        ),
+      ])
+      if ((result as { error?: Error }).error) throw (result as { error: Error }).error
       toast({
         title: 'Wachtwoord aangepast',
         description: 'Je kunt nu inloggen met je nieuwe wachtwoord.',
