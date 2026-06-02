@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard,
+  Gauge,
   Bot,
   BookOpen,
   Users,
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/command-center', label: 'Command Center', icon: Gauge },
   { href: '/assistants', label: 'Assistenten', icon: Bot },
   { href: '/knowledge', label: 'Kennisbronnen', icon: BookOpen },
   { href: '/team', label: 'Team', icon: Users },

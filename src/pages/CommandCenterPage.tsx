@@ -11,7 +11,7 @@ interface Stats {
   teamMembers: number
 }
 
-function DashboardPage() {
+function CommandCenterPage() {
   const { profile } = useAuth()
   const [stats, setStats] = useState<Stats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -40,8 +40,8 @@ function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Welkom terug, {profile?.full_name?.split(' ')[0] ?? 'gebruiker'}</h1>
-      <p className="text-muted-foreground mb-8">Hier is een overzicht van je omgeving</p>
+      <h1 className="text-2xl font-bold mb-1">Command Center — Welkom terug, {profile?.full_name?.split(' ')[0] ?? 'gebruiker'}</h1>
+      <p className="text-muted-foreground mb-8">Centraal overzicht van je omgeving</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {isLoading
@@ -100,4 +100,4 @@ function DashboardPage() {
   )
 }
 
-export default DashboardPage
+export default CommandCenterPage

@@ -36,17 +36,17 @@ Niet-ingelogde gebruikers worden naar `/login` gestuurd. Alle app-pagina's zitte
 
 ### ✅ Applicatie Layout — AppShell + Sidebar
 
-Linker sidebar met navigatie (Dashboard, Assistenten, Kennisbronnen, Team), gebruikersavatar, rol-badge, en uitlogknop. Team-link alleen zichtbaar voor admins.
+Linker sidebar met navigatie (Command Center, Assistenten, Kennisbronnen, Team), gebruikersavatar, rol-badge, en uitlogknop. Team-link alleen zichtbaar voor admins.
 
 **Files**: `src/components/layout/AppShell.tsx`
 
 ---
 
-### ✅ Dashboard — Welkom & Statistieken
+### ✅ Command Center — Welkom & Statistieken
 
 Welkom met voornaam + real-time statistieken: aantal assistenten, kennisbronnen, teamleden. Taken-kaart is placeholder ("Binnenkort").
 
-**Files**: `src/pages/DashboardPage.tsx`
+**Files**: `src/pages/CommandCenterPage.tsx`
 
 ---
 

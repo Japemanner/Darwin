@@ -73,7 +73,7 @@ src/
 │   ├── layout/            # AppShell + Sidebar
 │   └── ui/                # shadcn/ui components
 ├── pages/
-│   ├── DashboardPage.tsx  # Welkom + stat cards
+│   ├── CommandCenterPage.tsx  # Welkom + stat cards
 │   ├── AssistantsPage.tsx # Grid, modal, chat window
 │   ├── KnowledgePage.tsx  # Grid, slide-over, upload
 │   └── TeamPage.tsx       # Ledenlijst + invite flow

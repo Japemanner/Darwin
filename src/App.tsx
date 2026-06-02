@@ -7,7 +7,7 @@ import AppShell from '@/components/layout/AppShell'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 
-const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
+const CommandCenterPage = lazy(() => import('@/pages/CommandCenterPage'))
 const AssistantsPage = lazy(() => import('@/pages/AssistantsPage'))
 const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'))
 const TeamPage = lazy(() => import('@/pages/TeamPage'))
@@ -52,14 +52,14 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/command-center" element={<CommandCenterPage />} />
                   <Route path="/assistants" element={<AssistantsPage />} />
                   <Route path="/knowledge" element={<KnowledgePage />} />
                   <Route path="/team" element={<TeamPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Route>
               </Route>
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/command-center" replace />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
