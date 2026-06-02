@@ -5,5 +5,5 @@
   "here": true,
   "integration": "opencode",
   "script": "ps",
-  "speckit_version": "0.8.17"
+  "speckit_version": "0.9.0"
 }
