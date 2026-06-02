@@ -329,6 +329,38 @@ export interface Database {
           updated_at?: string
         }
       }
+      feedback_interactions: {
+        Row: {
+          id: string
+          conversation_id: string
+          assistant_id: string
+          user_id: string
+          organization_id: string
+          thumbs_up: boolean
+          feedback: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          assistant_id: string
+          user_id: string
+          organization_id: string
+          thumbs_up: boolean
+          feedback?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          assistant_id?: string
+          user_id?: string
+          organization_id?: string
+          thumbs_up?: boolean
+          feedback?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -346,3 +378,4 @@ export type FlowConfig = Database['public']['Tables']['flow_configs']['Row']
 export type Conversation = Database['public']['Tables']['conversations']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
 export type Invitation = Database['public']['Tables']['invitations']['Row']
+export type FeedbackInteraction = Database['public']['Tables']['feedback_interactions']['Row']

@@ -15,8 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import type { AIAssistant, Conversation, Message, KnowledgeBase } from '@/types/database.types'
-import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import type { AIAssistant, Conversation, Message, KnowledgeBase, FeedbackInteraction } from '@/types/database.types'
+import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react'
 
 const ASSISTANT_TYPES = [
   { value: 'chat', label: '💬 Chat' },
@@ -406,6 +406,13 @@ function ChatWindow({
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set())
+  const [existingFeedback, setExistingFeedback] = useState<FeedbackInteraction | null>(null)
+  const [isFeedbackLoaded, setIsFeedbackLoaded] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false)
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false)
+  const [thumbsUpSelected, setThumbsUpSelected] = useState(false)
+  const [thumbsDownSelected, setThumbsDownSelected] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -413,6 +420,13 @@ function ChatWindow({
     setMessages([])
     setConversation(null)
     setInput('')
+    setExistingFeedback(null)
+    setIsFeedbackLoaded(false)
+    setFeedbackText('')
+    setIsFeedbackSubmitting(false)
+    setShowFeedbackInput(false)
+    setThumbsUpSelected(false)
+    setThumbsDownSelected(false)
 
     async function initChat() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -453,6 +467,20 @@ function ChatWindow({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (!conversation || isFeedbackLoaded) return
+    const loadFeedback = async () => {
+      const { data } = await (supabase as any).from('feedback_interactions') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .eq('user_id', userId)
+        .maybeSingle()
+      setExistingFeedback(data)
+      setIsFeedbackLoaded(true)
+    }
+    loadFeedback()
+  }, [conversation, userId, isFeedbackLoaded])
 
   const toggleSources = (messageId: string) => {
     setExpandedSources((prev) => {
@@ -519,6 +547,64 @@ function ChatWindow({
       setIsSending(false)
     }
   }
+
+  const handleThumbsUp = async () => {
+    if (!conversation || !assistant || existingFeedback) return
+    setThumbsUpSelected(true)
+    try {
+      const { error } = await (supabase as any).from('feedback_interactions').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+        conversation_id: conversation.id,
+        assistant_id: assistant.id,
+        user_id: userId,
+        organization_id: organizationId,
+        thumbs_up: true,
+        feedback: null,
+      })
+      if (error) throw error
+      setExistingFeedback({ id: '', conversation_id: conversation.id, assistant_id: assistant.id, user_id: userId, organization_id: organizationId, thumbs_up: true, feedback: null, created_at: new Date().toISOString() } as FeedbackInteraction)
+    } catch (err: unknown) {
+      setThumbsUpSelected(false)
+      toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Kon feedback niet opslaan', variant: 'destructive' })
+    }
+  }
+
+  const handleThumbsDownClick = () => {
+    if (existingFeedback) return
+    setThumbsDownSelected(true)
+    setShowFeedbackInput(true)
+  }
+
+  const handleThumbsDownCancel = () => {
+    setThumbsDownSelected(false)
+    setShowFeedbackInput(false)
+    setFeedbackText('')
+  }
+
+  const handleThumbsDownSubmit = async () => {
+    if (!conversation || !assistant || !feedbackText.trim()) return
+    setIsFeedbackSubmitting(true)
+    try {
+      const { error } = await (supabase as any).from('feedback_interactions').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+        conversation_id: conversation.id,
+        assistant_id: assistant.id,
+        user_id: userId,
+        organization_id: organizationId,
+        thumbs_up: false,
+        feedback: feedbackText.trim(),
+      })
+      if (error) throw error
+      setExistingFeedback({ id: '', conversation_id: conversation.id, assistant_id: assistant.id, user_id: userId, organization_id: organizationId, thumbs_up: false, feedback: feedbackText.trim(), created_at: new Date().toISOString() } as FeedbackInteraction)
+      setShowFeedbackInput(false)
+      setFeedbackText('')
+    } catch (err: unknown) {
+      toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Kon feedback niet opslaan', variant: 'destructive' })
+    } finally {
+      setIsFeedbackSubmitting(false)
+    }
+  }
+
+  const hasAssistantMessages = messages.some((msg) => msg.role === 'assistant')
+  const feedbackSubmitted = !!existingFeedback
 
   if (!assistant) return null
 
@@ -593,6 +679,96 @@ function ChatWindow({
           </div>
         )}
       </div>
+
+      {hasAssistantMessages && (
+        <div className="border-t px-4 py-3 flex flex-col gap-2">
+          {!feedbackSubmitted ? (
+            <>
+              {!showFeedbackInput ? (
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleThumbsUp}
+                    disabled={thumbsDownSelected}
+                    className={cn(
+                      "p-2 rounded-full transition-colors",
+                      thumbsUpSelected
+                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                        : "hover:bg-accent text-muted-foreground hover:text-foreground"
+                    )}
+                    title="Goed antwoord"
+                  >
+                    <ThumbsUp className={cn("h-5 w-5", thumbsUpSelected && "fill-current")} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleThumbsDownClick}
+                    disabled={thumbsUpSelected}
+                    className={cn(
+                      "p-2 rounded-full transition-colors",
+                      thumbsDownSelected
+                        ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                        : "hover:bg-accent text-muted-foreground hover:text-foreground"
+                    )}
+                    title="Niet goed — geef feedback"
+                  >
+                    <ThumbsDown className={cn("h-5 w-5", thumbsDownSelected && "fill-current")} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleThumbsDownCancel}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Annuleren"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    <span className="text-sm text-muted-foreground">Wat ging er mis?</span>
+                  </div>
+                  <Textarea
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    placeholder="Beschrijf wat er niet goed was aan dit antwoord..."
+                    rows={2}
+                    className="resize-none"
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleThumbsDownCancel}
+                      disabled={isFeedbackSubmitting}
+                    >
+                      Annuleren
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleThumbsDownSubmit}
+                      disabled={isFeedbackSubmitting || !feedbackText.trim()}
+                    >
+                      {isFeedbackSubmitting ? 'Versturen...' : 'Feedback versturen'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground py-1">
+              {existingFeedback.thumbs_up ? (
+                <><ThumbsUp className="h-4 w-4 fill-current text-green-500" /> <span>Bedankt voor je feedback!</span></>
+              ) : (
+                <><ThumbsDown className="h-4 w-4 fill-current text-red-500" /> <span>Bedankt, we gaan hiermee aan de slag.</span></>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSend} className="p-4 border-t flex gap-2">
         <Input
