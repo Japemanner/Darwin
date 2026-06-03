@@ -19,16 +19,19 @@ function LoginPage() {
     setIsLoading(true)
 
     try {
+      console.log('Attempting login for email:', email)
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       toast({ title: 'Ingelogd', description: 'Welkom terug!' })
+      console.log('Login successful for email:', email)
       
       // Redirect back to original URL or default to command center
       const redirectUrl = localStorage.getItem('redirectAfterLogin') || '/command-center'
+      console.log('Redirecting to:', redirectUrl)
       localStorage.removeItem('redirectAfterLogin') // Clean up
       navigate(redirectUrl)
     } catch (err) {
-      console.error('Login error:', err)
+      console.error('Login error for email:', email, err)
       toast({
         title: 'Inloggen mislukt',
         description: err instanceof Error ? err.message : 'Onbekende fout',
