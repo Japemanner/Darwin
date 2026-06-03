@@ -17,12 +17,23 @@ interface AuthState {
 let initialized = false
 
 async function fetchProfile(userId: string) {
-  const { data } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
-  return data as Profile | null
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching profile:', error)
+      return null
+    }
+    
+    return data as Profile | null
+  } catch (error) {
+    console.error('Error fetching profile:', error)
+    return null
+  }
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -56,15 +67,23 @@ export const useAuthStore = create<AuthState>((set) => ({
           set({ user: session.user, isAuthenticated: true })
           const profile = await fetchProfile(session.user.id)
           if (profile) set({ profile })
-        } else if (event === 'SIGNED_OUT') {
+        } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          // Handle session expiry
           set({ user: null, profile: null, isAuthenticated: false })
+          // Optionally redirect to login with a message
+          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+            // Store current location for redirect after login
+            localStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search)
+            // Redirect to login
+            window.location.href = '/login'
+          }
         }
       })
 
       const { data: { session } } = await Promise.race([
         supabase.auth.getSession(),
         new Promise<{ data: { session: null } }>((resolve) =>
-          setTimeout(() => resolve({ data: { session: null } }), 5000)
+          setTimeout(() => resolve({ data: { session: null } }), 10000)
         ),
       ])
       if (session?.user) {

@@ -22,13 +22,18 @@ function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       toast({ title: 'Ingelogd', description: 'Welkom terug!' })
-      navigate('/dashboard')
+      
+      // Redirect back to original URL or default to command center
+      const redirectUrl = localStorage.getItem('redirectAfterLogin') || '/command-center'
+      localStorage.removeItem('redirectAfterLogin') // Clean up
+      navigate(redirectUrl)
     } catch (err) {
+      console.error('Login error:', err)
       toast({
         title: 'Inloggen mislukt',
         description: err instanceof Error ? err.message : 'Onbekende fout',
         variant: 'destructive',
-      })
+       })
     } finally {
       setIsLoading(false)
     }

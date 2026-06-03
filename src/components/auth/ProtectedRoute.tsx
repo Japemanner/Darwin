@@ -1,8 +1,9 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuthStore()
+  const location = useLocation()
 
   if (isLoading) {
     return (
@@ -13,6 +14,8 @@ function ProtectedRoute() {
   }
 
   if (!isAuthenticated) {
+    // Store the attempted URL so we can redirect back after login
+    localStorage.setItem('redirectAfterLogin', location.pathname + location.search)
     return <Navigate to="/login" replace />
   }
 
