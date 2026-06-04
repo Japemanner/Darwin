@@ -7,6 +7,7 @@ interface AuthState {
   user: User | null
   profile: Profile | null
   isLoading: boolean
+  isSigningIn: boolean
   isAuthenticated: boolean
   setUser: (user: User | null) => void
   setProfile: (profile: Profile | null) => void
@@ -16,68 +17,73 @@ interface AuthState {
 }
 
 let initialized = false
-let isSigningIn = false
 
-async function fetchProfile(userId: string) {
+async function fetchProfile(userId: string): Promise<Profile | null> {
   try {
-    // Add timeout to prevent hanging
-    const result = await Promise.race([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-      new Promise<{ data: null; error: Error }>((_, reject) =>
-        setTimeout(() => reject(new Error('Profile fetch timeout after 5 seconds')), 5000)
-      ),
-    ])
-    
-    const { data, error } = result as { data: Profile | null; error: any }
-    
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
     if (error) {
-      console.error('Error fetching profile:', error)
+      console.error('[auth] Profile fetch error:', error.message)
       return null
     }
-    
+
     return data as Profile | null
-  } catch (error) {
-    console.error('Error fetching profile:', error)
+  } catch (err) {
+    console.error('[auth] Profile fetch exception:', err)
     return null
   }
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
   isLoading: true,
+  isSigningIn: false,
   isAuthenticated: false,
 
-  setUser: (user) =>
-    set({
-      user,
-      isAuthenticated: !!user,
-    }),
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
 
   setProfile: (profile) => set({ profile }),
 
   signIn: async (email, password) => {
-    isSigningIn = true
+    console.log('[auth] signIn called for:', email)
+    set({ isSigningIn: true })
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-      
-      // Set user state immediately to prevent UI hanging
-      if (data.user) {
-        set({ user: data.user, isAuthenticated: true })
-        // Fetch profile in background
-        fetchProfile(data.user.id).then(profile => {
-          if (profile) set({ profile })
-        })
+
+      if (error) {
+        console.error('[auth] signIn error:', error.message)
+        set({ isSigningIn: false })
+        return { error: new Error(error.message) }
       }
-      
+
+      console.log('[auth] signIn success, user:', data.user?.id)
+
+      set({
+        user: data.user,
+        isAuthenticated: true,
+        isSigningIn: false,
+      })
+
+      fetchProfile(data.user.id).then((profile) => {
+        if (profile) {
+          console.log('[auth] Profile loaded:', profile.full_name)
+          set({ profile })
+        } else {
+          console.warn('[auth] No profile found for user:', data.user.id)
+        }
+      })
+
       return { error: undefined }
-    } catch (error) {
-      console.error('Sign in error:', error)
-      return { error: error as Error }
-    } finally {
-      // Reset flag after auth state change has time to fire
-      setTimeout(() => { isSigningIn = false }, 500)
+    } catch (err) {
+      console.error('[auth] signIn exception:', err)
+      set({ isSigningIn: false })
+      return { error: err as Error }
     }
   },
 
@@ -85,81 +91,62 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await supabase.auth.signOut()
     } catch {
-      // session already invalid — clean up locally
+      // session already invalid
     }
-    set({ user: null, profile: null, isAuthenticated: false })
+    set({ user: null, profile: null, isAuthenticated: false, isSigningIn: false })
   },
 
   initialize: async () => {
     if (initialized) return
-    try {
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log('Auth state change event:', event, session?.user?.id)
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('User signed in:', session.user.id)
-          // Skip if signIn function already handled this (prevents race condition)
-          if (isSigningIn) {
-            console.log('Skipping redundant SIGNED_IN event — signIn function handled it')
-            return
-          }
-          set({ user: session.user, isAuthenticated: true })
-          const profile = await fetchProfile(session.user.id)
-          if (profile) {
-            console.log('Profile loaded for signed in user:', profile.id, profile.full_name)
-            set({ profile })
-          } else {
-            console.warn('No profile found for signed in user:', session.user.id)
-          }
-        } else if (event === 'SIGNED_OUT') {
-          console.log('User signed out')
-          set({ user: null, profile: null, isAuthenticated: false })
-        } else if (event === 'INITIAL_SESSION') {
-          console.log('Initial session loaded')
-          if (session?.user) {
-            set({ user: session.user, isAuthenticated: true })
-            const profile = await fetchProfile(session.user.id)
-            if (profile) set({ profile })
-          }
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log('Token refreshed')
-          // Token refresh doesn't change authentication state, but update user if present
-          if (session?.user) {
-            set({ user: session.user })
-          }
-        } else if (event === 'USER_UPDATED') {
-          console.log('User updated')
-          // Refresh profile when user is updated
-          if (session?.user) {
-            const profile = await fetchProfile(session.user.id)
-            if (profile) {
-              console.log('Profile refreshed:', profile.id, profile.full_name)
-              set({ profile })
-            }
-          }
-        }
-      })
 
-      const { data: { session } } = await Promise.race([
-        supabase.auth.getSession(),
-        new Promise<{ data: { session: null } }>((resolve) =>
-          setTimeout(() => resolve({ data: { session: null } }), 10000)
-        ),
-      ])
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[auth] onAuthStateChange:', event, session?.user?.id ?? 'no user')
+
+      const state = get()
+
+      // SIGNED_IN: only update if signIn didn't already set the user
+      if (event === 'SIGNED_IN' && session?.user) {
+        if (state.isSigningIn) {
+          console.log('[auth] SIGNED_IN skipped — signIn already handled')
+          return
+        }
+        set({ user: session.user, isAuthenticated: true })
+        fetchProfile(session.user.id).then((profile) => {
+          if (profile) set({ profile })
+        })
+        return
+      }
+
+      if (event === 'SIGNED_OUT') {
+        set({ user: null, profile: null, isAuthenticated: false, isSigningIn: false })
+        return
+      }
+
+      // For INITIAL_SESSION, TOKEN_REFRESHED, USER_UPDATED — just sync user
       if (session?.user) {
-        console.log('Session found for user:', session.user.id)
+        const profilePromise = state.profile
+          ? Promise.resolve(state.profile)
+          : fetchProfile(session.user.id)
+        set({ user: session.user, isAuthenticated: true })
+        profilePromise.then((profile) => {
+          if (profile) set({ profile })
+        })
+      }
+    })
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        console.log('[auth] Existing session found:', session.user.id)
         set({ user: session.user, isAuthenticated: true })
         const profile = await fetchProfile(session.user.id)
-        if (profile) {
-          console.log('Profile loaded for user:', profile.id, profile.full_name)
-          set({ profile })
-        } else {
-          console.warn('No profile found for user:', session.user.id)
-        }
+        if (profile) set({ profile })
       } else {
-        console.log('No active session found')
+        console.log('[auth] No existing session')
       }
-    } catch {
-      // silent — user will need to login
+    } catch (err) {
+      console.error('[auth] getSession error:', err)
     } finally {
       set({ isLoading: false })
       initialized = true
