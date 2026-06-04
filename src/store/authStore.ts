@@ -104,7 +104,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const state = get()
 
-      // SIGNED_IN: only update if signIn didn't already set the user
       if (event === 'SIGNED_IN' && session?.user) {
         if (state.isSigningIn) {
           console.log('[auth] SIGNED_IN skipped — signIn already handled')
