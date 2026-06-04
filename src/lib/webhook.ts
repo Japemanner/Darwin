@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { AIAssistant, Conversation, FlowConfig, KnowledgeBase } from '@/types/database.types'
+import type { AIAssistant, Conversation, FlowConfig } from '@/types/database.types'
 
 interface RAGWebhookPayload {
   assistant: {
@@ -9,8 +9,11 @@ interface RAGWebhookPayload {
   }
   knowledge_bases: Array<{
     id: string
+    name: string
     vector_collection_id: string
   }>
+  knowledgeSourceName: string
+  tenantId: string
   conversation: {
     id: string
     history: Array<{
@@ -97,7 +100,7 @@ function classifyWebhookError(status: number, url: string): Error {
     return new Error('Te veel verzoeken (429). Wacht even en probeer opnieuw.')
   }
   if (status >= 500) {
-    return new Error('De AI-service is tijdelijk niet beschikbaar. Probeer het later opnieuw.')
+    return new Error('De n8n workflow gaf een fout (500). Controleer de workflow logs op fouten. Controleer of alle verwachte velden aanwezig zijn in het payload.')
   }
   return new Error(`Onverwachte fout (${status}). Controleer de webhook configuratie.`)
 }
@@ -111,7 +114,13 @@ async function loadFlowConfig(organizationId: string): Promise<FlowConfig | null
   return data as FlowConfig | null
 }
 
-async function loadAssistantKnowledgeBases(assistantId: string): Promise<KnowledgeBase[]> {
+interface KnowledgeBaseWithId {
+  id: string
+  name: string
+  vector_collection_id: string | null
+}
+
+async function loadAssistantKnowledgeBases(assistantId: string): Promise<KnowledgeBaseWithId[]> {
   const { data: links } = await (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
     .select('knowledge_base_id')
     .eq('assistant_id', assistantId)
@@ -120,13 +129,13 @@ async function loadAssistantKnowledgeBases(assistantId: string): Promise<Knowled
 
   const { data: kbs } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
     .from('knowledge_bases')
-    .select('id, vector_collection_id')
+    .select('id, name, vector_collection_id')
     .in(
       'id',
       links.map((l: { knowledge_base_id: string }) => l.knowledge_base_id),
     )
 
-  return (kbs as KnowledgeBase[]) ?? []
+  return (kbs as KnowledgeBaseWithId[]) ?? []
 }
 
 async function loadConversationHistory(conversationId: string): Promise<Array<{ role: string; content: string }>> {
@@ -182,6 +191,16 @@ export async function callRagWebhook(
   const knowledgeBases = await loadAssistantKnowledgeBases(assistant.id)
   const history = await loadConversationHistory(conversation.id)
 
+  const { data: orgData } = await supabase
+    .from('organizations')
+    .select('name')
+    .eq('id', organizationId)
+    .single()
+
+  const tenantId: string = (orgData as { name: string } | null)?.name ?? organizationId
+
+  const knowledgeSourceName = knowledgeBases.map((kb) => kb.name).join(', ') || ''
+
   const payload: RAGWebhookPayload = {
     assistant: {
       id: assistant.id,
@@ -190,8 +209,11 @@ export async function callRagWebhook(
     },
     knowledge_bases: knowledgeBases.map((kb) => ({
       id: kb.id,
+      name: kb.name,
       vector_collection_id: kb.vector_collection_id ?? '',
     })),
+    knowledgeSourceName,
+    tenantId,
     conversation: {
       id: conversation.id,
       history,
@@ -258,7 +280,16 @@ export async function testWebhook(
     const res = await fetch(normalizedUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
+      body: JSON.stringify({
+        test: true,
+        timestamp: new Date().toISOString(),
+        assistant: { id: 'test', name: 'Connectivity Test', system_prompt: 'test' },
+        knowledge_bases: [],
+        knowledgeSourceName: '',
+        tenantId: 'test',
+        conversation: { id: 'test', history: [] },
+        message: '__test_connection__',
+      }),
       signal: controller.signal,
     })
 
@@ -267,6 +298,14 @@ export async function testWebhook(
         ok: true,
         status: res.status,
         message: 'Verbinding geslaagd! De webhook is bereikbaar en accepteert verzoeken.',
+      }
+    }
+
+    if (res.status === 500) {
+      return {
+        ok: true,
+        status: res.status,
+        message: 'Webhook bereikbaar! De workflow gaf een fout (500) bij het testbericht — dit is normaal. Zorg dat je n8n workflow een IF-node heeft die test-berichten afhandelt.',
       }
     }
 
