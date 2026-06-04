@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/toast'
+import { useAuthStore } from '@/store/authStore'
 
 function LoginPage() {
   const [email, setEmail] = useState('')
@@ -13,6 +13,7 @@ function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { signIn } = useAuthStore()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,8 +21,9 @@ function LoginPage() {
 
     try {
       console.log('Attempting login for email:', email)
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await signIn(email, password)
       if (error) throw error
+      
       toast({ title: 'Ingelogd', description: 'Welkom terug!' })
       console.log('Login successful for email:', email)
       

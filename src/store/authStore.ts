@@ -10,11 +10,13 @@ interface AuthState {
   isAuthenticated: boolean
   setUser: (user: User | null) => void
   setProfile: (profile: Profile | null) => void
+  signIn: (email: string, password: string) => Promise<{ error?: Error }>
   signOut: () => Promise<void>
   initialize: () => Promise<void>
 }
 
 let initialized = false
+let isSigningIn = false
 
 async function fetchProfile(userId: string) {
   try {
@@ -54,6 +56,31 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setProfile: (profile) => set({ profile }),
 
+  signIn: async (email, password) => {
+    isSigningIn = true
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      
+      // Set user state immediately to prevent UI hanging
+      if (data.user) {
+        set({ user: data.user, isAuthenticated: true })
+        // Fetch profile in background
+        fetchProfile(data.user.id).then(profile => {
+          if (profile) set({ profile })
+        })
+      }
+      
+      return { error: undefined }
+    } catch (error) {
+      console.error('Sign in error:', error)
+      return { error: error as Error }
+    } finally {
+      // Reset flag after auth state change has time to fire
+      setTimeout(() => { isSigningIn = false }, 500)
+    }
+  },
+
   signOut: async () => {
     try {
       await supabase.auth.signOut()
@@ -70,6 +97,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         console.log('Auth state change event:', event, session?.user?.id)
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('User signed in:', session.user.id)
+          // Skip if signIn function already handled this (prevents race condition)
+          if (isSigningIn) {
+            console.log('Skipping redundant SIGNED_IN event — signIn function handled it')
+            return
+          }
           set({ user: session.user, isAuthenticated: true })
           const profile = await fetchProfile(session.user.id)
           if (profile) {
@@ -80,18 +112,20 @@ export const useAuthStore = create<AuthState>((set) => ({
           }
         } else if (event === 'SIGNED_OUT') {
           console.log('User signed out')
-          // Handle session expiry
           set({ user: null, profile: null, isAuthenticated: false })
-          // Optionally redirect to login with a message
-          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-            // Store current location for redirect after login
-            localStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search)
-            // Redirect to login
-            window.location.href = '/login'
+        } else if (event === 'INITIAL_SESSION') {
+          console.log('Initial session loaded')
+          if (session?.user) {
+            set({ user: session.user, isAuthenticated: true })
+            const profile = await fetchProfile(session.user.id)
+            if (profile) set({ profile })
           }
         } else if (event === 'TOKEN_REFRESHED') {
           console.log('Token refreshed')
-          // Token refresh doesn't change authentication state
+          // Token refresh doesn't change authentication state, but update user if present
+          if (session?.user) {
+            set({ user: session.user })
+          }
         } else if (event === 'USER_UPDATED') {
           console.log('User updated')
           // Refresh profile when user is updated
