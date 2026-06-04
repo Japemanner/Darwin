@@ -73,10 +73,10 @@ function AppShell() {
                 ))}
             </nav>
             <div className="border-t pt-4 flex items-center gap-3">
-              <Avatar fallback={profile?.full_name} size="sm" />
+              <Avatar fallback={profile?.full_name || 'Gebruiker'} size="sm" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{profile?.full_name}</p>
-                <p className="text-xs text-muted-foreground truncate">{profile?.role}</p>
+                <p className="text-sm font-medium truncate">{profile?.full_name || 'Onbekende gebruiker'}</p>
+                <p className="text-xs text-muted-foreground truncate">{profile?.role || 'Geen rol'}</p>
               </div>
               <Button variant="ghost" size="icon" onClick={signOut}>
                 <LogOut className="h-4 w-4" />
