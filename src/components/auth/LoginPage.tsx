@@ -1,45 +1,47 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/toast'
+import { useAuthStore } from '@/store/authStore'
 
 function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const signIn = useAuthStore((s) => s.signIn)
+  const isSigningIn = useAuthStore((s) => s.isSigningIn)
   const { toast } = useToast()
+
+  console.log('[LoginPage] render, isSigningIn:', isSigningIn)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setLoginError(null)
 
-    try {
-      console.log('Attempting login for email:', email)
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-      toast({ title: 'Ingelogd', description: 'Welkom terug!' })
-      console.log('Login successful for email:', email)
-      
-      // Redirect back to original URL or default to command center
-      const redirectUrl = localStorage.getItem('redirectAfterLogin') || '/command-center'
-      console.log('Redirecting to:', redirectUrl)
-      localStorage.removeItem('redirectAfterLogin') // Clean up
-      navigate(redirectUrl)
-    } catch (err) {
-      console.error('Login error for email:', email, err)
+    console.log('[LoginPage] handleLogin called for:', email)
+
+    const { error } = await signIn(email, password)
+
+    if (error) {
+      console.error('[LoginPage] signIn returned error:', error.message)
+      setLoginError(error.message)
       toast({
         title: 'Inloggen mislukt',
-        description: err instanceof Error ? err.message : 'Onbekende fout',
+        description: error.message,
         variant: 'destructive',
-       })
-    } finally {
-      setIsLoading(false)
+      })
+      return
     }
+
+    console.log('[LoginPage] signIn success, redirecting...')
+
+    const redirectUrl = localStorage.getItem('redirectAfterLogin') || '/command-center'
+    localStorage.removeItem('redirectAfterLogin')
+
+    window.location.href = redirectUrl
   }
 
   return (
@@ -72,8 +74,11 @@ function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Inloggen...' : 'Inloggen'}
+            {loginError && (
+              <p className="text-sm text-destructive">{loginError}</p>
+            )}
+            <Button type="submit" disabled={isSigningIn}>
+              {isSigningIn ? 'Inloggen...' : 'Inloggen'}
             </Button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-4">
