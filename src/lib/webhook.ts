@@ -31,6 +31,12 @@ interface RAGWebhookResponse {
   }> | null
 }
 
+export interface WebhookTestResult {
+  ok: boolean
+  status: number
+  message: string
+}
+
 function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < hex.length; i += 2) {
@@ -64,6 +70,7 @@ export async function encryptToken(plaintext: string): Promise<string> {
 }
 
 export async function decryptToken(ciphertext: string): Promise<string> {
+  if (!ciphertext) return ''
   const key = await getEncryptionKey()
   const combined = hexToBytes(ciphertext)
   const iv = combined.slice(0, 12)
@@ -72,7 +79,30 @@ export async function decryptToken(ciphertext: string): Promise<string> {
   return new TextDecoder().decode(decrypted)
 }
 
-async function loadFlowConfig(organizationId: string) {
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
+function classifyWebhookError(status: number, url: string): Error {
+  if (status === 401) {
+    return new Error('Authenticatiefout (401). Controleer of het token en de header naam overeenkomen met de n8n webhook instellingen.')
+  }
+  if (status === 403) {
+    return new Error('Webhook geweigerd (403). Controleer of het token correct is en de header naam (bijv. X-Webhook-Token) overeenkomt met de n8n webhook instellingen.')
+  }
+  if (status === 404) {
+    return new Error(`Webhook niet gevonden (404). Controleer de URL en of de n8n workflow actief is.${url.includes('/webhook-test/') ? ' Let op: /webhook-test/ is een test-URL, gebruik /webhook/ voor productie.' : ''}`)
+  }
+  if (status === 429) {
+    return new Error('Te veel verzoeken (429). Wacht even en probeer opnieuw.')
+  }
+  if (status >= 500) {
+    return new Error('De AI-service is tijdelijk niet beschikbaar. Probeer het later opnieuw.')
+  }
+  return new Error(`Onverwachte fout (${status}). Controleer de webhook configuratie.`)
+}
+
+async function loadFlowConfig(organizationId: string): Promise<FlowConfig | null> {
   const { data } = await (supabase as any).from('flow_configs') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
     .select('*')
     .eq('flow_type', 'rag_chat')
@@ -109,6 +139,14 @@ async function loadConversationHistory(conversationId: string): Promise<Array<{ 
   return data.slice(-20).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }))
 }
 
+function buildAuthHeaders(token: string | undefined, authHeader: string): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) {
+    headers[authHeader] = token
+  }
+  return headers
+}
+
 export async function callRagWebhook(
   assistant: AIAssistant,
   conversation: Conversation,
@@ -116,27 +154,27 @@ export async function callRagWebhook(
   organizationId: string,
 ): Promise<RAGWebhookResponse> {
   let webhookUrl: string
-  let token: string
+  let token: string | undefined
+  let authHeader = 'X-Webhook-Token'
 
   if (assistant.type === 'chat') {
     const config = await loadFlowConfig(organizationId)
     if (!config) {
       throw new Error('Geen RAG configuratie gevonden — neem contact op met de beheerder')
     }
-    webhookUrl = config.webhook_url
+    webhookUrl = normalizeUrl(config.webhook_url)
     if (!webhookUrl) {
       if (assistant.n8n_webhook_url) {
-        webhookUrl = assistant.n8n_webhook_url
-        token = ''
+        webhookUrl = normalizeUrl(assistant.n8n_webhook_url)
       } else {
         throw new Error('Webhook URL niet geconfigureerd')
       }
     } else {
-      token = await decryptToken(config.webhook_token)
+      authHeader = config.webhook_auth_header || 'X-Webhook-Token'
+      token = config.webhook_token ? await decryptToken(config.webhook_token) : undefined
     }
   } else if (assistant.n8n_webhook_url) {
-    webhookUrl = assistant.n8n_webhook_url
-    token = ''
+    webhookUrl = normalizeUrl(assistant.n8n_webhook_url)
   } else {
     throw new Error('Geen webhook URL beschikbaar voor deze assistant')
   }
@@ -165,8 +203,7 @@ export async function callRagWebhook(
   const timeout = setTimeout(() => controller.abort(), 30000)
 
   try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token) headers['Authorization'] = `Bearer ${token}`
+    const headers = buildAuthHeaders(token, authHeader)
 
     const res = await fetch(webhookUrl, {
       method: 'POST',
@@ -176,10 +213,7 @@ export async function callRagWebhook(
     })
 
     if (!res.ok) {
-      if (res.status === 401) throw new Error('Authenticatiefout — neem contact op met de beheerder')
-      if (res.status === 404) throw new Error('Webhook niet gevonden — controleer de configuratie')
-      if (res.status >= 500) throw new Error('De AI-service is tijdelijk niet beschikbaar. Probeer het later opnieuw.')
-      throw new Error(`HTTP ${res.status}`)
+      throw classifyWebhookError(res.status, webhookUrl)
     }
 
     const data = await res.json()
@@ -192,9 +226,76 @@ export async function callRagWebhook(
       throw new Error('De assistant reageert niet. Controleer de verbinding en probeer het opnieuw.')
     }
     if (err instanceof TypeError) {
-      throw new Error('Kon geen verbinding maken met de AI-service. Controleer je internetverbinding.')
+      throw new Error('Kon geen verbinding maken met de webhook. Controleer of de URL bereikbaar is en CORS is ingeschakeld in n8n.')
     }
     throw err
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+export async function testWebhook(
+  url: string,
+  token?: string,
+  authHeaderName: string = 'X-Webhook-Token',
+): Promise<WebhookTestResult> {
+  const normalizedUrl = normalizeUrl(url)
+
+  if (normalizedUrl.includes('/webhook-test/')) {
+    return {
+      ok: false,
+      status: 0,
+      message: 'Dit is een n8n test-URL (/webhook-test/). Gebruik de productie-URL (/webhook/) voor live assistenten.',
+    }
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10000)
+
+  try {
+    const headers = buildAuthHeaders(token, authHeaderName)
+
+    const res = await fetch(normalizedUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
+      signal: controller.signal,
+    })
+
+    if (res.ok) {
+      return {
+        ok: true,
+        status: res.status,
+        message: 'Verbinding geslaagd! De webhook is bereikbaar en accepteert verzoeken.',
+      }
+    }
+
+    const error = classifyWebhookError(res.status, normalizedUrl)
+    return {
+      ok: false,
+      status: res.status,
+      message: error.message,
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return {
+        ok: false,
+        status: 0,
+        message: 'Time-out: de webhook reageert niet binnen 10 seconden. Controleer of de n8n workflow actief is.',
+      }
+    }
+    if (err instanceof TypeError) {
+      return {
+        ok: false,
+        status: 0,
+        message: 'Kon geen verbinding maken. Controleer of de URL bereikbaar is en CORS is ingeschakeld in n8n.',
+      }
+    }
+    return {
+      ok: false,
+      status: 0,
+      message: err instanceof Error ? err.message : 'Onbekende fout',
+    }
   } finally {
     clearTimeout(timeout)
   }

@@ -306,6 +306,7 @@ export interface Database {
           flow_type: 'rag_chat'
           webhook_url: string
           webhook_token: string
+          webhook_auth_header: string
           organization_id: string
           created_at: string
           updated_at: string
@@ -314,7 +315,8 @@ export interface Database {
           id?: string
           flow_type: 'rag_chat'
           webhook_url: string
-          webhook_token: string
+          webhook_token?: string
+          webhook_auth_header?: string
           organization_id: string
           created_at?: string
           updated_at?: string
@@ -324,6 +326,7 @@ export interface Database {
           flow_type?: 'rag_chat'
           webhook_url?: string
           webhook_token?: string
+          webhook_auth_header?: string
           organization_id?: string
           created_at?: string
           updated_at?: string

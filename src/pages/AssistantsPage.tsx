@@ -538,9 +538,17 @@ function ChatWindow({
         sources: result.sources,
       })
     } catch (err) {
+      const description = err instanceof Error ? err.message : 'Kon geen antwoord krijgen'
+      const title = description.includes('verbinding maken') || description.includes('CORS')
+        ? 'Verbindingsfout'
+        : description.includes('geweigerd') || description.includes('Authenticatiefout')
+          ? 'Authenticatiefout'
+          : description.includes('niet gevonden')
+            ? 'Webhook niet gevonden'
+            : 'Fout bij versturen'
       toast({
-        title: 'Fout bij versturen',
-        description: err instanceof Error ? err.message : 'Kon geen antwoord krijgen',
+        title,
+        description,
         variant: 'destructive',
       })
     } finally {
