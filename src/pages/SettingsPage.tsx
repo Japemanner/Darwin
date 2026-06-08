@@ -260,7 +260,7 @@ function SettingsPage() {
       <div className="space-y-6">
         <FlowConfigCard
           flowType="rag_chat"
-          title="RAG Chat Configuratie"
+          title="Chat assistent Configuratie"
           description="Configureer de gedeelde n8n webhook voor alle chat assistants. Deze instelling geldt voor alle assistants van type &quot;chat&quot;."
           placeholder="https://n8n.example.com/webhook/rag-chat"
           profile={profile}
@@ -268,7 +268,7 @@ function SettingsPage() {
 
         <FlowConfigCard
           flowType="document_processing"
-          title="Documentverwerking Configuratie"
+          title="Kennisbron Documentverwerking Configuratie"
           description="Configureer de n8n webhook voor documentverwerking. Bij elke document-upload wordt de signed download URL naar deze webhook gestuurd."
           placeholder="https://n8n.example.com/webhook/documents"
           profile={profile}
