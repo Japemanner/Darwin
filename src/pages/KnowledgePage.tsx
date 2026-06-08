@@ -268,7 +268,7 @@ function KBSlideOver({
 
     setIsUploading(true)
     try {
-      await uploadDocument(file, kb.id, userId, organizationId)
+      await uploadDocument(file, kb.id, kb.name, userId, organizationId)
       toast({ title: 'Document geüpload', description: file.name })
       const { data: docs } = await supabase
         .from('knowledge_base_documents')

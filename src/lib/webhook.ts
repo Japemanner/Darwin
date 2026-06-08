@@ -105,10 +105,10 @@ function classifyWebhookError(status: number, url: string): Error {
   return new Error(`Onverwachte fout (${status}). Controleer de webhook configuratie.`)
 }
 
-async function loadFlowConfig(organizationId: string): Promise<FlowConfig | null> {
+async function loadFlowConfig(organizationId: string, flowType: string): Promise<FlowConfig | null> {
   const { data } = await (supabase as any).from('flow_configs') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
     .select('*')
-    .eq('flow_type', 'rag_chat')
+    .eq('flow_type', flowType)
     .eq('organization_id', organizationId)
     .single()
   return data as FlowConfig | null
@@ -167,7 +167,7 @@ export async function callRagWebhook(
   let authHeader = 'X-Webhook-Token'
 
   if (assistant.type === 'chat') {
-    const config = await loadFlowConfig(organizationId)
+    const config = await loadFlowConfig(organizationId, 'rag_chat')
     if (!config) {
       throw new Error('Geen RAG configuratie gevonden — neem contact op met de beheerder')
     }
@@ -337,5 +337,58 @@ export async function testWebhook(
     }
   } finally {
     clearTimeout(timeout)
+  }
+}
+
+export async function callDocumentWebhook(
+  organizationId: string,
+  knowledgeBaseName: string,
+  documentName: string,
+  documentType: string,
+  downloadUrl: string,
+): Promise<void> {
+  try {
+    const config = await loadFlowConfig(organizationId, 'document_processing')
+    if (!config || !config.webhook_url) return
+
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', organizationId)
+      .single()
+
+    const tenantId: string = (orgData as { name: string } | null)?.name ?? organizationId
+    const authHeader = config.webhook_auth_header || 'X-Webhook-Token'
+    const token = config.webhook_token ? await decryptToken(config.webhook_token) : undefined
+
+    const headers = buildAuthHeaders(token, authHeader)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+
+    try {
+      const res = await fetch(normalizeUrl(config.webhook_url), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          tenantId,
+          knowledgeSourceName: knowledgeBaseName,
+          document_name: documentName,
+          document_type: documentType,
+          download_url: downloadUrl,
+        }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        console.error('[webhook] Document webhook failed:', res.status, classifyWebhookError(res.status, config.webhook_url).message)
+      }
+    } catch (err) {
+      console.error('[webhook] Document webhook error:', err instanceof Error ? err.message : err)
+    } finally {
+      clearTimeout(timeout)
+    }
+  } catch (err) {
+    console.error('[webhook] Document webhook setup error:', err instanceof Error ? err.message : err)
   }
 }

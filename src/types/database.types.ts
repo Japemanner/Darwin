@@ -303,7 +303,7 @@ export interface Database {
       flow_configs: {
         Row: {
           id: string
-          flow_type: 'rag_chat'
+          flow_type: 'rag_chat' | 'document_processing'
           webhook_url: string
           webhook_token: string
           webhook_auth_header: string
@@ -313,7 +313,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          flow_type: 'rag_chat'
+          flow_type: 'rag_chat' | 'document_processing'
           webhook_url: string
           webhook_token?: string
           webhook_auth_header?: string
@@ -323,7 +323,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          flow_type?: 'rag_chat'
+          flow_type?: 'rag_chat' | 'document_processing'
           webhook_url?: string
           webhook_token?: string
           webhook_auth_header?: string
