@@ -58,7 +58,13 @@ export const getDocumentPublicUrl = (filePath: string) => {
   return data.publicUrl
 }
 
-export const deleteDocument = async (documentId: string, filePath: string) => {
+export const deleteDocument = async (
+  documentId: string,
+  filePath: string,
+  organizationId: string,
+  knowledgeBaseName: string,
+  documentName: string,
+) => {
   const { error: storageError } = await supabase.storage
     .from('knowledge-documents')
     .remove([filePath])
@@ -71,4 +77,7 @@ export const deleteDocument = async (documentId: string, filePath: string) => {
     .eq('id', documentId)
 
   if (error) throw error
+
+  const fileExt = filePath.split('.').pop()?.toLowerCase() || 'unknown'
+  await callDocumentWebhook(organizationId, knowledgeBaseName, documentName, fileExt, '', 'delete')
 }

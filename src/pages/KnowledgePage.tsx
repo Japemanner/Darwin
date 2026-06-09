@@ -286,7 +286,7 @@ function KBSlideOver({
 
   const handleDeleteDoc = async (doc: KnowledgeBaseDocument) => {
     try {
-      await deleteDocument(doc.id, doc.file_path)
+      await deleteDocument(doc.id, doc.file_path, organizationId, kb!.name, doc.name)
       toast({ title: 'Document verwijderd' })
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id))
     } catch (err) {

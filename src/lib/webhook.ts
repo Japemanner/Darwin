@@ -340,12 +340,15 @@ export async function testWebhook(
   }
 }
 
+export type DocumentAction = 'index' | 'modify' | 'delete'
+
 export async function callDocumentWebhook(
   organizationId: string,
   knowledgeBaseName: string,
   documentName: string,
   documentType: string,
   downloadUrl: string,
+  action: DocumentAction = 'index',
 ): Promise<void> {
   try {
     const config = await loadFlowConfig(organizationId, 'document_processing')
@@ -371,6 +374,7 @@ export async function callDocumentWebhook(
         method: 'POST',
         headers,
         body: JSON.stringify({
+          action,
           tenantId,
           knowledgeSourceName: knowledgeBaseName,
           document_name: documentName,
