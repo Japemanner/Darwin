@@ -164,7 +164,7 @@ export interface Database {
           knowledge_base_id: string
           organization_id: string
           name: string
-          file_path: string
+          file_path: string | null
           file_type: string
           file_size: number
           status: 'processing' | 'ready' | 'error'
@@ -190,7 +190,7 @@ export interface Database {
           knowledge_base_id?: string
           organization_id?: string
           name?: string
-          file_path?: string
+          file_path?: string | null
           file_type?: string
           file_size?: number
           status?: 'processing' | 'ready' | 'error'

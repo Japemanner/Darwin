@@ -48,6 +48,8 @@ export const uploadDocument = async (
     file.name,
     fileExt?.toLowerCase() || 'unknown',
     signedUrlData.signedUrl,
+    'index',
+    filePath,
   )
 
   return { document, signedUrl: signedUrlData.signedUrl }
@@ -55,16 +57,18 @@ export const uploadDocument = async (
 
 export const deleteDocument = async (
   documentId: string,
-  filePath: string,
+  filePath: string | null,
   organizationId: string,
   knowledgeBaseName: string,
   documentName: string,
 ) => {
-  const { error: storageError } = await supabase.storage
-    .from('knowledge-documents')
-    .remove([filePath])
+  if (filePath) {
+    const { error: storageError } = await supabase.storage
+      .from('knowledge-documents')
+      .remove([filePath])
 
-  if (storageError) throw storageError
+    if (storageError) throw storageError
+  }
 
   const { error } = await supabase
     .from('knowledge_base_documents')
@@ -73,6 +77,6 @@ export const deleteDocument = async (
 
   if (error) throw error
 
-  const fileExt = filePath.split('.').pop()?.toLowerCase() || 'unknown'
-  await callDocumentWebhook(organizationId, knowledgeBaseName, documentId, documentName, fileExt, '', 'delete')
+  const fileExt = filePath?.split('.').pop()?.toLowerCase() || 'unknown'
+  await callDocumentWebhook(organizationId, knowledgeBaseName, documentId, documentName, fileExt, '', 'delete', filePath ?? '')
 }

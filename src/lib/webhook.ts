@@ -351,6 +351,7 @@ export async function callDocumentWebhook(
   documentType: string,
   downloadUrl: string,
   action: DocumentAction = 'index',
+  filePath: string = '',
 ): Promise<void> {
   try {
     const config = await loadFlowConfig(organizationId, 'document_processing')
@@ -382,6 +383,7 @@ export async function callDocumentWebhook(
           document_id: documentId,
           document_name: documentName,
           document_type: documentType,
+          file_path: filePath,
           download_url: downloadUrl,
         }),
         signal: controller.signal,
