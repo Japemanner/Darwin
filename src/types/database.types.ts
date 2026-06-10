@@ -162,6 +162,7 @@ export interface Database {
         Row: {
           id: string
           knowledge_base_id: string
+          organization_id: string
           name: string
           file_path: string
           file_type: string
@@ -174,6 +175,7 @@ export interface Database {
         Insert: {
           id?: string
           knowledge_base_id: string
+          organization_id: string
           name: string
           file_path: string
           file_type: string
@@ -186,6 +188,7 @@ export interface Database {
         Update: {
           id?: string
           knowledge_base_id?: string
+          organization_id?: string
           name?: string
           file_path?: string
           file_type?: string

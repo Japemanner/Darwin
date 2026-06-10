@@ -120,7 +120,7 @@ interface KnowledgeBaseWithId {
   vector_collection_id: string | null
 }
 
-async function loadAssistantKnowledgeBases(assistantId: string): Promise<KnowledgeBaseWithId[]> {
+async function loadAssistantKnowledgeBases(assistantId: string, organizationId: string): Promise<KnowledgeBaseWithId[]> {
   const { data: links } = await (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
     .select('knowledge_base_id')
     .eq('assistant_id', assistantId)
@@ -130,6 +130,7 @@ async function loadAssistantKnowledgeBases(assistantId: string): Promise<Knowled
   const { data: kbs } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
     .from('knowledge_bases')
     .select('id, name, vector_collection_id')
+    .eq('organization_id', organizationId)
     .in(
       'id',
       links.map((l: { knowledge_base_id: string }) => l.knowledge_base_id),
@@ -188,7 +189,7 @@ export async function callRagWebhook(
     throw new Error('Geen webhook URL beschikbaar voor deze assistant')
   }
 
-  const knowledgeBases = await loadAssistantKnowledgeBases(assistant.id)
+  const knowledgeBases = await loadAssistantKnowledgeBases(assistant.id, organizationId)
   const history = await loadConversationHistory(conversation.id)
 
   const { data: orgData } = await supabase

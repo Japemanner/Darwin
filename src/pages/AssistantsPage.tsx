@@ -272,10 +272,10 @@ function AssistantModal({
     if (!assistant) return
     setIsDeleting(true)
     try {
-      const { error: convError } = await (supabase as any).from('conversations').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      const { error: convError } = await (supabase as any).from('conversations').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation; RLS enforces user_id = auth.uid()
       if (convError) throw convError
 
-      const { error: kbError } = await (supabase as any).from('assistant_knowledge_bases').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      const { error: kbError } = await (supabase as any).from('assistant_knowledge_bases').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation; RLS enforces org scoping
       if (kbError) throw kbError
 
       const { error } = await (supabase as any).from('ai_assistants').delete().eq('id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation

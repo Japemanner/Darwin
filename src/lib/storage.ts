@@ -22,6 +22,7 @@ export const uploadDocument = async (
     .from('knowledge_base_documents')
     .insert({
       knowledge_base_id: knowledgeBaseId,
+      organization_id: organizationId,
       name: file.name,
       file_path: filePath,
       file_type: fileExt || 'unknown',
@@ -50,13 +51,6 @@ export const uploadDocument = async (
   )
 
   return { document, signedUrl: signedUrlData.signedUrl }
-}
-
-export const getDocumentPublicUrl = (filePath: string) => {
-  const { data } = supabase.storage
-    .from('knowledge-documents')
-    .getPublicUrl(filePath)
-  return data.publicUrl
 }
 
 export const deleteDocument = async (
