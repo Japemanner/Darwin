@@ -30,7 +30,9 @@ Bij elke documentupload stuurt Darwin een POST naar de webhook URL:
 
 ```json
 {
+  "action": "index",
   "tenant_id": "uuid-van-organisatie",
+  "document_id": "uuid-van-document",
   "document_name": "handleiding.pdf",
   "document_type": "pdf",
   "download_url": "https://xxx.supabase.co/storage/v1/object/sign/..."
@@ -38,6 +40,14 @@ Bij elke documentupload stuurt Darwin een POST naar de webhook URL:
 ```
 
 De `download_url` is **15 minuten geldig**. N8N moet het document binnen die tijd downloaden.
+
+### Actions in de webhook payload
+
+| Action | Wanneer | Beschrijving |
+|--------|---------|--------------|
+| `index` | Bestand geüpload via UI | N8N moet document downloaden, chunk+embedden, en status updaten |
+| `modify` | *(placeholder, komt later)* | Nog niet in gebruik |
+| `delete` | Bestand verwijderd via UI | N8N kan vector data opruimen; `download_url` is leeg |
 
 ### Stap 1 — Webhook URL instellen in Darwin
 
@@ -76,10 +86,11 @@ Je flow moet minimaal deze stappen bevatten:
 Webhook → Download bestand (via download_url) → Chunk + Embed → Update status in Supabase
 ```
 
-1. **Webhook** node vangt de POST op → geeft `tenant_id`, `document_name`, `document_type`, `download_url`
-2. **HTTP Request** node (`GET {download_url}`) → downloadt het bestand (binnen 15 min!)
-3. **Chunk + Embed** naar je vector database (bijv. via LangChain node of custom code)
-4. **Supabase** node → `UPDATE knowledge_base_documents SET status = 'ready' WHERE name = '{document_name}'`
+1. **Webhook** node vangt de POST op → geeft `action`, `tenant_id`, `document_id`, `document_name`, `document_type`, `download_url`
+2. **Switch** node op `action`: `index` → verwerken, `delete` → opruimen
+3. **HTTP Request** node (`GET {download_url}`) → downloadt het bestand (binnen 15 min!)
+4. **Chunk + Embed** naar je vector database (bijv. via LangChain node of custom code)
+5. **Supabase** node → `UPDATE knowledge_base_documents SET status = 'ready' WHERE id = '{document_id}'`
 
 Bij fouten: zet status op `error`.
 

@@ -345,6 +345,7 @@ export type DocumentAction = 'index' | 'modify' | 'delete'
 export async function callDocumentWebhook(
   organizationId: string,
   knowledgeBaseName: string,
+  documentId: string,
   documentName: string,
   documentType: string,
   downloadUrl: string,
@@ -377,6 +378,7 @@ export async function callDocumentWebhook(
           action,
           tenantId,
           knowledgeSourceName: knowledgeBaseName,
+          document_id: documentId,
           document_name: documentName,
           document_type: documentType,
           download_url: downloadUrl,

@@ -396,9 +396,15 @@ function KBSlideOver({
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant={doc.status === 'ready' ? 'default' : 'secondary'}>
-                        {doc.status === 'ready' ? 'Klaar' : doc.status === 'processing' ? 'Verwerken' : 'Fout'}
-                      </Badge>
+                      {doc.status === 'ready' && (
+                        <Badge variant="default">Klaar</Badge>
+                      )}
+                      {doc.status === 'processing' && (
+                        <Badge variant="secondary">Verwerken...</Badge>
+                      )}
+                      {doc.status === 'error' && (
+                        <Badge variant="destructive">Error</Badge>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteDoc(doc)}>
                         <Trash2 className="h-4 w-4 text-muted-foreground" />
                       </Button>

@@ -43,6 +43,7 @@ export const uploadDocument = async (
   await callDocumentWebhook(
     organizationId,
     knowledgeBaseName,
+    (document as KnowledgeBaseDocument).id,
     file.name,
     fileExt?.toLowerCase() || 'unknown',
     signedUrlData.signedUrl,
@@ -79,5 +80,5 @@ export const deleteDocument = async (
   if (error) throw error
 
   const fileExt = filePath.split('.').pop()?.toLowerCase() || 'unknown'
-  await callDocumentWebhook(organizationId, knowledgeBaseName, documentName, fileExt, '', 'delete')
+  await callDocumentWebhook(organizationId, knowledgeBaseName, documentId, documentName, fileExt, '', 'delete')
 }
