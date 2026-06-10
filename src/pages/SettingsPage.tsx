@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Settings, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Select } from '@/components/ui/select'
+import { Settings, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle, Building2, UserPlus } from 'lucide-react'
 import type { FlowConfig } from '@/types/database.types'
 import type { WebhookTestResult } from '@/lib/webhook'
 
@@ -245,8 +247,153 @@ function FlowConfigCard({
   )
 }
 
+const TENANT_ROLE_OPTIONS = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'member', label: 'Lid' },
+]
+
+function CreateTenantCard() {
+  const { toast } = useToast()
+  const [orgName, setOrgName] = useState('')
+  const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+  const [userPassword, setUserPassword] = useState('')
+  const [userRole, setUserRole] = useState('admin')
+  const [isCreating, setIsCreating] = useState(false)
+  const [result, setResult] = useState<{ organization: { id: string; name: string }; user: { id: string; email: string } } | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsCreating(true)
+    setResult(null)
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-tenant', {
+        body: {
+          organization_name: orgName.trim(),
+          user_email: userEmail.trim(),
+          user_full_name: userName.trim(),
+          user_password: userPassword,
+          user_role: userRole,
+        },
+      })
+
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+
+      setResult(data)
+      toast({ title: 'Organisatie aangemaakt', description: `${data.organization.name} is succesvol aangemaakt met admin ${data.user.email}` })
+      setOrgName('')
+      setUserName('')
+      setUserEmail('')
+      setUserPassword('')
+      setUserRole('admin')
+    } catch (err) {
+      toast({ title: 'Fout bij aanmaken', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-primary" />
+          <CardTitle>Nieuwe Organisatie &amp; Gebruiker</CardTitle>
+        </div>
+        <CardDescription>
+          Maak een nieuwe tenant (organisatie) aan met een admin-gebruiker. De gebruiker kan direct inloggen met het opgegeven wachtwoord.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="tenant-org-name">Organisatienaam</Label>
+            <Input
+              id="tenant-org-name"
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+              placeholder="Bijv. Acme BV"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="tenant-user-name">Naam gebruiker</Label>
+            <Input
+              id="tenant-user-name"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              placeholder="Bijv. Jan de Vries"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="tenant-user-email">E-mailadres</Label>
+            <Input
+              id="tenant-user-email"
+              type="email"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              placeholder="jan@acme.nl"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="tenant-user-password">Wachtwoord</Label>
+            <Input
+              id="tenant-user-password"
+              type="password"
+              value={userPassword}
+              onChange={(e) => setUserPassword(e.target.value)}
+              placeholder="Minimaal 6 tekens"
+              minLength={6}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Geef dit wachtwoord aan de gebruiker. Later kan uitnodiging per e-mail worden toegevoegd.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="tenant-user-role">Rol</Label>
+            <Select
+              value={userRole}
+              onValueChange={setUserRole}
+              options={TENANT_ROLE_OPTIONS}
+            />
+          </div>
+
+          <Button type="submit" disabled={isCreating}>
+            {isCreating ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Aanmaken...</>
+            ) : (
+              <><UserPlus className="h-4 w-4 mr-2" /> Organisatie aanmaken</>
+            )}
+          </Button>
+
+          {result && (
+            <div className="flex items-start gap-2 p-3 rounded-md text-sm bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-400">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">Organisatie aangemaakt</p>
+                <p className="text-xs mt-1">Org ID: <code>{result.organization.id}</code></p>
+                <p className="text-xs">Gebruiker: <code>{result.user.email}</code> (ID: <code>{result.user.id}</code>)</p>
+              </div>
+            </div>
+          )}
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
 function SettingsPage() {
   const { profile } = useAuth()
+  const [activeTab, setActiveTab] = useState('webhooks')
 
   if (!profile) return null
 
@@ -254,57 +401,73 @@ function SettingsPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Instellingen</h1>
-        <p className="text-muted-foreground">Beheer globale configuraties voor AI flows</p>
+        <p className="text-muted-foreground">Beheer globale configuraties en organisaties</p>
       </div>
 
-      <div className="space-y-6">
-        <FlowConfigCard
-          flowType="rag_chat"
-          title="Chat assistent Configuratie"
-          description="Configureer de gedeelde n8n webhook voor alle chat assistants. Deze instelling geldt voor alle assistants van type &quot;chat&quot;."
-          placeholder="https://n8n.example.com/webhook/rag-chat"
-          profile={profile}
-        />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+          <TabsTrigger value="tenant">
+            <Building2 className="h-4 w-4 mr-1.5" />
+            Nieuwe Organisatie
+          </TabsTrigger>
+        </TabsList>
 
-        <FlowConfigCard
-          flowType="document_processing"
-          title="Kennisbron Documentverwerking Configuratie"
-          description="Configureer de n8n webhook voor documentverwerking. Bij elke document-upload wordt de signed download URL naar deze webhook gestuurd."
-          placeholder="https://n8n.example.com/webhook/documents"
-          profile={profile}
-        />
-      </div>
+        <TabsContent value="webhooks">
+          <div className="space-y-6">
+            <FlowConfigCard
+              flowType="rag_chat"
+              title="Chat assistent Configuratie"
+              description="Configureer de gedeelde n8n webhook voor alle chat assistants. Deze instelling geldt voor alle assistants van type &quot;chat&quot;."
+              placeholder="https://n8n.example.com/webhook/rag-chat"
+              profile={profile}
+            />
 
-      <div className="mt-6 max-w-2xl">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">n8n Webhook Configuratie Handleiding</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-3">
-            <div>
-              <p className="font-medium text-foreground">1. Webhook URL</p>
-              <p>In n8n: open de Webhook node → kopieer de <strong>Production URL</strong> (bevat <code>/webhook/</code>). Gebruik niet de Test URL (<code>/webhook-test/</code>).</p>
+            <FlowConfigCard
+              flowType="document_processing"
+              title="Kennisbron Documentverwerking Configuratie"
+              description="Configureer de n8n webhook voor documentverwerking. Bij elke document-upload wordt de signed download URL naar deze webhook gestuurd."
+              placeholder="https://n8n.example.com/webhook/documents"
+              profile={profile}
+            />
+
+            <div className="max-w-2xl">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">n8n Webhook Configuratie Handleiding</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-3">
+                  <div>
+                    <p className="font-medium text-foreground">1. Webhook URL</p>
+                    <p>In n8n: open de Webhook node → kopieer de <strong>Production URL</strong> (bevat <code>/webhook/</code>). Gebruik niet de Test URL (<code>/webhook-test/</code>).</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">2. CORS</p>
+                    <p>In de Webhook node → Settings → zet <strong>CORS op Enabled</strong> met Allow Origin <code>*</code>.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">3. Authenticatie</p>
+                    <p>In de Webhook node → Settings → Authentication → kies <strong>Header auth</strong>.</p>
+                    <p>Stel in n8n de Header Name in op <code>X-Webhook-Token</code> en de Header Value op een token naar keuze. Vul dezelfde waarden hierboven in.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">4. Workflow activeren</p>
+                    <p>Zorg dat de n8n workflow op <strong>Active</strong> staat, anders is de webhook URL niet bereikbaar.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">5. Documentverwerking</p>
+                    <p>Maak een aparte n8n workflow voor documentverwerking. Deze webhook ontvangt bij elke upload een payload met <code>tenantId</code>, <code>knowledgeSourceName</code>, <code>document_name</code>, <code>document_type</code> en <code>download_url</code>. De download URL is 15 minuten geldig.</p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <div>
-              <p className="font-medium text-foreground">2. CORS</p>
-              <p>In de Webhook node → Settings → zet <strong>CORS op Enabled</strong> met Allow Origin <code>*</code>.</p>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">3. Authenticatie</p>
-              <p>In de Webhook node → Settings → Authentication → kies <strong>Header auth</strong>.</p>
-              <p>Stel in n8n de Header Name in op <code>X-Webhook-Token</code> en de Header Value op een token naar keuze. Vul dezelfde waarden hierboven in.</p>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">4. Workflow activeren</p>
-              <p>Zorg dat de n8n workflow op <strong>Active</strong> staat, anders is de webhook URL niet bereikbaar.</p>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">5. Documentverwerking</p>
-              <p>Maak een aparte n8n workflow voor documentverwerking. Deze webhook ontvangt bij elke upload een payload met <code>tenantId</code>, <code>knowledgeSourceName</code>, <code>document_name</code>, <code>document_type</code> en <code>download_url</code>. De download URL is 15 minuten geldig.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="tenant">
+          <CreateTenantCard />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
