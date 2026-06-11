@@ -280,6 +280,7 @@ function CreateTenantCard() {
 
       if (error) throw error
       if (data?.error) throw new Error(data.error)
+      if (!data?.success) throw new Error(data?.error || 'Onbekende fout bij aanmaken organisatie')
 
       setResult(data)
       toast({ title: 'Organisatie aangemaakt', description: `${data.organization.name} is succesvol aangemaakt met admin ${data.user.email}` })

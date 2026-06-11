@@ -134,6 +134,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     })
 
     try {
+      const lsKeys = Object.keys(localStorage).filter(k => k.includes('auth-token'))
+      console.log('[auth] localStorage auth keys:', lsKeys, lsKeys.map(k => localStorage.getItem(k) ? 'present' : 'empty'))
+
       const { data: { session } } = await supabase.auth.getSession()
 
       if (session?.user) {

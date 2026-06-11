@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,8 @@ function LoginPage() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const signIn = useAuthStore((s) => s.signIn)
   const isSigningIn = useAuthStore((s) => s.isSigningIn)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const navigate = useNavigate()
   const { toast } = useToast()
 
   console.log('[LoginPage] render, isSigningIn:', isSigningIn)
@@ -36,12 +38,12 @@ function LoginPage() {
       return
     }
 
-    console.log('[LoginPage] signIn success, redirecting...')
+    console.log('[LoginPage] signIn success, isAuthenticated:', isAuthenticated)
 
     const redirectUrl = localStorage.getItem('redirectAfterLogin') || '/command-center'
     localStorage.removeItem('redirectAfterLogin')
 
-    window.location.href = redirectUrl
+    navigate(redirectUrl, { replace: true })
   }
 
   return (

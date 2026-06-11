@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 
 function ProtectedRoute() {
@@ -14,7 +14,20 @@ function ProtectedRoute() {
   }
 
   if (!isAuthenticated) {
-    // Store the attempted URL so we can redirect back after login
+    const alreadyRedirected = localStorage.getItem('redirectAfterLogin')
+    if (alreadyRedirected) {
+      console.error('[ProtectedRoute] Auth loop detected — was redirecting from:', alreadyRedirected)
+      localStorage.removeItem('redirectAfterLogin')
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-2">
+            <p className="text-destructive font-semibold">Sessie verlopen</p>
+            <p className="text-muted-foreground text-sm">Je sessie is verlopen. Log opnieuw in.</p>
+            <Link to="/login" className="text-primary text-sm hover:underline">Naar inloggen</Link>
+          </div>
+        </div>
+      )
+    }
     localStorage.setItem('redirectAfterLogin', location.pathname + location.search)
     return <Navigate to="/login" replace />
   }
