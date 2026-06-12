@@ -92,27 +92,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: invitation, error: invError } = await supabase
-      .from("invitations")
-      .insert({
-        email: user_email,
-        organization_id: org.id,
-        role,
-        invited_by: user.id,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (invError) {
-      await supabase.from("organizations").delete().eq("id", org.id);
-      console.error("Failed to create invitation:", invError);
-      return new Response(JSON.stringify({ error: "Failed to create invitation" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    }
-
     const { data: newUser, error: userError } = await supabase.auth.admin.createUser({
       email: user_email,
       password: user_password,
@@ -123,7 +102,6 @@ Deno.serve(async (req: Request) => {
     });
 
     if (userError) {
-      await supabase.from("invitations").delete().eq("id", invitation.id);
       await supabase.from("organizations").delete().eq("id", org.id);
       console.error("Failed to create user:", userError);
       return new Response(JSON.stringify({ error: `Failed to create user: ${userError.message}` }), {
@@ -132,49 +110,33 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { error: profileError } = await supabase.from("profiles").upsert({
-      id: newUser.id,
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: newUser.user.id,
       organization_id: org.id,
       full_name: user_full_name,
       role,
     });
 
     if (profileError) {
-      console.error("Profile upsert failed:", profileError);
-    }
-
-    await supabase.from("invitations").update({ status: "accepted" }).eq("id", invitation.id);
-
-    const { data: userProfile } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", newUser.id)
-      .single();
-
-    if (userProfile && userProfile.organization_id !== org.id) {
-      await supabase.from("profiles").update({ organization_id: org.id }).eq("id", newUser.id);
-
-      const { count } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", userProfile.organization_id);
-
-      if (count === 1) {
-        await supabase.from("organizations").delete().eq("id", userProfile.organization_id);
-      }
+      console.error("Profile insert failed:", profileError);
+      return new Response(JSON.stringify({ error: `Failed to create profile: ${profileError.message}` }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         organization: { id: org.id, name: org.name },
-        user: { id: newUser.id, email: newUser.email },
+        user: { id: newUser.user.id, email: newUser.user.email },
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
     );
   } catch (err) {
     console.error("Unexpected error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
