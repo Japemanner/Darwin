@@ -239,7 +239,8 @@ export async function callRagWebhook(
       throw classifyWebhookError(res.status, webhookUrl)
     }
 
-    const data = await res.json()
+    const raw = await res.json()
+    const data = Array.isArray(raw) ? raw[0] : raw
     return {
       answer: data.answer ?? data.response ?? 'Geen antwoord ontvangen',
       sources: data.sources ?? null,
