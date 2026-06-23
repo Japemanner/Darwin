@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database.types'
 import { supabase } from '@/lib/supabase'
+import { identifyUser, resetUser } from '@/lib/posthog'
 
 interface AuthState {
   user: User | null
@@ -109,6 +110,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           console.log('[auth] SIGNED_IN skipped — signIn already handled')
           return
         }
+        identifyUser(session.user.id)
         set({ user: session.user, isAuthenticated: true })
         fetchProfile(session.user.id).then((profile) => {
           if (profile) set({ profile })
@@ -117,12 +119,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (event === 'SIGNED_OUT') {
+        resetUser()
         set({ user: null, profile: null, isAuthenticated: false, isSigningIn: false })
         return
       }
 
       // For INITIAL_SESSION, TOKEN_REFRESHED, USER_UPDATED — just sync user
       if (session?.user) {
+        identifyUser(session.user.id)
         const profilePromise = state.profile
           ? Promise.resolve(state.profile)
           : fetchProfile(session.user.id)

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ToastProvider } from '@/components/ui/toast'
+import { PostHogAppProvider } from '@/lib/posthog'
 import LoginPage from '@/components/auth/LoginPage'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import AppShell from '@/components/layout/AppShell'
@@ -43,27 +44,29 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <BrowserRouter>
-          <Suspense fallback={<Loading />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppShell />}>
-                  <Route path="/command-center" element={<CommandCenterPage />} />
-                  <Route path="/assistants" element={<AssistantsPage />} />
-                  <Route path="/knowledge" element={<KnowledgePage />} />
-                  <Route path="/team" element={<TeamPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
+      <PostHogAppProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Suspense fallback={<Loading />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<AppShell />}>
+                    <Route path="/command-center" element={<CommandCenterPage />} />
+                    <Route path="/assistants" element={<AssistantsPage />} />
+                    <Route path="/knowledge" element={<KnowledgePage />} />
+                    <Route path="/team" element={<TeamPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                  </Route>
                 </Route>
-              </Route>
-              <Route path="*" element={<Navigate to="/command-center" replace />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </ToastProvider>
+                <Route path="*" element={<Navigate to="/command-center" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </ToastProvider>
+      </PostHogAppProvider>
     </QueryClientProvider>
   )
 }
