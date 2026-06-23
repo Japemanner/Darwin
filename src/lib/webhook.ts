@@ -86,6 +86,37 @@ function normalizeUrl(url: string): string {
   return url.replace(/\/+$/, '')
 }
 
+function extractWebhookResponse(raw: unknown): RAGWebhookResponse {
+  if (Array.isArray(raw)) {
+    const data = (raw[0] ?? {}) as Record<string, unknown>
+    return {
+      answer: (data.answer ?? data.response ?? 'Geen antwoord ontvangen') as string,
+      sources: (data.sources ?? null) as RAGWebhookResponse['sources'],
+    }
+  }
+
+  if (raw && typeof raw === 'object') {
+    for (const value of Object.values(raw)) {
+      if (Array.isArray(value) && value.length > 0) {
+        const item = value[0]
+        if (item && typeof item === 'object' && ('answer' in item || 'response' in item)) {
+          return {
+            answer: ((item as Record<string, unknown>).answer ?? (item as Record<string, unknown>).response ?? 'Geen antwoord ontvangen') as string,
+            sources: ((item as Record<string, unknown>).sources ?? null) as RAGWebhookResponse['sources'],
+          }
+        }
+      }
+    }
+
+    return {
+      answer: ((raw as Record<string, unknown>).answer ?? (raw as Record<string, unknown>).response ?? 'Geen antwoord ontvangen') as string,
+      sources: ((raw as Record<string, unknown>).sources ?? null) as RAGWebhookResponse['sources'],
+    }
+  }
+
+  return { answer: 'Geen antwoord ontvangen', sources: null }
+}
+
 function classifyWebhookError(status: number, url: string): Error {
   if (status === 401) {
     return new Error('Authenticatiefout (401). Controleer of het token en de header naam overeenkomen met de n8n webhook instellingen.')
@@ -240,11 +271,7 @@ export async function callRagWebhook(
     }
 
     const raw = await res.json()
-    const data = Array.isArray(raw) ? raw[0] : raw
-    return {
-      answer: data.answer ?? data.response ?? 'Geen antwoord ontvangen',
-      sources: data.sources ?? null,
-    }
+    return extractWebhookResponse(raw)
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error('De assistant reageert niet. Controleer de verbinding en probeer het opnieuw.')
