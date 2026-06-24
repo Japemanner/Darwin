@@ -367,8 +367,105 @@ export interface Database {
           created_at?: string
         }
       }
+      roadmap_features: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          status: 'in_overweging' | 'gepland' | 'in_ontwikkeling' | 'verzonden'
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          status?: 'in_overweging' | 'gepland' | 'in_ontwikkeling' | 'verzonden'
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          status?: 'in_overweging' | 'gepland' | 'in_ontwikkeling' | 'verzonden'
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      roadmap_votes: {
+        Row: {
+          id: string
+          feature_id: string
+          user_id: string
+          direction: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          feature_id: string
+          user_id: string
+          direction: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          feature_id?: string
+          user_id?: string
+          direction?: number
+          created_at?: string
+        }
+      }
+      feature_requests: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          motivation: string | null
+          submitted_by: string | null
+          status: 'nieuw' | 'beoordeeld' | 'gepromoot' | 'afgewezen'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description: string
+          motivation?: string | null
+          submitted_by?: string | null
+          status?: 'nieuw' | 'beoordeeld' | 'gepromoot' | 'afgewezen'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string
+          motivation?: string | null
+          submitted_by?: string | null
+          status?: 'nieuw' | 'beoordeeld' | 'gepromoot' | 'afgewezen'
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
-    Views: Record<string, never>
+    Views: {
+      roadmap_features_with_score: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          status: 'in_overweging' | 'gepland' | 'in_ontwikkeling' | 'verzonden'
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          score: number
+        }
+      }
+    }
     Functions: Record<string, never>
     Enums: Record<string, never>
   }
@@ -385,3 +482,6 @@ export type Conversation = Database['public']['Tables']['conversations']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
 export type Invitation = Database['public']['Tables']['invitations']['Row']
 export type FeedbackInteraction = Database['public']['Tables']['feedback_interactions']['Row']
+export type RoadmapFeature = Database['public']['Tables']['roadmap_features']['Row']
+export type RoadmapVote = Database['public']['Tables']['roadmap_votes']['Row']
+export type FeatureRequest = Database['public']['Tables']['feature_requests']['Row']

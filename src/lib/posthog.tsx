@@ -21,6 +21,8 @@ export const isPostHogEnabled = Boolean(POSTHOG_KEY)
  */
 export const PostHogEvent = {
   TASK_EFFORT_RATED: 'task_effort_rated',
+  ROADMAP_VOTED: 'roadmap_voted',
+  FEATURE_REQUEST_SUBMITTED: 'feature_request_submitted',
 } as const
 
 export type PostHogEventName = (typeof PostHogEvent)[keyof typeof PostHogEvent]
@@ -30,6 +32,8 @@ export type PostHogEventName = (typeof PostHogEvent)[keyof typeof PostHogEvent]
  */
 interface PostHogEventProperties {
   [PostHogEvent.TASK_EFFORT_RATED]: { ces_score: number; task: string }
+  [PostHogEvent.ROADMAP_VOTED]: { feature_id: string; direction: number }
+  [PostHogEvent.FEATURE_REQUEST_SUBMITTED]: { title: string }
 }
 
 /**

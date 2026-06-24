@@ -14,12 +14,14 @@ import {
   Menu,
   X,
   History,
+  Map,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/command-center', label: 'Command Center', icon: Gauge },
   { href: '/assistants', label: 'Assistenten', icon: Bot },
   { href: '/history', label: 'Geschiedenis', icon: History },
+  { href: '/roadmap', label: 'Roadmap', icon: Map },
   { href: '/knowledge', label: 'Kennisbronnen', icon: BookOpen },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/settings', label: 'Instellingen', icon: Settings },
