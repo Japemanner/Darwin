@@ -429,25 +429,6 @@ function ChatWindow({
     setThumbsDownSelected(false)
 
     async function initChat() {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const existing = (await supabase
-          .from('conversations')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('assistant_id', assistant!.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()).data as Conversation | null
-
-      if (existing) {
-        setConversation(existing)
-        const { data: msgs } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', existing.id)
-          .order('created_at', { ascending: true })
-        if (msgs) setMessages(msgs)
-      } else {
       const { data: created } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
           .from('conversations')
           .insert({
@@ -458,7 +439,6 @@ function ChatWindow({
           .select()
           .single()
         if (created) setConversation(created)
-      }
     }
 
     initChat()

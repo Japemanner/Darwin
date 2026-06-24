@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/authStore'
 
 const CommandCenterPage = lazy(() => import('@/pages/CommandCenterPage'))
 const AssistantsPage = lazy(() => import('@/pages/AssistantsPage'))
+const HistoryPage = lazy(() => import('@/pages/HistoryPage'))
 const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'))
 const TeamPage = lazy(() => import('@/pages/TeamPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
@@ -54,9 +55,10 @@ function App() {
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppShell />}>
-                    <Route path="/command-center" element={<CommandCenterPage />} />
-                    <Route path="/assistants" element={<AssistantsPage />} />
-                    <Route path="/knowledge" element={<KnowledgePage />} />
+                  <Route path="/command-center" element={<CommandCenterPage />} />
+                  <Route path="/assistants" element={<AssistantsPage />} />
+                  <Route path="/history" element={<HistoryPage />} />
+                  <Route path="/knowledge" element={<KnowledgePage />} />
                     <Route path="/team" element={<TeamPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                   </Route>

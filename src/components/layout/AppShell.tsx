@@ -13,11 +13,13 @@ import {
   LogOut,
   Menu,
   X,
+  History,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/command-center', label: 'Command Center', icon: Gauge },
   { href: '/assistants', label: 'Assistenten', icon: Bot },
+  { href: '/history', label: 'Geschiedenis', icon: History },
   { href: '/knowledge', label: 'Kennisbronnen', icon: BookOpen },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/settings', label: 'Instellingen', icon: Settings },
