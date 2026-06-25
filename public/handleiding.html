@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Darwin — Handleiding</title>
+  <style>
+    :root {
+      --fg: #1a1a1a;
+      --muted: #666;
+      --bg: #ffffff;
+      --bg-muted: #f7f7f8;
+      --border: #e5e5e5;
+      --accent: #2563eb;
+      --code-bg: #f4f4f5;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #e4e4e7;
+        --muted: #a1a1aa;
+        --bg: #0a0a0a;
+        --bg-muted: #18181b;
+        --border: #27272a;
+        --accent: #60a5fa;
+        --code-bg: #18181b;
+        --green: #4ade80;
+        --amber: #fbbf24;
+        --red: #f87171;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.7;
+      font-size: 16px;
+    }
+    .layout { display: flex; max-width: 1200px; margin: 0 auto; }
+    nav.toc {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 280px;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 32px 24px;
+      border-right: 1px solid var(--border);
+      background: var(--bg-muted);
+    }
+    nav.toc h2 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    nav.toc ul { list-style: none; }
+    nav.toc li { margin-bottom: 6px; }
+    nav.toc a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      display: block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    nav.toc a:hover { color: var(--fg); background: var(--border); }
+    nav.toc a.lvl2 { padding-left: 24px; font-size: 12px; }
+    main {
+      margin-left: 280px;
+      padding: 48px 64px;
+      max-width: 800px;
+      width: 100%;
+    }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    h1 + p { color: var(--muted); margin-bottom: 32px; }
+    h2 {
+      font-size: 22px;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+    h3 { font-size: 18px; margin-top: 32px; margin-bottom: 12px; }
+    h4 { font-size: 15px; margin-top: 24px; margin-bottom: 8px; color: var(--muted); }
+    p { margin-bottom: 12px; }
+    ul, ol { margin-bottom: 16px; padding-left: 24px; }
+    li { margin-bottom: 6px; }
+    code {
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.875em;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+    pre code { background: none; padding: 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { font-weight: 600; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .note {
+      background: var(--bg-muted);
+      border-left: 4px solid var(--accent);
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 16px;
+    }
+    .note strong { color: var(--accent); }
+    .warning {
+      border-left-color: var(--amber);
+    }
+    .warning strong { color: var(--amber); }
+    .danger {
+      border-left-color: var(--red);
+    }
+    .danger strong { color: var(--red); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(22,163,74,0.15); color: var(--green); }
+    .badge-blue { background: rgba(37,99,235,0.15); color: var(--accent); }
+    .badge-amber { background: rgba(217,119,6,0.15); color: var(--amber); }
+    .badge-gray { background: var(--bg-muted); color: var(--muted); }
+    hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+    a { color: var(--accent); }
+    .footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+    @media (max-width: 900px) {
+      nav.toc { display: none; }
+      main { margin-left: 0; padding: 32px 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+  <h2><a href="#top">Darwin Handleiding</a></h2>
+  <ul>
+    <li><a href="#top">Introductie</a></li>
+    <li><a href="#branching-strategy">Branching &amp; Deploy</a></li>
+    <li><a href="#omgeving-instellen">Omgeving instellen</a></li>
+    <li><a href="#command-center">Command Center</a></li>
+    <li><a href="#assistenten">Assistenten</a>
+      <ul>
+        <li><a href="#assistent-aanmaken" class="lvl2">Aanmaken &amp; bewerken</a></li>
+        <li><a href="#assistent-chatten" class="lvl2">Chatten (stateless)</a></li>
+      </ul>
+    </li>
+    <li><a href="#geschiedenis">Geschiedenis</a></li>
+    <li><a href="#roadmap">Roadmap</a>
+      <ul>
+        <li><a href="#roadmap-stemmen" class="lvl2">Stemmen</a></li>
+        <li><a href="#feature-request" class="lvl2">Feature request indienen</a></li>
+      </ul>
+    </li>
+    <li><a href="#kennisbronnen">Kennisbronnen</a>
+      <ul>
+        <li><a href="#kb-aanmaken" class="lvl2">Aanmaken</a></li>
+        <li><a href="#kb-uploaden" class="lvl2">Documenten uploaden</a></li>
+        <li><a href="#kb-verwijderen" class="lvl2">Verwijderen</a></li>
+      </ul>
+    </li>
+    <li><a href="#team">Team</a></li>
+    <li><a href="#instellingen">Instellingen</a></li>
+    <li><a href="#n8n-webhook">N8N Webhook</a>
+      <ul>
+        <li><a href="#n8n-payload" class="lvl2">Payload</a></li>
+        <li><a href="#n8n-instellen" class="lvl2">Instellen</a></li>
+        <li><a href="#n8n-flow" class="lvl2">Flow logica</a></li>
+      </ul>
+    </li>
+    <li><a href="#edge-functions">Edge Functions</a>
+      <ul>
+        <li><a href="#ef-create-tenant" class="lvl2">create-tenant</a></li>
+        <li><a href="#ef-invite-user" class="lvl2">invite-user</a></li>
+        <li><a href="#ef-send-feature-request" class="lvl2">send-feature-request</a></li>
+      </ul>
+    </li>
+    <li><a href="#posthog">PostHog Analytics</a></li>
+    <li><a href="#resend">Resend (e-mail)</a></li>
+    <li><a href="#problemen">Problemen oplossen</a></li>
+  </ul>
+</nav>
+
+<main>
+<h1 id="top">Darwin — Handleiding</h1>
+<p>Volledige handleiding voor het Darwin AI platform. Laatst bijgewerkt: juni 2025.</p>
+
+<!-- ============================================================ -->
+<h2 id="branching-strategy">Branching &amp; Deployment</h2>
+
+<p>Darwin gebruikt een <strong>develop &rarr; main</strong> branching strategy. Elke wijziging gaat eerst naar <code>develop</code>, wordt daar getest, en pas daarna naar <code>main</code> gemerged.</p>
+
+<h3>Branches</h3>
+<table>
+  <tr><th>Branch</th><th>Doel</th><th>Netlify URL</th></tr>
+  <tr><td><code>develop</code></td><td>Actieve ontwikkeling &amp; testen</td><td><code>develop--jouwsite.netlify.app</code> (staging)</td></tr>
+  <tr><td><code>main</code></td><td>Productie</td><td><code>jouwsite.netlify.app</code> (productie)</td></tr>
+</table>
+
+<div class="note">
+  <strong>Ja, precies:</strong> een commit/merge naar <code>develop</code> herbouwt de staging-omgeving en is daar actueel. Een commit/merge naar <code>main</code> herbouwt de productie-omgeving en is daar actueel.
+</div>
+
+<p>Elke branch leeft op zijn eigen URL met zijn eigen env-variabelen, en draait pas opnieuw wanneer er iets naar díe branch gepusht wordt. <strong>Een commit naar <code>develop</code> raakt productie dus niet, en andersom.</strong></p>
+
+<div class="note warning">
+  <strong>Eén ding om in je achterhoofd te houden:</strong> ze lopen onafhankelijk. Als je iets naar <code>develop</code> pusht maar nooit doormerge naar <code>main</code>, blijft productie gewoon op de oude versie staan — wat precies de bedoeling is. Productie verandert alleen als er iets in <code>main</code> landt.
+</div>
+
+<h3>Workflow per feature/fix</h3>
+<ol>
+  <li>Branch vanaf <code>develop</code>:
+    <pre><code>git checkout develop
+git pull origin develop
+git checkout -b feat/&lt;scope&gt;-&lt;korte-beschrijving&gt;</code></pre>
+  </li>
+  <li>Committen &amp; pushen naar je feature-branch</li>
+  <li>Open een Pull Request naar <code>develop</code></li>
+  <li>Test op <code>develop</code> (Netlify preview-deploy of lokaal):
+    <ul>
+      <li><code>npx tsc --noEmit</code> slaagt</li>
+      <li><code>npm run build</code> slaagt</li>
+      <li>Pre-commit hook (fitness checks + gitleaks) groen</li>
+      <li>Happy-path handmatig getest in browser</li>
+    </ul>
+  </li>
+  <li>Pas daarna: PR van <code>develop</code> &rarr; <code>main</code></li>
+</ol>
+
+<h3>Hotfix</h3>
+<ol>
+  <li>Branch <code>hotfix/&lt;scope&gt;-&lt;beschrijving&gt;</code> vanaf <code>main</code></li>
+  <li>Fix, test, commit</li>
+  <li>PR naar zowel <code>main</code> als <code>develop</code></li>
+</ol>
+
+<div class="note danger">
+  <strong>NOOIT</strong> direct naar <code>main</code> committen of pushen. Altijd via <code>develop</code>.
+</div>
+
+<h3>Netlify dashboard configureren</h3>
+<p>In de Netlify dashboard: Site settings &rarr; Build &amp; deploy &rarr; Branches:</p>
+<ul>
+  <li><code>main</code> &rarr; productie-deploy (gepubliceerd)</li>
+  <li><code>develop</code> &rarr; preview-deploy (niet gepubliceerd, alleen voor testen)</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="omgeving-instellen">Omgeving instellen</h2>
+
+<h3>Vereisten</h3>
+<ul>
+  <li>Node.js 20+</li>
+  <li>npm</li>
+  <li>Supabase project (PostgreSQL + Auth + Storage + Edge Functions)</li>
+  <li>n8n (self-hosted via Docker, voor documentverwerking)</li>
+</ul>
+
+<h3>Lokale setup</h3>
+<pre><code>cp .env.example .env.local
+# Vul .env.local in met je Supabase + PostHog credentials
+npm install
+npm run dev</code></pre>
+
+<h3>Environment variables</h3>
+<table>
+  <tr><th>Variabele</th><th>Waar</th><th>Opmerking</th></tr>
+  <tr><td><code>VITE_SUPABASE_URL</code></td><td>Supabase Dashboard &rarr; Settings &rarr; API</td><td>Project URL</td></tr>
+  <tr><td><code>VITE_SUPABASE_ANON_KEY</code></td><td>Supabase Dashboard &rarr; Settings &rarr; API</td><td>Publieke anon key (safe in browser)</td></tr>
+  <tr><td><code>VITE_PUBLIC_POSTHOG_KEY</code></td><td>https://eu.posthog.com (EU Cloud)</td><td>Product analytics — zie <a href="#posthog">PostHog sectie</a></td></tr>
+  <tr><td><code>VITE_PUBLIC_POSTHOG_HOST</code></td><td><code>https://eu.i.posthog.com</code></td><td>EU Cloud host — NOOIT US</td></tr>
+</table>
+
+<div class="note warning">
+  <strong>Netlify env-vars:</strong> Alle <code>VITE_</code>-variabelen moeten ook in de Netlify dashboard &rarr; Site settings &rarr; Environment variables staan, anders werkt de productie/staging-build niet. Vite inlinet deze namelijk at build time.
+</div>
+
+<h3>Eerste admin aanmaken</h3>
+<ol>
+  <li>Draai <code>supabase/migrations/001_initial_schema.sql</code> in de Supabase SQL Editor</li>
+  <li>Maak een organisatie aan:
+    <pre><code>INSERT INTO organizations (name) VALUES ('Mijn Organisatie');
+-- Noteer het gegenereerde UUID</code></pre>
+  </li>
+  <li>Maak een admin aan via Supabase &rarr; Authentication &rarr; Users &rarr; Add User</li>
+  <li>Koppel de admin aan de organisatie:
+    <pre><code>UPDATE profiles
+SET organization_id = '&lt;org-uuid&gt;', role = 'admin'
+WHERE id = '&lt;user-uuid&gt;';</code></pre>
+  </li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="command-center">Command Center</h2>
+<p>De Command Center is het startpoud na inloggen. Het toont:</p>
+<ul>
+  <li>Aantal assistenten in je organisatie</li>
+  <li>Aantal kennisbronnen</li>
+  <li>Aantal teamleden</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="assistenten">Assistenten</h2>
+
+<p>Beheer je AI-assistenten en chat met ze. Elke assistent is gekoppeld aan een n8n-webhook (RAG-chat) en optioneel aan &eacute;&eacute;n of meer kennisbronnen.</p>
+
+<h3 id="assistent-aanmaken">Aanmaken &amp; bewerken</h3>
+<ol>
+  <li>Ga naar <strong>Assistenten</strong> in de sidebar</li>
+  <li>Klik <strong>+ Nieuwe assistent</strong></li>
+  <li>Vul in: naam, type (chat), beschrijving</li>
+  <li>Selecteer de kennisbronnen die deze assistent mag gebruiken</li>
+  <li>Vink <strong>Actief</strong> aan (of uit om te deactiveren)</li>
+  <li>Klik <strong>Opslaan</strong></li>
+</ol>
+<p>Bewerken: klik op het potlood-icoon naast een assistent. Verwijderen: klik op de prullenbak in het bewerkingsdialoog (verwijdert ook alle gekoppelde conversaties en kennisbronkoppelingen).</p>
+
+<h3 id="assistent-chatten">Chatten (stateless)</h3>
+<p>Klik <strong>Chat</strong> op een assistent-kaart om het chatvenster te openen. Het chatvenster is <strong>stateless</strong>: bij elke openening start een nieuwe conversatie. Eerdere berichten zie je niet terug in het chatvenster — die zijn opgeslagen en terug te lezen via het <a href="#geschiedenis">Geschiedenis</a>-tabblad.</p>
+
+<p>Bij elke gestuurde vraag:</p>
+<ol>
+  <li>Het bericht wordt opgeslagen in de Supabase <code>messages</code>-tabel</li>
+  <li>Darwin roept de n8n-webhook aan met de conversatie-historie</li>
+  <li>Het antwoord verschijnt in de chat en wordt opgeslagen</li>
+  <li>Bronnen (kennisfragmenten) zijn uitklapbaar per antwoord</li>
+</ol>
+
+<p>Na afloop kun je <strong>duimpjes omhoog/omlaag</strong> geven. Bij een duimpje omlaag wordt gevraagd om tekstuele feedback.</p>
+
+<!-- ============================================================ -->
+<h2 id="geschiedenis">Geschiedenis</h2>
+<p>Het <strong>Geschiedenis</strong>-tabblad toont alle eerdere chat-runs. Per run zie je:</p>
+<ul>
+  <li>Naam en icon van de assistent</li>
+  <li>Titel van de conversatie</li>
+  <li>Datum/tijd</li>
+</ul>
+
+<h3>Filteren</h3>
+<p>Rechtsboven staat een filter-dropdown waarmee je runs van één specifieke assistent kunt tonen.</p>
+
+<h3>Berichten teruglezen</h3>
+<p>Klik op een run in de lijst om een rechtse drawer te openen met alle berichten (read-only), inclusief uitklapbare bronnen. Sluiten met het X-icoon.</p>
+
+<!-- ============================================================ -->
+<h2 id="roadmap">Roadmap</h2>
+<p>Het <strong>Roadmap</strong>-tabblad toont de product-roadmap met features die in ontwikkeling zijn of gepland staan. Gebruikers kunnen stemmen op features die zij belangrijk vinden — dit biedt transparantie over de ontwikkelrichting.</p>
+
+<h3>Statussen</h3>
+<table>
+  <tr><th>Status</th><th>Badge-kleur</th><th>Betekenis</th></tr>
+  <tr><td><span class="badge badge-gray">In overweging</span></td><td>Grijs</td><td>Feature wordt overwogen maar nog niet bevestigd</td></tr>
+  <tr><td><span class="badge badge-blue">Gepland</span></td><td>Blauw</td><td>Feature is gepland voor ontwikkeling</td></tr>
+  <tr><td><span class="badge badge-amber">In ontwikkeling</span></td><td>Amber</td><td>Wordt momenteel gebouwd</td></tr>
+  <tr><td><span class="badge badge-green">Verzonden</span></td><td>Groen</td><td>Feature is live</td></tr>
+</table>
+
+<h3>Filteren</h3>
+<p>Bovenaan de pagina staan filter-tabs: Alle / In overweging / Gepland / In ontwikkeling / Verzonden.</p>
+
+<h3 id="roadmap-stemmen">Stemmen (upvote / downvote)</h3>
+<p>Elke feature-rij heeft twee pijl-knoppen:</p>
+<ul>
+  <li><strong>Pijl omhoog</strong> (groen bij actief) — upvote (+1)</li>
+  <li><strong>Pijl omlaag</strong> (rood bij actief) — downvote (&minus;1)</li>
+</ul>
+<p>De lijst is <strong>aflopend gesorteerd op score</strong> (upvotes &minus; downvotes). De score is zichtbaar voor iedereen. Stem-gedrag:</p>
+<ul>
+  <li>Nog niet gestemd + klik omhoog &rarr; upvote (+1)</li>
+  <li>Al upvoted + klik omhoog &rarr; stem verwijderd (toggle uit)</li>
+  <li>Al upvoted + klik omlaag &rarr; wissel naar downvote (&minus;2 verschil)</li>
+  <li>E&eacute;&eacute;n stem per gebruiker per feature (UNIQUE constraint in database)</li>
+</ul>
+<p>De UI updatet direct (optimistic update); bij een fout wordt de stem teruggedraaid met een foutmelding.</p>
+
+<h3 id="feature-request">Feature request indienen</h3>
+<p>Heb je een idee voor een nieuwe feature? Dien een request in:</p>
+<ol>
+  <li>Klik <strong>Feature request</strong> rechtsboven</li>
+  <li>Vul in:
+    <ul>
+      <li><strong>Titel</strong> (verplicht) — korte beschrijving van je idee</li>
+      <li><strong>Beschrijving</strong> (verplicht) — wat moet de feature doen</li>
+      <li><strong>Waarom heb je dit nodig?</strong> (optioneel) — motivatie</li>
+    </ul>
+  </li>
+  <li>Klik <strong>Verzenden</strong></li>
+</ol>
+<p>Het request wordt opgeslagen in Supabase en <strong>direct per e-mail naar jaap@jaaphoeve.com</strong> gestuurd via Resend. Je krijgt geen publieke status terug te zien — de admin beoordeelt elk request en promoveert het (al dan niet) naar een stem-baar roadmap-item.</p>
+
+<!-- ============================================================ -->
+<h2 id="kennisbronnen">Kennisbronnen</h2>
+<p>Kennisbronnen zijn collecties documenten die assistenten kunnen raadplegen via RAG (Retrieval-Augmented Generation). Elke kennisbron heeft een eigen vector-collection in de vector database.</p>
+
+<h3 id="kb-aanmaken">1. Nieuwe kennisbron aanmaken</h3>
+<ol>
+  <li>Ga naar <strong>Kennisbronnen</strong> in de sidebar</li>
+  <li>Klik op <strong>+ Nieuwe kennisbron</strong></li>
+  <li>Vul een naam in (bijv. "HR Documenten") en optioneel een beschrijving</li>
+  <li>Klik <strong>Opslaan</strong></li>
+</ol>
+
+<h3 id="kb-uploaden">2. Documenten uploaden</h3>
+<ol>
+  <li>Klik op een kennisbron om de detailweergave te openen</li>
+  <li>In de <strong>Documenten</strong> tab: klik op het upload-gebied of sleep een bestand</li>
+  <li>Toegestane typen: <strong>PDF, TXT, DOCX</strong></li>
+  <li>Het document verschijnt in de lijst met status <strong>Verwerken</strong></li>
+</ol>
+<p>Bij de upload stuurt Darwin een webhook naar n8n (zie <a href="#n8n-webhook">N8N Webhook sectie</a>). n8n downloadt het bestand, chunkt+embed het in de vector database, en werkt de status bij naar <strong>Ready</strong>. Bij een fout wordt de status <strong>Error</strong>.</p>
+
+<h3 id="kb-verwijderen">3. Documenten verwijderen</h3>
+<p>Klik op het prullenbak-icoon naast een document om het permanent te verwijderen uit zowel Supabase Storage als de database. n8n krijgt een <code>delete</code>-webhook om de vectors op te ruimen.</p>
+
+<!-- ============================================================ -->
+<h2 id="team">Team</h2>
+<p>Het <strong>Team</strong>-tabblad (alleen voor admins) toont alle leden van je organisatie en openstaande uitnodigingen.</p>
+
+<h3>Lid uitnodigen</h3>
+<ol>
+  <li>Klik <strong>+ Nodig uit</strong></li>
+  <li>Vul e-mailadres en rol (Lid of Admin) in</li>
+  <li>De uitnodiging wordt aangemaakt; de edge function <code>invite-user</code> maakt het account aan</li>
+  <li>De genodigde kan inloggen met het opgegeven e-mailadres</li>
+</ol>
+
+<h3>Uitnodiging intrekken</h3>
+<p>Klik op het prullenbak-icoon naast een openstaande uitnodiging om deze in te trekken.</p>
+
+<!-- ============================================================ -->
+<h2 id="instellingen">Instellingen</h2>
+<p>Het <strong>Instellingen</strong>-tabblad (alleen voor admins) bevat tenant-beheer en flow-configuraties. Hier kun je:</p>
+<ul>
+  <li>Nieuwe organisaties/tenants aanmaken (via de <code>create-tenant</code> edge function)</li>
+  <li>n8n-webhook URLs en tokens configureren per flow-type (RAG chat, document processing)</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="n8n-webhook">N8N Webhook instellen</h2>
+
+<h3 id="n8n-payload">Wat stuurt Darwin naar N8N?</h3>
+<p>Bij elke documentactie stuurt Darwin een POST naar de webhook URL:</p>
+
+<h4>Upload (action: index)</h4>
+<pre><code>{
+  "action": "index",
+  "tenant_id": "uuid-van-organisatie",
+  "document_id": "uuid-van-document",
+  "document_name": "handleiding.pdf",
+  "document_type": "pdf",
+  "file_path": "org-uuid/kb-uuid/doc-uuid.pdf",
+  "download_url": "https://xxx.supabase.co/storage/v1/object/sign/..."
+}</code></pre>
+
+<h4>Verwijdering (action: delete)</h4>
+<pre><code>{
+  "action": "delete",
+  "tenant_id": "uuid-van-organisatie",
+  "document_id": "uuid-van-document",
+  "document_name": "handleiding.pdf",
+  "document_type": "pdf",
+  "file_path": "org-uuid/kb-uuid/doc-uuid.pdf",
+  "download_url": ""
+}</code></pre>
+
+<ul>
+  <li><code>download_url</code> is <strong>15 minuten geldig</strong> bij <code>index</code>. n8n moet het document binnen die tijd downloaden.</li>
+  <li><code>file_path</code> is het pad in Supabase Storage. Gebruik dit om het bestand na verwerking te verwijderen.</li>
+  <li>Bij <code>delete</code> is <code>download_url</code> leeg omdat het bestand al uit Storage is verwijderd.</li>
+</ul>
+
+<h3>Actions in de webhook payload</h3>
+<table>
+  <tr><th>Action</th><th>Wanneer</th><th>Beschrijving</th></tr>
+  <tr><td><code>index</code></td><td>Bestand geüpload via UI</td><td>n8n downloadt, chunkt+embed, werkt status bij, verwijdert bestand uit Storage</td></tr>
+  <tr><td><code>modify</code></td><td><em>(placeholder, komt later)</em></td><td>Nog niet in gebruik</td></tr>
+  <tr><td><code>delete</code></td><td>Bestand verwijderd via UI</td><td>n8n ruimt vectors op; bestand is al uit Storage verwijderd</td></tr>
+</table>
+
+<h3 id="n8n-instellen">Stap 1 — Webhook URL instellen in Darwin</h3>
+<p>Zet in <code>.env.local</code>:</p>
+<pre><code>VITE_N8N_DOCUMENT_WEBHOOK=https://jouw-n8n-domein/webhook/documents</code></pre>
+
+<h3>Stap 2 — N8N workflow aanmaken</h3>
+<ol>
+  <li>Open n8n, maak een nieuwe workflow</li>
+  <li>Voeg een <strong>Webhook</strong> trigger node toe:
+    <ul>
+      <li>HTTP Method: <code>POST</code></li>
+      <li>Path: <code>/documents</code></li>
+      <li>Response Mode: <code>Last Node</code></li>
+    </ul>
+  </li>
+  <li><strong>Activeer</strong> de workflow — je ziet nu de <strong>Production URL</strong></li>
+  <li>Kopieer die URL naar <code>.env.local</code> als <code>VITE_N8N_DOCUMENT_WEBHOOK</code></li>
+</ol>
+
+<h3>Stap 3 — Supabase credentials in n8n</h3>
+<p>n8n heeft de service role key nodig om documenten te downloaden en statussen up te daten:</p>
+<table>
+  <tr><th>Variabele</th><th>Waar te vinden</th></tr>
+  <tr><td><code>SUPABASE_URL</code></td><td>Supabase Dashboard &rarr; Settings &rarr; API &rarr; Project URL</td></tr>
+  <tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>Supabase Dashboard &rarr; Settings &rarr; API &rarr; service_role</td></tr>
+</table>
+<p>Zet deze als <strong>n8n Credentials</strong> (type: Supabase) of als environment variables in je n8n Docker container.</p>
+
+<h3 id="n8n-flow">Stap 4 — N8N flow logica</h3>
+<pre><code>Webhook &rarr; Switch (action) &rarr; [index] Download &rarr; Chunk + Embed &rarr; Update status &rarr; Delete file from Storage
+                                &rarr; [delete] Cleanup vectors</code></pre>
+
+<h4>Index flow (bestand geüpload)</h4>
+<ol>
+  <li><strong>Webhook</strong> node vangt de POST &rarr; geeft <code>action</code>, <code>tenant_id</code>, <code>document_id</code>, <code>document_name</code>, <code>document_type</code>, <code>file_path</code>, <code>download_url</code></li>
+  <li><strong>Switch</strong> node op <code>action</code>: <code>index</code> &rarr; verwerken, <code>delete</code> &rarr; opruimen</li>
+  <li><strong>HTTP Request</strong> (<code>GET {download_url}</code>) &rarr; downloadt het bestand (binnen 15 min!)</li>
+  <li><strong>Chunk + Embed</strong> naar je vector database (bijv. via LangChain node of custom code)</li>
+  <li><strong>Supabase</strong> node &rarr; <code>UPDATE knowledge_base_documents SET status = 'ready' WHERE id = '{document_id}'</code></li>
+  <li><strong>HTTP Request</strong> &rarr; verwijdert het bestand uit Storage na verwerking:
+    <ul>
+      <li>Method: <code>DELETE</code></li>
+      <li>URL: <code>{{ $env.SUPABASE_URL }}/storage/v1/object/knowledge-documents/{{ $json.file_path }}</code></li>
+      <li>Header: <code>Authorization: Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}</code></li>
+    </ul>
+  </li>
+  <li><strong>Supabase</strong> node &rarr; <code>UPDATE knowledge_base_documents SET file_path = NULL WHERE id = '{document_id}'</code></li>
+</ol>
+<p>Bij fouten in stap 4: zet status op <code>error</code>.</p>
+
+<h4>Delete flow (bestand verwijderd via UI)</h4>
+<ol>
+  <li>Gebruik het <code>document_id</code> om de vectors uit je vector database te verwijderen</li>
+  <li>Het bestand is al uit Storage verwijderd door Darwin — geen extra actie nodig</li>
+</ol>
+
+<h3>N8N testen</h3>
+<ol>
+  <li>Start Darwin: <code>npm run dev</code></li>
+  <li>Upload een PDF naar een kennisbron</li>
+  <li>Open n8n &rarr; <strong>Executions</strong> &rarr; je ziet een nieuwe webhook call met de payload</li>
+  <li>Controleer of de flow het document correct verwerkt en het bestand uit Storage verwijdert</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="edge-functions">Edge Functions</h2>
+<p>Darwin gebruikt Supabase Edge Functions (Deno/TypeScript) voor server-side operaties die de service role key nodig hebben. Deze draaien op Supabase's servers en zijn niet in de browser-bundle.</p>
+
+<table>
+  <tr><th>Function</th><th>Pad</th><th>Doel</th></tr>
+  <tr><td><code>create-tenant</code></td><td><code>supabase/functions/create-tenant</code></td><td>Nieuwe organisatie + admin-user aanmaken</td></tr>
+  <tr><td><code>invite-user</code></td><td><code>supabase/functions/invite-user</code></td><td>Lid uitnodigen per e-mail</td></tr>
+  <tr><td><code>send-feature-request</code></td><td><code>supabase/functions/send-feature-request</code></td><td>Feature request opslaan + e-mail naar jaap@jaaphoeve.com via Resend</td></tr>
+</table>
+
+<h3 id="ef-create-tenant">create-tenant</h3>
+<p>Maakt een nieuwe organisatie en een admin-gebruiker aan. Wordt aangeroepen vanuit de Instellingen-pagina (admins only).</p>
+<p><strong>Secrets:</strong> <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> (automatisch geïnjecteerd door Supabase).</p>
+
+<h3 id="ef-invite-user">invite-user</h3>
+<p>Maakt een nieuw auth-account aan voor een uitgenodigd teamlid en koppelt dit aan de organisatie. Wordt aangeroepen vanuit de Team-pagina (admins only).</p>
+<p><strong>Secrets:</strong> <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> (automatisch geïnjecteerd).</p>
+
+<h3 id="ef-send-feature-request">send-feature-request</h3>
+<p>Ontvangt een feature request van een ingelogde gebruiker, slaat deze op in de <code>feature_requests</code>-tabel, en stuurt een notificatie-e-mail naar <code>jaap@jaaphoeve.com</code> via de Resend API.</p>
+<p><strong>Secrets:</strong></p>
+<table>
+  <tr><th>Secret</th><th>Beschrijving</th><th>Waar instellen</th></tr>
+  <tr><td><code>SUPABASE_URL</code></td><td>Supabase project URL</td><td>Automatisch geïnjecteerd</td></tr>
+  <tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>Service role key (bypasses RLS)</td><td>Automatisch geïnjecteerd</td></tr>
+  <tr><td><code>RESEND_API_KEY</code></td><td>Resend API key (<code>re_xxx</code>)</td><td>Supabase Dashboard &rarr; Edge Functions &rarr; Secrets — <strong>handmatig toevoegen</strong></td></tr>
+</table>
+
+<p><strong>Resend domein:</strong> het from-adres <code>Darwin &lt;noreply@jaaphoeve.com&gt;</code> vereist dat <code>jaaphoeve.com</code> is geverifieerd in Resend (DNS-records toevoegen).</p>
+
+<!-- ============================================================ -->
+<h2 id="posthog">PostHog Analytics</h2>
+<p>Darwin gebruikt PostHog (EU Cloud) voor product analytics. De scope is bewust beperkt tot <strong>pageviews en custom events</strong> — geen session replay, feature flags of A/B-testing.</p>
+
+<h3>Configuratie</h3>
+<table>
+  <tr><th>Variabele</th><th>Waarde</th></tr>
+  <tr><td><code>VITE_PUBLIC_POSTHOG_KEY</code></td><td>PostHog project key (<code>phc_xxx</code>)</td></tr>
+  <tr><td><code>VITE_PUBLIC_POSTHOG_HOST</code></td><td><code>https://eu.i.posthog.com</code> (EU Cloud — NOOIT US)</td></tr>
+</table>
+
+<div class="note warning">
+  <strong>Netlify:</strong> deze twee variabelen MOETEN ook in de Netlify dashboard &rarr; Site settings &rarr; Environment variables staan. Vite inlinet <code>VITE_</code>-vars at build time — zonder deze waarden werkt de productie/staging-build niet.
+</div>
+
+<h3>Init-config (in <code>src/lib/posthog.tsx</code>)</h3>
+<ul>
+  <li><code>defaults: '2025-05-24'</code> &rarr; <code>capture_pageview</code> defaultt naar <code>'history_change'</code> (vangt SPA route-changes)</li>
+  <li><code>capture_pageleave: true</code></li>
+  <li><code>person_profiles: 'identified_only'</code> &rarr; géén anonieme profielen (GDPR + kosten)</li>
+  <li><code>autocapture: false</code> &rarr; scope beperkt tot pageviews + custom events</li>
+  <li><code>disable_session_recording: true</code></li>
+</ul>
+
+<h3>Custom events</h3>
+<table>
+  <tr><th>Event</th><th>Properties</th><th>Wanneer</th></tr>
+  <tr><td><code>task_effort_rated</code></td><td><code>ces_score</code>, <code>task</code></td><td>CES-voorbereiding (nog niet aan UI gekoppeld)</td></tr>
+  <tr><td><code>roadmap_voted</code></td><td><code>feature_id</code>, <code>direction</code></td><td>Bij upvote/downvote op roadmap</td></tr>
+  <tr><td><code>feature_request_submitted</code></td><td><code>title</code></td><td>Bij indienen feature request</td></tr>
+</table>
+
+<h3>User identificatie</h3>
+<p>PostHog-identiteit is gekoppeld aan de Supabase-auth-sessie: <code>posthog.identify(user.id)</code> bij SIGNED_IN / INITIAL_SESSION, <code>posthog.reset()</code> bij SIGNED_OUT. Alleen de Supabase UUID wordt gebruikt als <code>distinct_id</code> — géén e-mailadres of andere PII.</p>
+
+<!-- ============================================================ -->
+<h2 id="resend">Resend (e-mail)</h2>
+<p>Resend is de e-maildienst voor feature-request notificaties. Darwin gebruikt de Resend REST API (<code>POST https://api.resend.com/emails</code>) direct vanuit de <code>send-feature-request</code> edge function.</p>
+
+<h3>Setup</h3>
+<ol>
+  <li>Maak een account aan op <a href="https://resend.com">https://resend.com</a></li>
+  <li>Verifieer domein <code>jaaphoeve.com</code> &rarr; voeg de DNS-records toe die Resend aangeeft (SPF, DKIM, DMARC)</li>
+  <li>Maak een API-key aan (<code>re_xxx</code>)</li>
+  <li>Voeg toe als Supabase secret: <code>RESEND_API_KEY</code> in Supabase Dashboard &rarr; Edge Functions &rarr; Secrets</li>
+</ol>
+
+<div class="note warning">
+  <strong>From-adres:</strong> <code>Darwin &lt;noreply@jaaphoeve.com&gt;</code> vereist dat <code>jaaphoeve.com</code> is geverifieerd in Resend. Zonder geverifieerd domein weigert Resend de e-mail te versturen.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="problemen">Problemen oplossen</h2>
+
+<table>
+  <tr><th>Probleem</th><th>Oplossing</th></tr>
+  <tr><td>Upload faalt</td><td>Controleer of <code>.env.local</code> Supabase credentials bevat</td></tr>
+  <tr><td>Webhook wordt niet verstuurd</td><td>Controleer <code>VITE_N8N_DOCUMENT_WEBHOOK</code> in <code>.env.local</code> — feature werkt ook zonder</td></tr>
+  <tr><td>n8n krijgt geen data binnen</td><td>n8n workflow geactiveerd? Webhook node gebruikt <code>POST</code>?</td></tr>
+  <tr><td>Document blijft op "Verwerken"</td><td>n8n flow updatet de status niet — check Supabase node in de flow</td></tr>
+  <tr><td>Download URL verlopen</td><td>n8n moet document binnen 15 min downloaden — vertraagt de flow?</td></tr>
+  <tr><td>Bestand blijft in Storage</td><td>Controleer of de DELETE HTTP Request node correct werkt (URL, Service Role Key)</td></tr>
+  <tr><td>Roadmap laadt niet</td><td>Draai migration <code>010_roadmap.sql</code> in Supabase SQL Editor</td></tr>
+  <tr><td>Stemmen werkt niet</td><td>Controleer of <code>roadmap_votes</code> RLS policies aanwezig zijn (migration 010)</td></tr>
+  <tr><td>Feature request e-mail komt niet aan</td><td>Controleer <code>RESEND_API_KEY</code> secret in Supabase + of <code>jaaphoeve.com</code> is geverifieerd in Resend</td></tr>
+  <tr><td>PostHog werkt niet in productie</td><td>Controleer of <code>VITE_PUBLIC_POSTHOG_KEY</code> en <code>VITE_PUBLIC_POSTHOG_HOST</code> in Netlify env-vars staan</td></tr>
+  <tr><td>Chat toont oude berichten</td><td>Niet meer — chat is stateless sinds v0.2. Oude runs staan in Geschiedenis</td></tr>
+  <tr><td>Build faalt op Netlify</td><td>Controleer of alle <code>VITE_</code>-vars in Netlify env-vars staan</td></tr>
+</table>
+
+<div class="footer">
+  <p>Darwin AI Platform &mdash; Handleiding. Actueel gehouden op de <code>develop</code> branch. Vragen? jaap@jaaphoeve.com</p>
+</div>
+
+</main>
+</div>
+</body>
+</html>
