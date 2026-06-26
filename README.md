@@ -98,6 +98,26 @@ src/
 - `handle_new_user()` trigger voor auto-profile creatie
 - `update_updated_at()` trigger op alle relevante tabellen
 
+## Deployment strategy
+
+### Branches
+
+| Branch      | Doel                                  | Wie pushed             |
+|-------------|---------------------------------------|------------------------|
+| `develop`   | Actieve ontwikkeling &amp; testen      | Iedereen (via PR)      |
+| `main`      | Productie — alleen via PR vanuit develop | Maintainer (na testing) |
+
+### Werkwijze
+
+1. **Altijd vanaf `develop`** branchen voor features/fixes
+2. **Eerst op `develop` testen** — TypeScript build, Vite build, fitness checks moeten groen zijn
+3. **Pas daarna naar `main`** via PR van `develop` &rarr; `main`
+4. **Direct committen op `main` is verboden** — altijd via `develop`
+
+Hotfixes: branch vanaf `main`, PR naar zowel `main` als `develop`.
+
+Zie `AGENTS.md` voor de volledige branching strategy.
+
 ## N8N Webhook contract
 
 POST body naar `ai_assistants.n8n_webhook_url`:

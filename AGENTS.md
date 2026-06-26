@@ -153,6 +153,57 @@ Runs in Netlify or GitHub Actions — not locally.
 
 ---
 
+## Branching Strategy — Develop &rarr; Main
+
+> **Ijzeren regel:** elke wijziging gaat eerst naar `develop`, wordt daar getest, en pas daarna naar `main` gemerged.
+
+### Branches
+
+| Branch      | Doel                                  | Wie pushed             |
+|-------------|---------------------------------------|------------------------|
+| `develop`   | Actieve ontwikkeling &amp; testen      | Iedereen (via PR)      |
+| `main`      | Productie — alleen via PR vanuit develop | Maintainer (na testing) |
+
+### Workflow
+
+1. **Branch vanaf `develop`** voor elke feature/fix:
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout -b feat/<scope>-<korte-beschrijving>
+   ```
+2. **Commit &amp; push** naar je feature-branch, open een PR naar `develop`
+3. **Test op `develop`** — de Netlify preview-deploy (of lokaal) moet groen zijn:
+   - `npx tsc --noEmit` slaagt
+   - `npm run build` slaagt
+   - Pre-commit hook (fitness checks + gitleaks) groen
+   - Happy-path handmatig getest in browser
+4. **Merge naar `main`** via PR van `develop` &rarr; `main` — alleen nadat develop getest is
+5. **Direct committen op `main` is verboden** — altijd via develop
+
+### Wat als er een hotfix nodig is?
+
+1. Branch `hotfix/<scope>-<beschrijving>` vanaf `main`
+2. Fix, test, commit
+3. PR naar zowel `main` als `develop` (zodat develop de fix ook heeft)
+
+### Netlify deploy branches
+
+Configureer in Netlify dashboard:
+- `main` &rarr; productie-deploy
+- `develop` &rarr; preview-deploy (geen publicatie, alleen voor testen)
+
+### Samenvattend
+
+```
+feature-branch → develop (testen) → main (productie)
+hotfix-branch → main + develop (parallel)
+```
+
+**NOOIT** direct naar `main` committen of pushen.
+
+---
+
 ## Commit Convention
 
 ```
