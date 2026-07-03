@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { MessageContent } from '@/components/chat/MessageContent'
 import type { AIAssistant, Conversation, Message, KnowledgeBase, FeedbackInteraction } from '@/types/database.types'
 import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react'
 
@@ -626,7 +627,7 @@ function ChatWindow({
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted'
               )}>
-                {msg.content}
+                <MessageContent content={msg.content} />
               </div>
               {msg.role === 'assistant' && msg.sources && Array.isArray(msg.sources) && (msg.sources as Source[]).length > 0 && (
                 <div className="text-xs">

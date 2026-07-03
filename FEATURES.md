@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-05-29_
-_Total features: 15_
+_Last updated: 2026-07-03_
+_Total features: 16_
 
 ---
 
@@ -147,6 +147,16 @@ Deployed op Netlify met SPA redirects (`/* → /index.html`), Node 20 build.
 ### ⚠️ Testing — Playwright (nog niet opgezet)
 
 AGENTS.md mandateert Playwright tests na elke feature, maar de `tests/` directory bestaat niet.
+
+---
+
+### 🧪 HTML-weergave Assistent-antwoorden — DOMPurify sanitization
+
+Assistent-antwoorden worden als HTML aangeleverd (door n8n) en veilig weergegeven via DOMPurify-sanitization met een strikte allow-list. Eén gedeelde `MessageContent`-component vervangt de gedupliceerde `{msg.content}`-rendering in zowel de live chat als de geschiedenis-weergave. Visuele vormgeving ongewijzigd: zelfde bubble-stijl, lettergrootte, kleuren en padding. Oude platte-tekst berichten blijven correct zichtbaar (DOMPurify laat platte tekst ongemoeid).
+
+**Files**: `src/components/chat/MessageContent.tsx`, `src/lib/sanitize.ts`, `src/pages/AssistantsPage.tsx`, `src/pages/HistoryPage.tsx`
+
+**Gap**: Playwright-tests (XSS-preventie, visuele-identiek check) nog te schrijven — tests/ directory ontbreekt.
 
 ---
 
