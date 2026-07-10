@@ -431,7 +431,6 @@ export function useCreateKnowledgeBase(orgId: string) {
       name: string
       description: string | null
       vector_collection_id: string | null
-      processing_mode: 'vectorized' | 'plain_text'
       created_by: string
     }) => {
       const { error } = await supabase
@@ -453,7 +452,6 @@ export function useUpdateKnowledgeBase(orgId: string) {
       name: string
       description: string | null
       vector_collection_id: string | null
-      processing_mode: 'vectorized' | 'plain_text'
     }) => {
       const { error } = await supabase
         .from('knowledge_bases')
@@ -461,7 +459,6 @@ export function useUpdateKnowledgeBase(orgId: string) {
           name: payload.name,
           description: payload.description,
           vector_collection_id: payload.vector_collection_id,
-          processing_mode: payload.processing_mode,
         })
         .eq('id', payload.id)
       if (error) throw error
@@ -514,30 +511,6 @@ export function useDeleteKnowledgeItem(kbId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kb-items', kbId] })
-    },
-  })
-}
-
-export function useToggleKBLink(kbId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ assistantId, link }: { assistantId: string; link: boolean }) => {
-      if (link) {
-        const { error } = await supabase
-          .from('assistant_knowledge_bases')
-          .insert({ assistant_id: assistantId, knowledge_base_id: kbId })
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('assistant_knowledge_bases')
-          .delete()
-          .eq('assistant_id', assistantId)
-          .eq('knowledge_base_id', kbId)
-        if (error) throw error
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['kb-linked-assistants', kbId] })
     },
   })
 }

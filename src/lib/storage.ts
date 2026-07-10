@@ -7,8 +7,7 @@ export const uploadDocument = async (
   knowledgeBaseId: string,
   knowledgeBaseName: string,
   userId: string,
-  organizationId: string,
-  processingMode: 'vectorized' | 'plain_text' = 'vectorized',
+  organizationId: string
 ): Promise<{ document: KnowledgeBaseDocument; signedUrl: string }> => {
   const fileExt = file.name.split('.').pop()
   const filePath = `${organizationId}/${knowledgeBaseId}/${crypto.randomUUID()}.${fileExt}`
@@ -19,8 +18,6 @@ export const uploadDocument = async (
 
   if (uploadError) throw uploadError
 
-  const isPlainText = processingMode === 'plain_text'
-
   const { data: document, error: insertError } = await supabase
     .from('knowledge_base_documents')
     .insert({
@@ -30,7 +27,7 @@ export const uploadDocument = async (
       file_path: filePath,
       file_type: fileExt || 'unknown',
       file_size: file.size,
-      status: isPlainText ? 'ready' : 'processing',
+      status: 'processing',
       created_by: userId,
     })
     .select()
@@ -53,8 +50,6 @@ export const uploadDocument = async (
     signedUrlData.signedUrl,
     'index',
     filePath,
-    processingMode,
-    knowledgeBaseId,
   )
 
   return { document, signedUrl: signedUrlData.signedUrl }
@@ -66,8 +61,6 @@ export const deleteDocument = async (
   organizationId: string,
   knowledgeBaseName: string,
   documentName: string,
-  processingMode: 'vectorized' | 'plain_text' = 'vectorized',
-  knowledgeBaseId: string = '',
 ) => {
   if (filePath) {
     const { error: storageError } = await supabase.storage
@@ -85,5 +78,5 @@ export const deleteDocument = async (
   if (error) throw error
 
   const fileExt = filePath?.split('.').pop()?.toLowerCase() || 'unknown'
-  await callDocumentWebhook(organizationId, knowledgeBaseName, documentId, documentName, fileExt, '', 'delete', filePath ?? '', processingMode, knowledgeBaseId)
+  await callDocumentWebhook(organizationId, knowledgeBaseName, documentId, documentName, fileExt, '', 'delete', filePath ?? '')
 }

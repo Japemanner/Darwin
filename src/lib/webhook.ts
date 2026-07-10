@@ -11,7 +11,6 @@ interface RAGWebhookPayload {
     id: string
     name: string
     vector_collection_id: string
-    processing_mode: string
   }>
   knowledgeSourceName: string
   tenantId: string
@@ -152,7 +151,6 @@ interface KnowledgeBaseWithId {
   id: string
   name: string
   vector_collection_id: string | null
-  processing_mode: 'vectorized' | 'plain_text' | null
 }
 
 const kbCache = new Map<string, KnowledgeBaseWithId[]>()
@@ -164,7 +162,7 @@ async function loadAssistantKnowledgeBases(assistantId: string, organizationId: 
 
   const { data, error } = await supabase
     .from('assistant_knowledge_bases')
-    .select('knowledge_bases(id, name, vector_collection_id, processing_mode)')
+    .select('knowledge_bases(id, name, vector_collection_id)')
     .eq('assistant_id', assistantId)
 
   if (error || !data) return []
@@ -220,17 +218,16 @@ export async function callRagWebhook(
   if (assistant.type === 'chat') {
     config = await loadFlowConfig(organizationId, 'rag_chat')
     if (!config) {
+      throw new Error('Geen RAG configuratie gevonden — neem contact op met de beheerder')
+    }
+    webhookUrl = normalizeUrl(config.webhook_url)
+    if (!webhookUrl) {
       if (assistant.n8n_webhook_url) {
         webhookUrl = normalizeUrl(assistant.n8n_webhook_url)
       } else {
-        throw new Error('Geen RAG configuratie gevonden — neem contact op met de beheerder')
+        throw new Error('Webhook URL niet geconfigureerd')
       }
-    } else if (assistant.n8n_webhook_url) {
-      webhookUrl = normalizeUrl(assistant.n8n_webhook_url)
-      authHeader = config.webhook_auth_header || 'X-Webhook-Token'
-      token = config.webhook_token ? await decryptToken(config.webhook_token) : undefined
     } else {
-      webhookUrl = normalizeUrl(config.webhook_url)
       authHeader = config.webhook_auth_header || 'X-Webhook-Token'
       token = config.webhook_token ? await decryptToken(config.webhook_token) : undefined
     }
@@ -264,7 +261,6 @@ export async function callRagWebhook(
       id: kb.id,
       name: kb.name,
       vector_collection_id: kb.vector_collection_id ?? '',
-      processing_mode: kb.processing_mode ?? 'vectorized',
     })),
     knowledgeSourceName,
     tenantId,
@@ -402,8 +398,6 @@ export async function callDocumentWebhook(
   downloadUrl: string,
   action: DocumentAction = 'index',
   filePath: string = '',
-  processingMode: 'vectorized' | 'plain_text' = 'vectorized',
-  knowledgeBaseId: string = '',
 ): Promise<void> {
   try {
     const config = await loadFlowConfig(organizationId, 'document_processing')
@@ -432,8 +426,6 @@ export async function callDocumentWebhook(
           action,
           tenantId,
           knowledgeSourceName: knowledgeBaseName,
-          knowledge_base_id: knowledgeBaseId,
-          processing_mode: processingMode,
           document_id: documentId,
           document_name: documentName,
           document_type: documentType,

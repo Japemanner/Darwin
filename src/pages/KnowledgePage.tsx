@@ -11,23 +11,20 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
-import { Select } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import {
   useKnowledgeBases,
   useKnowledgeBaseDocuments,
   useKnowledgeItems,
   useLinkedAssistants,
-  useAssistants,
   useCreateKnowledgeBase,
   useUpdateKnowledgeBase,
   useAddKnowledgeItem,
   useDeleteKnowledgeItem,
-  useToggleKBLink,
 } from '@/hooks/queries'
 import { useQueryClient } from '@tanstack/react-query'
 import type { KnowledgeBase, KnowledgeBaseDocument, KnowledgeItem } from '@/types/database.types'
-import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X, FilePlus, Check } from 'lucide-react'
+import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X, FilePlus } from 'lucide-react'
 
 function KnowledgePage() {
   const { profile } = useAuth()
@@ -84,13 +81,6 @@ function KnowledgePage() {
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {kb.description ?? 'Geen beschrijving'}
                 </p>
-                <div className="mt-2">
-                  {kb.processing_mode === 'plain_text' ? (
-                    <Badge variant="outline" className="text-xs">Platte tekst</Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-xs">RAG / Doorzoekbaar</Badge>
-                  )}
-                </div>
               </CardContent>
               <CardFooter>
                 <Button variant="ghost" size="sm" className="ml-auto" onClick={(e) => { e.stopPropagation(); setEditingKB(kb); setModalOpen(true) }}>
@@ -139,7 +129,6 @@ function KBMappingModal({
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [vectorCollectionId, setVectorCollectionId] = useState('')
-  const [processingMode, setProcessingMode] = useState<'vectorized' | 'plain_text'>('vectorized')
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -147,22 +136,20 @@ function KBMappingModal({
       setName(kb.name)
       setDescription(kb.description ?? '')
       setVectorCollectionId(kb.vector_collection_id ?? '')
-      setProcessingMode(kb.processing_mode ?? 'vectorized')
     } else {
       setName('')
       setDescription('')
       setVectorCollectionId('')
-      setProcessingMode('vectorized')
     }
   }, [kb, open])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
-    const payload = { organization_id: organizationId, name, description: description || null, vector_collection_id: vectorCollectionId || null, processing_mode: processingMode, created_by: userId }
+    const payload = { organization_id: organizationId, name, description: description || null, vector_collection_id: vectorCollectionId || null, created_by: userId }
     try {
       if (kb) {
-        await updateMutation.mutateAsync({ id: kb.id, name: payload.name, description: payload.description, vector_collection_id: payload.vector_collection_id, processing_mode: payload.processing_mode })
+        await updateMutation.mutateAsync({ id: kb.id, name: payload.name, description: payload.description, vector_collection_id: payload.vector_collection_id })
         toast({ title: 'Kennisbron bijgewerkt' })
       } else {
         await createMutation.mutateAsync(payload)
@@ -190,28 +177,10 @@ function KBMappingModal({
             <Textarea id="kb-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optionele omschrijving" rows={3} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="kb-mode">Verwerkingsmodus</Label>
-            <Select
-              value={processingMode}
-              onValueChange={(v) => setProcessingMode(v as 'vectorized' | 'plain_text')}
-              options={[
-                { value: 'vectorized', label: 'Automatisch doorzoekbaar maken (RAG)' },
-                { value: 'plain_text', label: 'Platte tekst (geen automatische verwerking)' },
-              ]}
-            />
-            <p className="text-xs text-muted-foreground">
-              {processingMode === 'vectorized'
-                ? 'Documenten worden vectorized en doorzoekbaar via RAG.'
-                : 'Documenten worden als platte tekst opgeslagen. Geen vectorisatie of automatische doorzoeking.'}
-            </p>
+            <Label htmlFor="kb-vector">Vector Collection ID</Label>
+            <Input id="kb-vector" value={vectorCollectionId} onChange={(e) => setVectorCollectionId(e.target.value)} placeholder="my-collection-name" />
+            <p className="text-xs text-muted-foreground">Verwijzing naar de collectie in de vector database (Pinecone namespace, Qdrant collection, etc.)</p>
           </div>
-          {processingMode === 'vectorized' && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="kb-vector">Vector Collection ID</Label>
-              <Input id="kb-vector" value={vectorCollectionId} onChange={(e) => setVectorCollectionId(e.target.value)} placeholder="my-collection-name" />
-              <p className="text-xs text-muted-foreground">Verwijzing naar de collectie in de vector database (Pinecone namespace, Qdrant collection, etc.)</p>
-            </div>
-          )}
         </DialogContent>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
@@ -243,10 +212,8 @@ function KBSlideOver({
   const { data: documents, isPending: docsLoading } = useKnowledgeBaseDocuments(kb?.id)
   const { data: items, isPending: itemsLoading } = useKnowledgeItems(kb?.id)
   const { data: linkedAssistants } = useLinkedAssistants(kb?.id)
-  const { data: allAssistants } = useAssistants(organizationId || undefined)
   const addItemMutation = useAddKnowledgeItem(kb?.id ?? '')
   const deleteItemMutation = useDeleteKnowledgeItem(kb?.id ?? '')
-  const toggleLinkMutation = useToggleKBLink(kb?.id ?? '')
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -262,7 +229,7 @@ function KBSlideOver({
 
     setIsUploading(true)
     try {
-      await uploadDocument(file, kb.id, kb.name, userId, organizationId, kb.processing_mode)
+      await uploadDocument(file, kb.id, kb.name, userId, organizationId)
       toast({ title: 'Document geüpload', description: file.name })
       qc.invalidateQueries({ queryKey: ['kb-documents', kb.id] })
     } catch (err) {
@@ -275,7 +242,7 @@ function KBSlideOver({
 
   const handleDeleteDoc = async (doc: KnowledgeBaseDocument) => {
     try {
-      await deleteDocument(doc.id, doc.file_path, organizationId, kb!.name, doc.name, kb!.processing_mode, kb!.id)
+      await deleteDocument(doc.id, doc.file_path, organizationId, kb!.name, doc.name)
       toast({ title: 'Document verwijderd' })
       qc.invalidateQueries({ queryKey: ['kb-documents', kb?.id] })
     } catch {
@@ -464,32 +431,19 @@ function KBSlideOver({
 
           {tab === 'assistants' && (
             <div>
-              <p className="text-xs text-muted-foreground mb-3">Vink assistenten aan om ze aan deze kennisbron te koppelen.</p>
-              {(allAssistants ?? []).length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-8">Nog geen assistenten beschikbaar</p>
+              {(linkedAssistants ?? []).length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">Nog geen assistenten gekoppeld</p>
               ) : (
                 <div className="space-y-2">
-                  {(allAssistants ?? []).map((a) => {
-                    const isLinked = (linkedAssistants ?? []).some((la) => la.id === a.id)
-                    return (
-                      <label key={a.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isLinked}
-                          onChange={() => {
-                            toggleLinkMutation.mutate({ assistantId: a.id, link: !isLinked })
-                          }}
-                          className="rounded border-input"
-                        />
-                        <span className="text-xl">{a.icon}</span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{a.name}</p>
-                          <p className="text-xs text-muted-foreground line-clamp-1">{a.description}</p>
-                        </div>
-                        {isLinked && <Check className="h-4 w-4 text-primary ml-auto shrink-0" />}
-                      </label>
-                    )
-                  })}
+                  {(linkedAssistants ?? []).map((a) => (
+                    <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                      <span className="text-xl">{a.icon}</span>
+                      <div>
+                        <p className="text-sm font-medium">{a.name}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{a.description}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
