@@ -1,42 +1,12 @@
-import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
+import { useDashboardCounts } from '@/hooks/queries'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Bot, BookOpen, Users, ClipboardList } from 'lucide-react'
 
-interface Stats {
-  assistants: number
-  knowledgeBases: number
-  teamMembers: number
-}
-
 function CommandCenterPage() {
   const { profile } = useAuth()
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    if (!profile?.organization_id) return
-
-    async function loadStats() {
-      const orgId = profile!.organization_id
-      const [assistantsRes, kbRes, membersRes] = await Promise.all([
-        supabase.from('ai_assistants').select('id', { count: 'exact', head: true }).eq('organization_id', orgId),
-        supabase.from('knowledge_bases').select('id', { count: 'exact', head: true }).eq('organization_id', orgId),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('organization_id', orgId),
-      ])
-
-      setStats({
-        assistants: assistantsRes.count ?? 0,
-        knowledgeBases: kbRes.count ?? 0,
-        teamMembers: membersRes.count ?? 0,
-      })
-      setIsLoading(false)
-    }
-
-    loadStats()
-  }, [profile])
+  const { data: stats, isPending } = useDashboardCounts(profile?.organization_id)
 
   return (
     <div>
@@ -44,7 +14,7 @@ function CommandCenterPage() {
       <p className="text-muted-foreground mb-8">Centraal overzicht van je omgeving</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {isLoading
+        {isPending
           ? Array.from({ length: 4 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader className="pb-2">

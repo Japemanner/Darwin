@@ -5,7 +5,7 @@ import { PostHogAppProvider } from '@/lib/posthog'
 import LoginPage from '@/components/auth/LoginPage'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import AppShell from '@/components/layout/AppShell'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 
 const CommandCenterPage = lazy(() => import('@/pages/CommandCenterPage'))
@@ -18,7 +18,16 @@ const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 function Loading() {
   return (
@@ -30,19 +39,10 @@ function Loading() {
 
 function App() {
   const initialize = useAuthStore((s) => s.initialize)
-  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    initialize().catch(() => {}).finally(() => setReady(true))
+    initialize().catch(() => {})
   }, [])
-
-  if (!ready) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    )
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
