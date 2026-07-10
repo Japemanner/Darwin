@@ -150,7 +150,9 @@ function AssistantModal({
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [icon, setIcon] = useState('🤖')
   const [type, setType] = useState('chat')
+  const [webhookUrl, setWebhookUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -161,13 +163,17 @@ function AssistantModal({
     if (assistant) {
       setName(assistant.name)
       setDescription(assistant.description ?? '')
+      setIcon(assistant.icon ?? '🤖')
       setType(assistant.type ?? 'chat')
+      setWebhookUrl(assistant.n8n_webhook_url ?? '')
       setIsActive(assistant.is_active);
       setSelectedKBIds(linkedKBIds ?? new Set())
     } else {
       setName('')
       setDescription('')
+      setIcon('🤖')
       setType('chat')
+      setWebhookUrl('')
       setIsActive(true)
       setSelectedKBIds(new Set())
     }
@@ -191,9 +197,9 @@ function AssistantModal({
       name,
       description: description || null,
       system_prompt: assistant?.system_prompt ?? '',
-      icon: assistant?.icon ?? '🤖',
+      icon: icon || '🤖',
       type,
-      n8n_webhook_url: null,
+      n8n_webhook_url: webhookUrl.trim() || null,
       is_active: isActive,
       created_by: userId,
       kbIds: [...selectedKBIds],
@@ -206,6 +212,8 @@ function AssistantModal({
           name: payload.name,
           description: payload.description,
           type: payload.type,
+          icon: payload.icon,
+          n8n_webhook_url: payload.n8n_webhook_url,
           is_active: payload.is_active,
           kbIds: payload.kbIds,
         })
@@ -245,9 +253,15 @@ function AssistantModal({
           <DialogTitle>{assistant ? 'Assistent bewerken' : 'Nieuwe assistent'}</DialogTitle>
         </DialogHeader>
         <DialogContent className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="name">Naam</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mijn assistent" required />
+          <div className="flex gap-4">
+            <div className="flex flex-col gap-2 w-20">
+              <Label htmlFor="icon">Icoon</Label>
+              <Input id="icon" value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🤖" maxLength={4} className="text-center text-xl" />
+            </div>
+            <div className="flex flex-col gap-2 flex-1">
+              <Label htmlFor="name">Naam</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mijn assistent" required />
+            </div>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="type">Type</Label>
@@ -256,6 +270,11 @@ function AssistantModal({
           <div className="flex flex-col gap-2">
             <Label htmlFor="desc">Beschrijving</Label>
             <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Korte omschrijving" rows={2} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="webhook-url">N8N Webhook URL</Label>
+            <Input id="webhook-url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://n8n.example.com/webhook/mijn-flow" />
+            <p className="text-xs text-muted-foreground">Optioneel. Als ingevuld, gebruikt deze assistent zijn eigen webhook URL i.p.v. de gedeelde RAG-configuratie.</p>
           </div>
           <div className="flex flex-col gap-2">
             <Label>Kennisbronnen</Label>
