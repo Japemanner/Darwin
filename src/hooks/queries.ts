@@ -353,6 +353,8 @@ export function useUpdateAssistant(orgId: string) {
       name: string
       description: string | null
       type: string
+      icon: string
+      n8n_webhook_url: string | null
       is_active: boolean
       kbIds: string[]
     }) => {
@@ -362,6 +364,8 @@ export function useUpdateAssistant(orgId: string) {
           name: payload.name,
           description: payload.description,
           type: payload.type as 'chat' | 'agent' | 'voice',
+          icon: payload.icon,
+          n8n_webhook_url: payload.n8n_webhook_url,
           is_active: payload.is_active,
         })
         .eq('id', payload.id)
