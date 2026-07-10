@@ -143,6 +143,7 @@ export interface Database {
           name: string
           description: string | null
           vector_collection_id: string | null
+          processing_mode: 'vectorized' | 'plain_text'
           created_by: string
           created_at: string
           updated_at: string
@@ -153,6 +154,7 @@ export interface Database {
           name: string
           description?: string | null
           vector_collection_id?: string | null
+          processing_mode?: 'vectorized' | 'plain_text'
           created_by: string
           created_at?: string
           updated_at?: string
@@ -163,6 +165,7 @@ export interface Database {
           name?: string
           description?: string | null
           vector_collection_id?: string | null
+          processing_mode?: 'vectorized' | 'plain_text'
           created_by?: string
           created_at?: string
           updated_at?: string
