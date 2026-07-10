@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/toast'
@@ -13,13 +13,9 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { trackEvent, PostHogEvent } from '@/lib/posthog'
-import type { RoadmapFeature, RoadmapVote } from '@/types/database.types'
+import { useRoadmapFeatures, useVote, type FeatureWithScore } from '@/hooks/queries'
+import type { RoadmapFeature } from '@/types/database.types'
 import { Map as MapIcon, ChevronUp, ChevronDown, Lightbulb } from 'lucide-react'
-
-interface FeatureWithScore extends RoadmapFeature {
-  score: number
-  user_vote: number | null
-}
 
 const STATUS_LABELS: Record<RoadmapFeature['status'], string> = {
   in_overweging: 'In overweging',
@@ -45,124 +41,13 @@ const FILTER_TABS: { value: string; label: string }[] = [
 
 function RoadmapPage() {
   const { profile } = useAuth()
-  const { toast } = useToast()
-  const [features, setFeatures] = useState<FeatureWithScore[]>([])
-  const [userVotes, setUserVotes] = useState<Map<string, number>>(new Map())
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: features, isPending } = useRoadmapFeatures(profile?.id)
   const [activeFilter, setActiveFilter] = useState('all')
   const [requestModalOpen, setRequestModalOpen] = useState(false)
 
-  const loadFeatures = useCallback(async () => {
-    // Haal features met score op via de publieke view (bypasses vote RLS voor aggregate)
-    const { data: featureData, error: featureError } = await supabase
-      .from('roadmap_features_with_score')
-      .select('*')
-      .order('score', { ascending: false })
-
-    if (featureError) {
-      toast({ title: 'Fout bij laden roadmap', variant: 'destructive' })
-      setIsLoading(false)
-      return
-    }
-
-    const features = (featureData ?? []) as Array<RoadmapFeature & { score: number }>
-
-    // Haal eigen votes op (RLS beperkt tot user_id = auth.uid())
-    const { data: voteData } = await supabase
-      .from('roadmap_votes')
-      .select('feature_id, direction')
-      .eq('user_id', profile?.id ?? '')
-
-    const voteMap = new Map<string, number>()
-    for (const v of (voteData ?? []) as RoadmapVote[]) {
-      voteMap.set(v.feature_id, v.direction)
-    }
-    setUserVotes(voteMap)
-
-    const featuresWithScore: FeatureWithScore[] = features.map((f) => ({
-      ...f,
-      user_vote: voteMap.get(f.id) ?? null,
-    }))
-
-    setFeatures(featuresWithScore)
-    setIsLoading(false)
-  }, [profile, toast])
-
-  useEffect(() => {
-    loadFeatures()
-  }, [loadFeatures])
-
-  const handleVote = async (featureId: string, direction: number) => {
-    if (!profile) return
-
-    const currentVote = userVotes.get(featureId) ?? null
-    const feature = features.find((f) => f.id === featureId)
-    if (!feature) return
-
-    // Optimistic update
-    const newVoteMap = new Map(userVotes)
-    let newScore = feature.score
-
-    if (currentVote === direction) {
-      // Toggle uit: verwijder vote
-      newVoteMap.delete(featureId)
-      newScore -= direction
-    } else if (currentVote === null) {
-      // Nieuwe vote
-      newVoteMap.set(featureId, direction)
-      newScore += direction
-    } else {
-      // Wissel van richting
-      newVoteMap.set(featureId, direction)
-      newScore += direction - currentVote
-    }
-
-    setUserVotes(newVoteMap)
-    setFeatures((prev) =>
-      prev
-        .map((f) =>
-          f.id === featureId
-            ? { ...f, score: newScore, user_vote: newVoteMap.get(featureId) ?? null }
-            : f
-        )
-        .sort((a, b) => b.score - a.score)
-    )
-
-    trackEvent(PostHogEvent.ROADMAP_VOTED, { feature_id: featureId, direction })
-
-    // Server-side sync
-    try {
-      if (currentVote === direction) {
-        // Verwijder vote
-        const { error } = await (supabase as any).from('roadmap_votes') // eslint-disable-line @typescript-eslint/no-explicit-any
-          .delete()
-          .eq('feature_id', featureId)
-          .eq('user_id', profile.id)
-        if (error) throw error
-      } else if (currentVote === null) {
-        // Nieuwe vote
-        const { error } = await (supabase as any).from('roadmap_votes') // eslint-disable-line @typescript-eslint/no-explicit-any
-          .insert({ feature_id: featureId, user_id: profile.id, direction })
-        if (error) throw error
-      } else {
-        // Update richting
-        const { error } = await (supabase as any).from('roadmap_votes') // eslint-disable-line @typescript-eslint/no-explicit-any
-          .update({ direction })
-          .eq('feature_id', featureId)
-          .eq('user_id', profile.id)
-        if (error) throw error
-      }
-    } catch (err) {
-      // Revert optimistic update bij fout
-      toast({ title: 'Stemmen mislukt', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
-      setUserVotes(userVotes)
-      loadFeatures()
-    }
-  }
-
   const filteredFeatures = activeFilter === 'all'
-    ? features
-    : features.filter((f) => f.status === activeFilter)
+    ? (features ?? [])
+    : (features ?? []).filter((f) => f.status === activeFilter)
 
   return (
     <div>
@@ -193,7 +78,7 @@ function RoadmapPage() {
         ))}
       </div>
 
-      {isLoading ? (
+      {isPending ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -220,8 +105,7 @@ function RoadmapPage() {
             <FeatureRow
               key={feature.id}
               feature={feature}
-              userVote={userVotes.get(feature.id) ?? null}
-              onVote={handleVote}
+              userId={profile?.id ?? ''}
             />
           ))}
         </div>
@@ -237,23 +121,33 @@ function RoadmapPage() {
 
 function FeatureRow({
   feature,
-  userVote,
-  onVote,
+  userId,
 }: {
   feature: FeatureWithScore
-  userVote: number | null
-  onVote: (featureId: string, direction: number) => void
+  userId: string
 }) {
+  const { toast } = useToast()
+  const voteMutation = useVote(feature.id, userId)
+
+  const handleVote = async (direction: number) => {
+    trackEvent(PostHogEvent.ROADMAP_VOTED, { feature_id: feature.id, direction })
+    try {
+      await voteMutation.mutateAsync(direction)
+    } catch (err) {
+      toast({ title: 'Stemmen mislukt', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
+    }
+  }
+
   return (
     <Card>
       <CardContent className="p-4 flex items-start gap-4">
         <div className="flex flex-col items-center gap-1 shrink-0 pt-1">
           <button
-            onClick={() => onVote(feature.id, 1)}
+            onClick={() => handleVote(1)}
             disabled={!feature}
             className={cn(
               'p-1.5 rounded-md transition-colors',
-              userVote === 1
+              feature.user_vote === 1
                 ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
                 : 'hover:bg-accent text-muted-foreground hover:text-foreground'
             )}
@@ -268,11 +162,11 @@ function FeatureRow({
             {feature.score}
           </span>
           <button
-            onClick={() => onVote(feature.id, -1)}
+            onClick={() => handleVote(-1)}
             disabled={!feature}
             className={cn(
               'p-1.5 rounded-md transition-colors',
-              userVote === -1
+              feature.user_vote === -1
                 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                 : 'hover:bg-accent text-muted-foreground hover:text-foreground'
             )}

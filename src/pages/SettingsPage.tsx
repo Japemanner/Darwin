@@ -11,11 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select } from '@/components/ui/select'
 import { Settings, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle, Building2, UserPlus } from 'lucide-react'
-import type { FlowConfig } from '@/types/database.types'
+import { useFlowConfig, useSaveFlowConfig } from '@/hooks/queries'
 import type { WebhookTestResult } from '@/lib/webhook'
 
 interface FlowConfigFormState {
-  config: FlowConfig | null
   webhookUrl: string
   webhookToken: string
   webhookAuthHeader: string
@@ -30,18 +29,17 @@ function FlowConfigCard({
   description,
   placeholder,
   profile,
-  onSaved,
 }: {
   flowType: 'rag_chat' | 'document_processing'
   title: string
   description: string
   placeholder: string
   profile: { organization_id: string }
-  onSaved?: () => void
 }) {
   const { toast } = useToast()
+  const { data: config, isPending } = useFlowConfig(profile.organization_id, flowType)
+  const saveMutation = useSaveFlowConfig(profile.organization_id, flowType)
   const [state, setState] = useState<FlowConfigFormState>({
-    config: null,
     webhookUrl: '',
     webhookToken: '',
     webhookAuthHeader: 'X-Webhook-Token',
@@ -49,30 +47,18 @@ function FlowConfigCard({
     testResult: null,
     isTesting: false,
   })
-  const [isLoading, setIsLoading] = useState(true)
 
   const isTestUrl = state.webhookUrl.includes('/webhook-test/')
 
   useEffect(() => {
-    const loadConfig = async () => {
-      const { data } = await (supabase as any).from('flow_configs') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        .select('*')
-        .eq('flow_type', flowType)
-        .eq('organization_id', profile.organization_id)
-        .single()
-      if (data) {
-        const cfg = data as FlowConfig
-        setState((prev) => ({
-          ...prev,
-          config: cfg,
-          webhookUrl: cfg.webhook_url,
-          webhookAuthHeader: cfg.webhook_auth_header || 'X-Webhook-Token',
-        }))
-      }
-      setIsLoading(false)
+    if (config) {
+      setState((prev) => ({
+        ...prev,
+        webhookUrl: config.webhook_url,
+        webhookAuthHeader: config.webhook_auth_header || 'X-Webhook-Token',
+      }))
     }
-    loadConfig()
-  }, [flowType, profile.organization_id])
+  }, [config])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,37 +68,24 @@ function FlowConfigCard({
     try {
       const tokenToSave = state.webhookToken.trim()
         ? await encryptToken(state.webhookToken.trim())
-        : state.config?.webhook_token ?? ''
+        : config?.webhook_token ?? ''
 
-      const payload: Record<string, unknown> = {
-        flow_type: flowType,
+      await saveMutation.mutateAsync({
+        configId: config?.id ?? null,
         webhook_url: state.webhookUrl.trim(),
         webhook_token: tokenToSave,
         webhook_auth_header: state.webhookAuthHeader.trim() || 'X-Webhook-Token',
         organization_id: profile.organization_id,
-      }
+        flow_type: flowType,
+      })
 
-      if (state.config) {
-        const { error } = await (supabase as any).from('flow_configs').update(payload).eq('id', state.config.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        if (error) throw error
+      if (config) {
         toast({ title: 'Instellingen bijgewerkt', description: `${title} is succesvol opgeslagen` })
       } else {
-        const { data: created, error } = await (supabase as any).from('flow_configs').insert(payload).select().single() // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        if (error) throw error
-        setState((prev) => ({ ...prev, config: created }))
         toast({ title: 'Instellingen opgeslagen', description: `${title} is aangemaakt` })
       }
 
-      const { data: refreshed } = await supabase
-        .from('flow_configs')
-        .select('*')
-        .eq('flow_type', flowType)
-        .eq('organization_id', profile.organization_id)
-        .single()
-      if (refreshed) setState((prev) => ({ ...prev, config: refreshed }))
-
       setState((prev) => ({ ...prev, webhookToken: '' }))
-      onSaved?.()
     } catch (err) {
       toast({ title: 'Fout bij opslaan', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
     } finally {
@@ -132,8 +105,8 @@ function FlowConfigCard({
       let tokenToTest: string | undefined
       if (state.webhookToken.trim()) {
         tokenToTest = state.webhookToken.trim()
-      } else if (state.config?.webhook_token) {
-        tokenToTest = await decryptToken(state.config.webhook_token)
+      } else if (config?.webhook_token) {
+        tokenToTest = await decryptToken(config.webhook_token)
       }
 
       const result = await testWebhook(state.webhookUrl.trim(), tokenToTest, state.webhookAuthHeader || 'X-Webhook-Token')
@@ -153,7 +126,7 @@ function FlowConfigCard({
     }
   }
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <Card className="max-w-2xl">
         <CardHeader><Skeleton className="h-6 w-40" /></CardHeader>
@@ -213,10 +186,10 @@ function FlowConfigCard({
               type="password"
               value={state.webhookToken}
               onChange={(e) => setState((prev) => ({ ...prev, webhookToken: e.target.value }))}
-              placeholder={state.config ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (laat leeg om huidige token te behouden)' : 'De Header Value uit je n8n Webhook node'}
+              placeholder={config ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (laat leeg om huidige token te behouden)' : 'De Header Value uit je n8n Webhook node'}
             />
             <p className="text-xs text-muted-foreground">
-              {state.config
+              {config
                 ? 'Dit is de Header Value uit je n8n Webhook node (Header Auth). De token wordt versleuteld opgeslagen. Laat leeg om de bestaande token te behouden.'
                 : 'Voer de Header Value in uit je n8n Webhook node (Header Auth). De token wordt versleuteld opgeslagen.'}
             </p>
@@ -224,7 +197,7 @@ function FlowConfigCard({
 
           <div className="flex gap-3">
             <Button type="submit" disabled={state.isSaving}>
-              {state.isSaving ? 'Opslaan...' : state.config ? 'Bijwerken' : 'Configuratie aanmaken'}
+              {state.isSaving ? 'Opslaan...' : config ? 'Bijwerken' : 'Configuratie aanmaken'}
             </Button>
             <Button type="button" variant="outline" disabled={state.isTesting || !state.webhookUrl.trim()} onClick={handleTest}>
               {state.isTesting ? (

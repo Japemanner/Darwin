@@ -11,6 +11,7 @@ interface RAGWebhookPayload {
     id: string
     name: string
     vector_collection_id: string
+    processing_mode: string
   }>
   knowledgeSourceName: string
   tenantId: string
@@ -136,48 +137,64 @@ function classifyWebhookError(status: number, url: string): Error {
   return new Error(`Onverwachte fout (${status}). Controleer de webhook configuratie.`)
 }
 
-async function loadFlowConfig(organizationId: string, flowType: string): Promise<FlowConfig | null> {
-  const { data } = await (supabase as any).from('flow_configs') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+async function loadFlowConfig(organizationId: string, flowType: 'rag_chat' | 'document_processing'): Promise<FlowConfig | null> {
+  const { data } = await supabase
+    .from('flow_configs')
     .select('*')
     .eq('flow_type', flowType)
     .eq('organization_id', organizationId)
     .single()
-  return data as FlowConfig | null
+  if (data) return data as FlowConfig | null
+  return null
 }
 
 interface KnowledgeBaseWithId {
   id: string
   name: string
   vector_collection_id: string | null
+  processing_mode: 'vectorized' | 'plain_text' | null
 }
 
+const kbCache = new Map<string, KnowledgeBaseWithId[]>()
+
 async function loadAssistantKnowledgeBases(assistantId: string, organizationId: string): Promise<KnowledgeBaseWithId[]> {
-  const { data: links } = await (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-    .select('knowledge_base_id')
+  const cacheKey = `${assistantId}:${organizationId}`
+  const cached = kbCache.get(cacheKey)
+  if (cached) return cached
+
+  const { data, error } = await supabase
+    .from('assistant_knowledge_bases')
+    .select('knowledge_bases(id, name, vector_collection_id, processing_mode)')
     .eq('assistant_id', assistantId)
 
-  if (!links || links.length === 0) return []
+  if (error || !data) return []
 
-  const { data: kbs } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-    .from('knowledge_bases')
-    .select('id, name, vector_collection_id')
-    .eq('organization_id', organizationId)
-    .in(
-      'id',
-      links.map((l: { knowledge_base_id: string }) => l.knowledge_base_id),
-    )
+  const kbs = data
+    .map((row) => row.knowledge_bases)
+    .filter(Boolean) as KnowledgeBaseWithId[]
 
-  return (kbs as KnowledgeBaseWithId[]) ?? []
+  kbCache.set(cacheKey, kbs)
+  return kbs
+}
+
+export function invalidateAssistantKBCache(assistantId: string) {
+  for (const key of kbCache.keys()) {
+    if (key.startsWith(`${assistantId}:`)) {
+      kbCache.delete(key)
+    }
+  }
 }
 
 async function loadConversationHistory(conversationId: string): Promise<Array<{ role: string; content: string }>> {
-  const { data } = await (supabase as any).from('messages') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+  const { data } = await supabase
+    .from('messages')
     .select('role, content')
     .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
+    .limit(20)
 
   if (!data) return []
-  return data.slice(-20).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }))
+  return data.reverse().map((m) => ({ role: m.role, content: m.content }))
 }
 
 function buildAuthHeaders(token: string | undefined, authHeader: string): Record<string, string> {
@@ -193,24 +210,27 @@ export async function callRagWebhook(
   conversation: Conversation,
   userMessage: string,
   organizationId: string,
+  existingHistory?: Array<{ role: string; content: string }>,
 ): Promise<RAGWebhookResponse> {
   let webhookUrl: string
   let token: string | undefined
   let authHeader = 'X-Webhook-Token'
+  let config: FlowConfig | null = null
 
   if (assistant.type === 'chat') {
-    const config = await loadFlowConfig(organizationId, 'rag_chat')
+    config = await loadFlowConfig(organizationId, 'rag_chat')
     if (!config) {
-      throw new Error('Geen RAG configuratie gevonden — neem contact op met de beheerder')
-    }
-    webhookUrl = normalizeUrl(config.webhook_url)
-    if (!webhookUrl) {
       if (assistant.n8n_webhook_url) {
         webhookUrl = normalizeUrl(assistant.n8n_webhook_url)
       } else {
-        throw new Error('Webhook URL niet geconfigureerd')
+        throw new Error('Geen RAG configuratie gevonden — neem contact op met de beheerder')
       }
+    } else if (assistant.n8n_webhook_url) {
+      webhookUrl = normalizeUrl(assistant.n8n_webhook_url)
+      authHeader = config.webhook_auth_header || 'X-Webhook-Token'
+      token = config.webhook_token ? await decryptToken(config.webhook_token) : undefined
     } else {
+      webhookUrl = normalizeUrl(config.webhook_url)
       authHeader = config.webhook_auth_header || 'X-Webhook-Token'
       token = config.webhook_token ? await decryptToken(config.webhook_token) : undefined
     }
@@ -220,16 +240,17 @@ export async function callRagWebhook(
     throw new Error('Geen webhook URL beschikbaar voor deze assistant')
   }
 
-  const knowledgeBases = await loadAssistantKnowledgeBases(assistant.id, organizationId)
-  const history = await loadConversationHistory(conversation.id)
+  const historyPromise = existingHistory && existingHistory.length > 0
+    ? Promise.resolve(existingHistory)
+    : loadConversationHistory(conversation.id)
 
-  const { data: orgData } = await supabase
-    .from('organizations')
-    .select('name')
-    .eq('id', organizationId)
-    .single()
+  const [knowledgeBases, history, orgResult] = await Promise.all([
+    loadAssistantKnowledgeBases(assistant.id, organizationId),
+    historyPromise,
+    supabase.from('organizations').select('name').eq('id', organizationId).single(),
+  ])
 
-  const tenantId: string = (orgData as { name: string } | null)?.name ?? organizationId
+  const tenantId: string = (orgResult.data as { name: string } | null)?.name ?? organizationId
 
   const knowledgeSourceName = knowledgeBases.map((kb) => kb.name).join(', ') || ''
 
@@ -243,6 +264,7 @@ export async function callRagWebhook(
       id: kb.id,
       name: kb.name,
       vector_collection_id: kb.vector_collection_id ?? '',
+      processing_mode: kb.processing_mode ?? 'vectorized',
     })),
     knowledgeSourceName,
     tenantId,
@@ -380,6 +402,8 @@ export async function callDocumentWebhook(
   downloadUrl: string,
   action: DocumentAction = 'index',
   filePath: string = '',
+  processingMode: 'vectorized' | 'plain_text' = 'vectorized',
+  knowledgeBaseId: string = '',
 ): Promise<void> {
   try {
     const config = await loadFlowConfig(organizationId, 'document_processing')
@@ -408,6 +432,8 @@ export async function callDocumentWebhook(
           action,
           tenantId,
           knowledgeSourceName: knowledgeBaseName,
+          knowledge_base_id: knowledgeBaseId,
+          processing_mode: processingMode,
           document_id: documentId,
           document_name: documentName,
           document_type: documentType,

@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
 import { uploadDocument, deleteDocument } from '@/lib/storage'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
@@ -12,32 +11,32 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import type { KnowledgeBase, KnowledgeBaseDocument, KnowledgeItem, AIAssistant } from '@/types/database.types'
-import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X, FilePlus } from 'lucide-react'
+import {
+  useKnowledgeBases,
+  useKnowledgeBaseDocuments,
+  useKnowledgeItems,
+  useLinkedAssistants,
+  useAssistants,
+  useCreateKnowledgeBase,
+  useUpdateKnowledgeBase,
+  useAddKnowledgeItem,
+  useDeleteKnowledgeItem,
+  useToggleKBLink,
+} from '@/hooks/queries'
+import { useQueryClient } from '@tanstack/react-query'
+import type { KnowledgeBase, KnowledgeBaseDocument, KnowledgeItem } from '@/types/database.types'
+import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X, FilePlus, Check } from 'lucide-react'
 
 function KnowledgePage() {
   const { profile } = useAuth()
-  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: knowledgeBases, isPending } = useKnowledgeBases(profile?.organization_id)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingKB, setEditingKB] = useState<KnowledgeBase | null>(null)
   const [selectedKB, setSelectedKB] = useState<KnowledgeBase | null>(null)
 
-  const loadKnowledgeBases = useCallback(async () => {
-    if (!profile) return
-    const { data } = await supabase
-      .from('knowledge_bases')
-      .select('*')
-      .eq('organization_id', profile.organization_id)
-      .order('created_at', { ascending: false })
-    if (data) setKnowledgeBases(data)
-    setIsLoading(false)
-  }, [profile])
-
-  useEffect(() => { loadKnowledgeBases() }, [loadKnowledgeBases])
-
-  if (isLoading) {
+  if (isPending) {
     return (
       <div>
         <div className="flex items-center justify-between mb-8">
@@ -64,7 +63,7 @@ function KnowledgePage() {
         </Button>
       </div>
 
-      {knowledgeBases.length === 0 ? (
+      {(knowledgeBases ?? []).length === 0 ? (
         <EmptyState
           icon={<BookOpen className="h-12 w-12" />}
           title="Nog geen kennisbronnen"
@@ -73,7 +72,7 @@ function KnowledgePage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {knowledgeBases.map((kb) => (
+          {(knowledgeBases ?? []).map((kb) => (
             <Card key={kb.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedKB(kb)}>
               <CardHeader>
                 <div className="flex items-center gap-2">
@@ -85,6 +84,13 @@ function KnowledgePage() {
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {kb.description ?? 'Geen beschrijving'}
                 </p>
+                <div className="mt-2">
+                  {kb.processing_mode === 'plain_text' ? (
+                    <Badge variant="outline" className="text-xs">Platte tekst</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">RAG / Doorzoekbaar</Badge>
+                  )}
+                </div>
               </CardContent>
               <CardFooter>
                 <Button variant="ghost" size="sm" className="ml-auto" onClick={(e) => { e.stopPropagation(); setEditingKB(kb); setModalOpen(true) }}>
@@ -102,7 +108,6 @@ function KnowledgePage() {
         kb={editingKB}
         organizationId={profile?.organization_id ?? ''}
         userId={profile?.id ?? ''}
-        onSaved={loadKnowledgeBases}
       />
 
       <KBSlideOver
@@ -121,19 +126,20 @@ function KBMappingModal({
   kb,
   organizationId,
   userId,
-  onSaved,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   kb: KnowledgeBase | null
   organizationId: string
   userId: string
-  onSaved: () => void
 }) {
   const { toast } = useToast()
+  const createMutation = useCreateKnowledgeBase(organizationId)
+  const updateMutation = useUpdateKnowledgeBase(organizationId)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [vectorCollectionId, setVectorCollectionId] = useState('')
+  const [processingMode, setProcessingMode] = useState<'vectorized' | 'plain_text'>('vectorized')
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -141,28 +147,27 @@ function KBMappingModal({
       setName(kb.name)
       setDescription(kb.description ?? '')
       setVectorCollectionId(kb.vector_collection_id ?? '')
+      setProcessingMode(kb.processing_mode ?? 'vectorized')
     } else {
       setName('')
       setDescription('')
       setVectorCollectionId('')
+      setProcessingMode('vectorized')
     }
   }, [kb, open])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
-    const payload = { organization_id: organizationId, name, description: description || null, vector_collection_id: vectorCollectionId || null, created_by: userId }
+    const payload = { organization_id: organizationId, name, description: description || null, vector_collection_id: vectorCollectionId || null, processing_mode: processingMode, created_by: userId }
     try {
       if (kb) {
-        const { error } = await (supabase as any).from('knowledge_bases').update(payload).eq('id', kb.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        if (error) throw error
+        await updateMutation.mutateAsync({ id: kb.id, name: payload.name, description: payload.description, vector_collection_id: payload.vector_collection_id, processing_mode: payload.processing_mode })
         toast({ title: 'Kennisbron bijgewerkt' })
       } else {
-        const { error } = await (supabase as any).from('knowledge_bases').insert(payload) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        if (error) throw error
+        await createMutation.mutateAsync(payload)
         toast({ title: 'Kennisbron aangemaakt' })
       }
-      onSaved()
       onOpenChange(false)
     } catch (err) {
       toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
@@ -185,10 +190,28 @@ function KBMappingModal({
             <Textarea id="kb-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optionele omschrijving" rows={3} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="kb-vector">Vector Collection ID</Label>
-            <Input id="kb-vector" value={vectorCollectionId} onChange={(e) => setVectorCollectionId(e.target.value)} placeholder="my-collection-name" />
-            <p className="text-xs text-muted-foreground">Verwijzing naar de collectie in de vector database (Pinecone namespace, Qdrant collection, etc.)</p>
+            <Label htmlFor="kb-mode">Verwerkingsmodus</Label>
+            <Select
+              value={processingMode}
+              onValueChange={(v) => setProcessingMode(v as 'vectorized' | 'plain_text')}
+              options={[
+                { value: 'vectorized', label: 'Automatisch doorzoekbaar maken (RAG)' },
+                { value: 'plain_text', label: 'Platte tekst (geen automatische verwerking)' },
+              ]}
+            />
+            <p className="text-xs text-muted-foreground">
+              {processingMode === 'vectorized'
+                ? 'Documenten worden vectorized en doorzoekbaar via RAG.'
+                : 'Documenten worden als platte tekst opgeslagen. Geen vectorisatie of automatische doorzoeking.'}
+            </p>
           </div>
+          {processingMode === 'vectorized' && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="kb-vector">Vector Collection ID</Label>
+              <Input id="kb-vector" value={vectorCollectionId} onChange={(e) => setVectorCollectionId(e.target.value)} placeholder="my-collection-name" />
+              <p className="text-xs text-muted-foreground">Verwijzing naar de collectie in de vector database (Pinecone namespace, Qdrant collection, etc.)</p>
+            </div>
+          )}
         </DialogContent>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
@@ -211,48 +234,19 @@ function KBSlideOver({
   organizationId: string
 }) {
   const { toast } = useToast()
+  const qc = useQueryClient()
   const [tab, setTab] = useState<'documents' | 'items' | 'assistants'>('documents')
-  const [documents, setDocuments] = useState<KnowledgeBaseDocument[]>([])
-  const [items, setItems] = useState<KnowledgeItem[]>([])
-  const [linkedAssistants, setLinkedAssistants] = useState<AIAssistant[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [itemForm, setItemForm] = useState({ title: '', content: '', sourceUrl: '' })
   const [isSavingItem, setIsSavingItem] = useState(false)
 
-  useEffect(() => {
-    if (!kb) return
-    const kbId = kb.id
-    async function load() {
-      const { data: docs } = await supabase
-        .from('knowledge_base_documents')
-        .select('*')
-        .eq('knowledge_base_id', kbId)
-        .order('created_at', { ascending: false })
-      if (docs) setDocuments(docs)
-
-      const { data: kItems } = await supabase
-        .from('knowledge_items')
-        .select('*')
-        .eq('knowledge_base_id', kbId)
-        .order('created_at', { ascending: false })
-      if (kItems) setItems(kItems)
-
-      const { data: links } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        .from('assistant_knowledge_bases')
-        .select('assistant_id')
-        .eq('knowledge_base_id', kbId)
-      if (links && links.length > 0 && kb) {
-        const { data: assistants } = await supabase
-          .from('ai_assistants')
-          .select('*')
-          .in('id', (links as { assistant_id: string }[]).map((l) => l.assistant_id))
-        if (assistants) setLinkedAssistants(assistants)
-      } else {
-        setLinkedAssistants([])
-      }
-    }
-    load()
-  }, [kb])
+  const { data: documents, isPending: docsLoading } = useKnowledgeBaseDocuments(kb?.id)
+  const { data: items, isPending: itemsLoading } = useKnowledgeItems(kb?.id)
+  const { data: linkedAssistants } = useLinkedAssistants(kb?.id)
+  const { data: allAssistants } = useAssistants(organizationId || undefined)
+  const addItemMutation = useAddKnowledgeItem(kb?.id ?? '')
+  const deleteItemMutation = useDeleteKnowledgeItem(kb?.id ?? '')
+  const toggleLinkMutation = useToggleKBLink(kb?.id ?? '')
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -268,14 +262,9 @@ function KBSlideOver({
 
     setIsUploading(true)
     try {
-      await uploadDocument(file, kb.id, kb.name, userId, organizationId)
+      await uploadDocument(file, kb.id, kb.name, userId, organizationId, kb.processing_mode)
       toast({ title: 'Document geüpload', description: file.name })
-      const { data: docs } = await supabase
-        .from('knowledge_base_documents')
-        .select('*')
-        .eq('knowledge_base_id', kb.id)
-        .order('created_at', { ascending: false })
-      if (docs) setDocuments(docs)
+      qc.invalidateQueries({ queryKey: ['kb-documents', kb.id] })
     } catch (err) {
       toast({ title: 'Upload mislukt', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
     } finally {
@@ -286,10 +275,10 @@ function KBSlideOver({
 
   const handleDeleteDoc = async (doc: KnowledgeBaseDocument) => {
     try {
-      await deleteDocument(doc.id, doc.file_path, organizationId, kb!.name, doc.name)
+      await deleteDocument(doc.id, doc.file_path, organizationId, kb!.name, doc.name, kb!.processing_mode, kb!.id)
       toast({ title: 'Document verwijderd' })
-      setDocuments((prev) => prev.filter((d) => d.id !== doc.id))
-    } catch (err) {
+      qc.invalidateQueries({ queryKey: ['kb-documents', kb?.id] })
+    } catch {
       toast({ title: 'Fout bij verwijderen', variant: 'destructive' })
     }
   }
@@ -299,7 +288,7 @@ function KBSlideOver({
     if (!kb || !itemForm.title.trim() || !itemForm.content.trim() || isSavingItem) return
     setIsSavingItem(true)
     try {
-      const { error } = await (supabase as any).from('knowledge_items').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      await addItemMutation.mutateAsync({
         knowledge_base_id: kb.id,
         title: itemForm.title.trim(),
         content: itemForm.content.trim(),
@@ -307,15 +296,8 @@ function KBSlideOver({
         embedding_status: 'pending',
         created_by: userId,
       })
-      if (error) throw error
       toast({ title: 'Kennisitem toegevoegd', description: itemForm.title.trim() })
       setItemForm({ title: '', content: '', sourceUrl: '' })
-      const { data: kItems } = await supabase
-        .from('knowledge_items')
-        .select('*')
-        .eq('knowledge_base_id', kb.id)
-        .order('created_at', { ascending: false })
-      if (kItems) setItems(kItems)
     } catch (err) {
       toast({ title: 'Fout bij toevoegen', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
     } finally {
@@ -325,14 +307,9 @@ function KBSlideOver({
 
   const handleDeleteItem = async (item: KnowledgeItem) => {
     try {
-      const { error } = await supabase
-        .from('knowledge_items')
-        .delete()
-        .eq('id', item.id)
-      if (error) throw error
+      await deleteItemMutation.mutateAsync(item.id)
       toast({ title: 'Kennisitem verwijderd' })
-      setItems((prev) => prev.filter((i) => i.id !== item.id))
-    } catch (err) {
+    } catch {
       toast({ title: 'Fout bij verwijderen', variant: 'destructive' })
     }
   }
@@ -381,10 +358,12 @@ function KBSlideOver({
                 <input type="file" accept=".pdf,.txt,.docx" className="hidden" onChange={handleUpload} disabled={isUploading} />
               </label>
 
-              {documents.length === 0 ? (
+              {docsLoading ? (
+                <p className="text-center text-sm text-muted-foreground py-8">Laden...</p>
+              ) : (documents ?? []).length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground py-8">Nog geen documenten geüpload</p>
               ) : (
-                documents.map((doc) => (
+                (documents ?? []).map((doc) => (
                   <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center gap-3 min-w-0">
                       <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
@@ -453,10 +432,12 @@ function KBSlideOver({
                 </Button>
               </form>
 
-              {items.length === 0 ? (
+              {itemsLoading ? (
+                <p className="text-center text-sm text-muted-foreground py-8">Laden...</p>
+              ) : (items ?? []).length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground py-8">Nog geen kennisitems toegevoegd</p>
               ) : (
-                items.map((item) => (
+                (items ?? []).map((item) => (
                   <div key={item.id} className="flex items-start justify-between p-3 rounded-lg border">
                     <div className="min-w-0 flex-1 mr-2">
                       <p className="text-sm font-medium truncate">{item.title}</p>
@@ -483,19 +464,32 @@ function KBSlideOver({
 
           {tab === 'assistants' && (
             <div>
-              {linkedAssistants.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-8">Nog geen assistenten gekoppeld</p>
+              <p className="text-xs text-muted-foreground mb-3">Vink assistenten aan om ze aan deze kennisbron te koppelen.</p>
+              {(allAssistants ?? []).length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">Nog geen assistenten beschikbaar</p>
               ) : (
                 <div className="space-y-2">
-                  {linkedAssistants.map((a) => (
-                    <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                      <span className="text-xl">{a.icon}</span>
-                      <div>
-                        <p className="text-sm font-medium">{a.name}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{a.description}</p>
-                      </div>
-                    </div>
-                  ))}
+                  {(allAssistants ?? []).map((a) => {
+                    const isLinked = (linkedAssistants ?? []).some((la) => la.id === a.id)
+                    return (
+                      <label key={a.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isLinked}
+                          onChange={() => {
+                            toggleLinkMutation.mutate({ assistantId: a.id, link: !isLinked })
+                          }}
+                          className="rounded border-input"
+                        />
+                        <span className="text-xl">{a.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{a.name}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-1">{a.description}</p>
+                        </div>
+                        {isLinked && <Check className="h-4 w-4 text-primary ml-auto shrink-0" />}
+                      </label>
+                    )
+                  })}
                 </div>
               )}
             </div>
