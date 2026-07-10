@@ -16,7 +16,6 @@ function ProtectedRoute() {
   if (!isAuthenticated) {
     const alreadyRedirected = localStorage.getItem('redirectAfterLogin')
     if (alreadyRedirected) {
-      console.error('[ProtectedRoute] Auth loop detected — was redirecting from:', alreadyRedirected)
       localStorage.removeItem('redirectAfterLogin')
       return (
         <div className="min-h-screen flex items-center justify-center">

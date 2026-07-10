@@ -51,7 +51,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setProfile: (profile) => set({ profile }),
 
   signIn: async (email, password) => {
-    console.log('[auth] signIn called for:', email)
     set({ isSigningIn: true })
 
     try {
@@ -63,8 +62,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { error: new Error(error.message) }
       }
 
-      console.log('[auth] signIn success, user:', data.user?.id)
-
       set({
         user: data.user,
         isAuthenticated: true,
@@ -73,10 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       fetchProfile(data.user.id).then((profile) => {
         if (profile) {
-          console.log('[auth] Profile loaded:', profile.full_name)
           set({ profile })
-        } else {
-          console.warn('[auth] No profile found for user:', data.user.id)
         }
       })
 
@@ -101,13 +95,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (initialized) return
 
     supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[auth] onAuthStateChange:', event, session?.user?.id ?? 'no user')
-
       const state = get()
 
       if (event === 'SIGNED_IN' && session?.user) {
         if (state.isSigningIn) {
-          console.log('[auth] SIGNED_IN skipped — signIn already handled')
           return
         }
         identifyUser(session.user.id)
@@ -124,7 +115,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return
       }
 
-      // For INITIAL_SESSION, TOKEN_REFRESHED, USER_UPDATED — just sync user
       if (session?.user) {
         identifyUser(session.user.id)
         const profilePromise = state.profile
@@ -138,18 +128,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     })
 
     try {
-      const lsKeys = Object.keys(localStorage).filter(k => k.includes('auth-token'))
-      console.log('[auth] localStorage auth keys:', lsKeys, lsKeys.map(k => localStorage.getItem(k) ? 'present' : 'empty'))
-
       const { data: { session } } = await supabase.auth.getSession()
 
       if (session?.user) {
-        console.log('[auth] Existing session found:', session.user.id)
         set({ user: session.user, isAuthenticated: true })
-        const profile = await fetchProfile(session.user.id)
-        if (profile) set({ profile })
-      } else {
-        console.log('[auth] No existing session')
+        fetchProfile(session.user.id).then((profile) => {
+          if (profile) set({ profile })
+        })
       }
     } catch (err) {
       console.error('[auth] getSession error:', err)

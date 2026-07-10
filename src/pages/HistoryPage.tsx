@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
+import { useConversations, useConversationMessages, useAssistantOptions } from '@/hooks/queries'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -10,12 +10,9 @@ import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { MessageContent } from '@/components/chat/MessageContent'
-import type { AIAssistant, Conversation, Message } from '@/types/database.types'
+import type { ConversationWithAssistant } from '@/hooks/queries'
+import type { Message } from '@/types/database.types'
 import { History, X, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
-
-interface ConversationWithAssistant extends Conversation {
-  ai_assistants: { name: string; icon: string } | null
-}
 
 interface Source {
   knowledge_item_id?: string
@@ -37,49 +34,14 @@ function formatDate(iso: string): string {
 
 function HistoryPage() {
   const { profile } = useAuth()
-  const [conversations, setConversations] = useState<ConversationWithAssistant[]>([])
-  const [assistants, setAssistants] = useState<AIAssistant[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [filterAssistantId, setFilterAssistantId] = useState('all')
 
-  const loadConversations = useCallback(async () => {
-    if (!profile) return
-    let query = supabase
-      .from('conversations')
-      .select('*, ai_assistants(name, icon)')
-      .eq('user_id', profile.id)
-      .order('created_at', { ascending: false })
-
-    if (filterAssistantId !== 'all') {
-      query = query.eq('assistant_id', filterAssistantId)
-    }
-
-    const { data, error } = await query
-    if (!error && data) setConversations(data as ConversationWithAssistant[])
-    setIsLoading(false)
-  }, [profile, filterAssistantId])
-
-  const loadAssistants = useCallback(async () => {
-    if (!profile) return
-    const { data, error } = await supabase
-      .from('ai_assistants')
-      .select('*')
-      .eq('organization_id', profile.organization_id)
-      .order('name', { ascending: true })
-    if (!error && data) setAssistants(data)
-  }, [profile])
-
-  useEffect(() => {
-    loadAssistants()
-  }, [loadAssistants])
-
-  useEffect(() => {
-    loadConversations()
-  }, [loadConversations])
+  const { data: conversations, isPending } = useConversations(profile?.id, filterAssistantId)
+  const { data: assistants } = useAssistantOptions(profile?.organization_id)
 
   const assistantOptions = [
     { value: 'all', label: 'Alle assistenten' },
-    ...assistants.map((a) => ({ value: a.id, label: `${a.icon} ${a.name}` })),
+    ...(assistants ?? []).map((a) => ({ value: a.id, label: `${a.icon} ${a.name}` })),
   ]
 
   return (
@@ -98,7 +60,7 @@ function HistoryPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isPending ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}>
@@ -113,7 +75,7 @@ function HistoryPage() {
             </Card>
           ))}
         </div>
-      ) : conversations.length === 0 ? (
+      ) : (conversations ?? []).length === 0 ? (
         <EmptyState
           icon={<History className="h-12 w-12" />}
           title="Nog geen runs"
@@ -121,7 +83,7 @@ function HistoryPage() {
         />
       ) : (
         <div className="space-y-2">
-          {conversations.map((conv) => (
+          {(conversations ?? []).map((conv) => (
             <ConversationRow key={conv.id} conversation={conv} />
           ))}
         </div>
@@ -182,27 +144,8 @@ function ConversationDrawer({
   assistantIcon: string
   onClose: () => void
 }) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: messages, isPending } = useConversationMessages(conversation.id)
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set())
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    async function loadMessages() {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversation.id)
-        .order('created_at', { ascending: true })
-      if (!error && data) setMessages(data)
-      setIsLoading(false)
-    }
-    loadMessages()
-  }, [conversation.id])
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 })
-  }, [messages])
 
   const toggleSources = (messageId: string) => {
     setExpandedSources((prev) => {
@@ -230,17 +173,17 @@ function ConversationDrawer({
         </Button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoading ? (
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isPending ? (
           <div className="flex items-center justify-center py-8">
             <Spinner className="h-6 w-6" />
           </div>
-        ) : messages.length === 0 ? (
+        ) : (messages ?? []).length === 0 ? (
           <p className="text-center text-muted-foreground text-sm mt-8">
             Geen berichten in deze run
           </p>
         ) : (
-          messages.map((msg) => (
+          (messages ?? []).map((msg: Message) => (
             <div key={msg.id} className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
               <div className="flex flex-col gap-1 max-w-[80%]">
                 <div className={cn(

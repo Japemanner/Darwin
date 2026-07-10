@@ -20,6 +20,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -49,6 +50,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'profiles_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
       }
       invitations: {
         Row: {
@@ -81,6 +85,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'invitations_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
       }
       ai_assistants: {
         Row: {
@@ -125,6 +132,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'ai_assistants_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
       }
       knowledge_bases: {
         Row: {
@@ -157,6 +167,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'knowledge_bases_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
       }
       knowledge_base_documents: {
         Row: {
@@ -198,6 +211,10 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'knowledge_base_documents_knowledge_base_id_fkey'; columns: ['knowledge_base_id']; referencedRelation: 'knowledge_bases'; referencedColumns: ['id'] },
+          { foreignKeyName: 'knowledge_base_documents_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
       }
       knowledge_items: {
         Row: {
@@ -233,6 +250,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'knowledge_items_knowledge_base_id_fkey'; columns: ['knowledge_base_id']; referencedRelation: 'knowledge_bases'; referencedColumns: ['id'] },
+        ]
       }
       assistant_knowledge_bases: {
         Row: {
@@ -250,6 +270,10 @@ export interface Database {
           knowledge_base_id?: string
           created_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'assistant_knowledge_bases_assistant_id_fkey'; columns: ['assistant_id']; referencedRelation: 'ai_assistants'; referencedColumns: ['id'] },
+          { foreignKeyName: 'assistant_knowledge_bases_knowledge_base_id_fkey'; columns: ['knowledge_base_id']; referencedRelation: 'knowledge_bases'; referencedColumns: ['id'] },
+        ]
       }
       conversations: {
         Row: {
@@ -276,6 +300,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'conversations_assistant_id_fkey'; columns: ['assistant_id']; referencedRelation: 'ai_assistants'; referencedColumns: ['id'] },
+        ]
       }
       messages: {
         Row: {
@@ -302,6 +329,9 @@ export interface Database {
           sources?: Record<string, unknown> | null
           created_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'messages_conversation_id_fkey'; columns: ['conversation_id']; referencedRelation: 'conversations'; referencedColumns: ['id'] },
+        ]
       }
       flow_configs: {
         Row: {
@@ -334,6 +364,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'flow_configs_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
       }
       feedback_interactions: {
         Row: {
@@ -366,6 +399,11 @@ export interface Database {
           feedback?: string | null
           created_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'feedback_interactions_conversation_id_fkey'; columns: ['conversation_id']; referencedRelation: 'conversations'; referencedColumns: ['id'] },
+          { foreignKeyName: 'feedback_interactions_assistant_id_fkey'; columns: ['assistant_id']; referencedRelation: 'ai_assistants'; referencedColumns: ['id'] },
+          { foreignKeyName: 'feedback_interactions_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
       }
       roadmap_features: {
         Row: {
@@ -395,6 +433,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       roadmap_votes: {
         Row: {
@@ -418,6 +457,9 @@ export interface Database {
           direction?: number
           created_at?: string
         }
+        Relationships: [
+          { foreignKeyName: 'roadmap_votes_feature_id_fkey'; columns: ['feature_id']; referencedRelation: 'roadmap_features'; referencedColumns: ['id'] },
+        ]
       }
       feature_requests: {
         Row: {
@@ -450,6 +492,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
     }
     Views: {
@@ -464,6 +507,7 @@ export interface Database {
           updated_at: string
           score: number
         }
+        Relationships: []
       }
     }
     Functions: Record<string, never>

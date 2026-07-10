@@ -18,7 +18,7 @@ export const uploadDocument = async (
 
   if (uploadError) throw uploadError
 
-  const { data: document, error: insertError } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+  const { data: document, error: insertError } = await supabase
     .from('knowledge_base_documents')
     .insert({
       knowledge_base_id: knowledgeBaseId,
@@ -44,7 +44,7 @@ export const uploadDocument = async (
   await callDocumentWebhook(
     organizationId,
     knowledgeBaseName,
-    (document as KnowledgeBaseDocument).id,
+    (document).id,
     file.name,
     fileExt?.toLowerCase() || 'unknown',
     signedUrlData.signedUrl,

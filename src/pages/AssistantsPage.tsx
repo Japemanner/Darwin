@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { callRagWebhook } from '@/lib/webhook'
@@ -16,7 +16,16 @@ import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { MessageContent } from '@/components/chat/MessageContent'
-import type { AIAssistant, Conversation, Message, KnowledgeBase, FeedbackInteraction } from '@/types/database.types'
+import {
+  useAssistants,
+  useKnowledgeBases,
+  useAssistantKBLinks,
+  useCreateAssistant,
+  useUpdateAssistant,
+  useDeleteAssistant,
+  useFeedbackInteraction,
+} from '@/hooks/queries'
+import type { AIAssistant, Conversation, Message, FeedbackInteraction } from '@/types/database.types'
 import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react'
 
 const ASSISTANT_TYPES = [
@@ -25,28 +34,12 @@ const ASSISTANT_TYPES = [
 
 function AssistantsPage() {
   const { profile } = useAuth()
-  const [assistants, setAssistants] = useState<AIAssistant[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: assistants, isPending } = useAssistants(profile?.organization_id)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAssistant, setEditingAssistant] = useState<AIAssistant | null>(null)
   const [chatAssistant, setChatAssistant] = useState<AIAssistant | null>(null)
 
-  const loadAssistants = useCallback(async () => {
-    if (!profile) return
-    const { data, error } = await supabase
-      .from('ai_assistants')
-      .select('*')
-      .eq('organization_id', profile.organization_id)
-      .order('created_at', { ascending: false })
-    if (!error && data) setAssistants(data)
-    setIsLoading(false)
-  }, [profile])
-
-  useEffect(() => {
-    loadAssistants()
-  }, [loadAssistants])
-
-  if (isLoading) {
+  if (isPending) {
     return (
       <div>
         <div className="flex items-center justify-between mb-8">
@@ -76,7 +69,7 @@ function AssistantsPage() {
         </Button>
       </div>
 
-      {assistants.length === 0 ? (
+      {(assistants ?? []).length === 0 ? (
         <EmptyState
           icon={<Bot className="h-12 w-12" />}
           title="Nog geen assistenten"
@@ -85,7 +78,7 @@ function AssistantsPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {assistants.map((a) => (
+          {(assistants ?? []).map((a) => (
             <Card key={a.id} className={cn("flex flex-col", !a.is_active && "opacity-60")}>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -123,7 +116,6 @@ function AssistantsPage() {
         assistant={editingAssistant}
         organizationId={profile?.organization_id ?? ''}
         userId={profile?.id ?? ''}
-        onSaved={loadAssistants}
       />
 
       <ChatWindow
@@ -142,16 +134,20 @@ function AssistantModal({
   assistant,
   organizationId,
   userId,
-  onSaved,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   assistant: AIAssistant | null
   organizationId: string
   userId: string
-  onSaved: () => void
 }) {
   const { toast } = useToast()
+  const { data: availableKBs } = useKnowledgeBases(organizationId || undefined)
+  const { data: linkedKBIds } = useAssistantKBLinks(assistant?.id)
+  const createMutation = useCreateAssistant(organizationId)
+  const updateMutation = useUpdateAssistant(organizationId)
+  const deleteMutation = useDeleteAssistant(organizationId)
+
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState('chat')
@@ -159,22 +155,7 @@ function AssistantModal({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [availableKBs, setAvailableKBs] = useState<KnowledgeBase[]>([])
   const [selectedKBIds, setSelectedKBIds] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    if (open && organizationId) {
-      const loadKBs = async () => {
-        const { data } = await supabase
-          .from('knowledge_bases')
-          .select('*')
-          .eq('organization_id', organizationId)
-          .order('name', { ascending: true })
-        if (data) setAvailableKBs(data)
-      }
-      loadKBs()
-    }
-  }, [open, organizationId])
 
   useEffect(() => {
     if (assistant) {
@@ -182,14 +163,7 @@ function AssistantModal({
       setDescription(assistant.description ?? '')
       setType(assistant.type ?? 'chat')
       setIsActive(assistant.is_active);
-
-      void (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        .select('knowledge_base_id')
-        .eq('assistant_id', assistant.id)
-        .then(({ data }: { data: Array<{ knowledge_base_id: string }> | null }) => {
-          if (data) setSelectedKBIds(new Set(data.map((d) => d.knowledge_base_id)))
-          else setSelectedKBIds(new Set())
-        })
+      setSelectedKBIds(linkedKBIds ?? new Set())
     } else {
       setName('')
       setDescription('')
@@ -197,7 +171,7 @@ function AssistantModal({
       setIsActive(true)
       setSelectedKBIds(new Set())
     }
-  }, [assistant, open])
+  }, [assistant, open, linkedKBIds])
 
   const toggleKB = (id: string) => {
     setSelectedKBIds((prev) => {
@@ -222,45 +196,25 @@ function AssistantModal({
       n8n_webhook_url: null,
       is_active: isActive,
       created_by: userId,
+      kbIds: [...selectedKBIds],
     }
 
     try {
-      let assistantId: string
-
       if (assistant) {
-        const { error } = await (supabase as any).from('ai_assistants').update(payload).eq('id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        if (error) throw error
-        assistantId = assistant.id
+        await updateMutation.mutateAsync({
+          id: assistant.id,
+          name: payload.name,
+          description: payload.description,
+          type: payload.type,
+          is_active: payload.is_active,
+          kbIds: payload.kbIds,
+        })
         toast({ title: 'Assistent bijgewerkt', description: `${name} is succesvol bijgewerkt` })
       } else {
-        const { data: created, error } = await (supabase as any).from('ai_assistants').insert(payload).select().single() // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        if (error) throw error
-        assistantId = created.id
+        await createMutation.mutateAsync(payload)
         toast({ title: 'Assistent aangemaakt', description: `${name} is klaar voor gebruik` })
       }
 
-      const { data: existingLinks } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        .from('assistant_knowledge_bases')
-        .select('knowledge_base_id')
-        .eq('assistant_id', assistantId)
-
-      const existingIds = new Set(((existingLinks ?? []) as Array<{ knowledge_base_id: string }>).map((l) => l.knowledge_base_id))
-      const toAdd = [...selectedKBIds].filter((id) => !existingIds.has(id))
-      const toRemove = [...existingIds].filter((id) => !selectedKBIds.has(id))
-
-      if (toRemove.length > 0) {
-        await (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-          .delete()
-          .eq('assistant_id', assistantId)
-          .in('knowledge_base_id', toRemove)
-      }
-
-      if (toAdd.length > 0) {
-        await (supabase as any).from('assistant_knowledge_bases') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-          .insert(toAdd.map((kbId) => ({ assistant_id: assistantId, knowledge_base_id: kbId })))
-      }
-
-      onSaved()
       onOpenChange(false)
     } catch (err) {
       toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
@@ -273,18 +227,9 @@ function AssistantModal({
     if (!assistant) return
     setIsDeleting(true)
     try {
-      const { error: convError } = await (supabase as any).from('conversations').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation; RLS enforces user_id = auth.uid()
-      if (convError) throw convError
-
-      const { error: kbError } = await (supabase as any).from('assistant_knowledge_bases').delete().eq('assistant_id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation; RLS enforces org scoping
-      if (kbError) throw kbError
-
-      const { error } = await (supabase as any).from('ai_assistants').delete().eq('id', assistant.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-      if (error) throw error
-
+      await deleteMutation.mutateAsync(assistant.id)
       toast({ title: 'Assistent verwijderd', description: `${assistant.name} is permanent verwijderd` })
       setShowDeleteConfirm(false)
-      onSaved()
       onOpenChange(false)
     } catch (err) {
       toast({ title: 'Fout bij verwijderen', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
@@ -316,10 +261,10 @@ function AssistantModal({
             <Label>Kennisbronnen</Label>
             <p className="text-xs text-muted-foreground">Selecteer de kennisbronnen die deze assistent mag gebruiken</p>
             <div className="border rounded-lg max-h-40 overflow-y-auto">
-              {availableKBs.length === 0 ? (
+              {(availableKBs ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground p-3">Geen kennisbronnen beschikbaar</p>
               ) : (
-                availableKBs.map((kb) => (
+                (availableKBs ?? []).map((kb) => (
                   <label key={kb.id} className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer">
                     <input
                       type="checkbox"
@@ -407,14 +352,18 @@ function ChatWindow({
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set())
-  const [existingFeedback, setExistingFeedback] = useState<FeedbackInteraction | null>(null)
-  const [isFeedbackLoaded, setIsFeedbackLoaded] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false)
   const [showFeedbackInput, setShowFeedbackInput] = useState(false)
   const [thumbsUpSelected, setThumbsUpSelected] = useState(false)
   const [thumbsDownSelected, setThumbsDownSelected] = useState(false)
+  const [existingFeedback, setExistingFeedback] = useState<FeedbackInteraction | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { data: feedback } = useFeedbackInteraction(conversation?.id, userId)
+
+  useEffect(() => {
+    if (feedback !== undefined) setExistingFeedback(feedback)
+  }, [feedback])
 
   useEffect(() => {
     if (!assistant) return
@@ -422,46 +371,16 @@ function ChatWindow({
     setConversation(null)
     setInput('')
     setExistingFeedback(null)
-    setIsFeedbackLoaded(false)
     setFeedbackText('')
     setIsFeedbackSubmitting(false)
     setShowFeedbackInput(false)
     setThumbsUpSelected(false)
     setThumbsDownSelected(false)
-
-    async function initChat() {
-      const { data: created } = await (supabase as any) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-          .from('conversations')
-          .insert({
-            user_id: userId,
-            assistant_id: assistant!.id,
-            title: `Chat met ${assistant!.name}`,
-          })
-          .select()
-          .single()
-        if (created) setConversation(created)
-    }
-
-    initChat()
-  }, [assistant, userId])
+  }, [assistant])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
-
-  useEffect(() => {
-    if (!conversation || isFeedbackLoaded) return
-    const loadFeedback = async () => {
-      const { data } = await (supabase as any).from('feedback_interactions') // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        .select('*')
-        .eq('conversation_id', conversation.id)
-        .eq('user_id', userId)
-        .maybeSingle()
-      setExistingFeedback(data)
-      setIsFeedbackLoaded(true)
-    }
-    loadFeedback()
-  }, [conversation, userId, isFeedbackLoaded])
 
   const toggleSources = (messageId: string) => {
     setExpandedSources((prev) => {
@@ -474,11 +393,31 @@ function ChatWindow({
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || !conversation || !assistant || isSending) return
+    if (!input.trim() || !assistant || isSending) return
+
+    let conv = conversation
+
+    if (!conv) {
+      const { data: created, error: convError } = await supabase
+        .from('conversations')
+        .insert({
+          user_id: userId,
+          assistant_id: assistant.id,
+          title: `Chat met ${assistant.name}`,
+        })
+        .select()
+        .single()
+      if (convError) {
+        toast({ title: 'Fout bij aanmaken gesprek', variant: 'destructive' })
+        return
+      }
+      conv = created
+      setConversation(conv)
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
-      conversation_id: conversation.id,
+      conversation_id: conv.id,
       role: 'user',
       content: input.trim(),
       created_at: new Date().toISOString(),
@@ -489,21 +428,25 @@ function ChatWindow({
     setInput('')
     setIsSending(true)
 
-    const { error: msgError } = await (supabase as any).from('messages').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-      conversation_id: conversation.id,
-      role: 'user',
-      content: userMessage.content,
-    })
-    if (msgError) {
-      toast({ title: 'Fout bij opslaan bericht', variant: 'destructive' })
-    }
-
     try {
-      const result = await callRagWebhook(assistant, conversation, userMessage.content, organizationId)
+      const [insertResult, webhookResult] = await Promise.all([
+        supabase.from('messages').insert({
+          conversation_id: conv.id,
+          role: 'user',
+          content: userMessage.content,
+        }),
+        callRagWebhook(assistant, conv, userMessage.content, organizationId, messages),
+      ])
+
+      if (insertResult.error) {
+        toast({ title: 'Fout bij opslaan bericht', variant: 'destructive' })
+      }
+
+      const result = webhookResult
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
-        conversation_id: conversation.id,
+        conversation_id: conv.id,
         role: 'assistant',
         content: result.answer,
         created_at: new Date().toISOString(),
@@ -512,11 +455,13 @@ function ChatWindow({
 
       setMessages((prev) => [...prev, assistantMessage])
 
-      await (supabase as any).from('messages').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-        conversation_id: conversation.id,
+      supabase.from('messages').insert({
+        conversation_id: conv.id,
         role: 'assistant',
         content: result.answer,
-        sources: result.sources,
+        sources: result.sources as Record<string, unknown> | null,
+      }).then(({ error }) => {
+        if (error) console.error('[chat] Failed to persist assistant message:', error.message)
       })
     } catch (err) {
       const description = err instanceof Error ? err.message : 'Kon geen antwoord krijgen'
@@ -541,7 +486,7 @@ function ChatWindow({
     if (!conversation || !assistant || existingFeedback) return
     setThumbsUpSelected(true)
     try {
-      const { error } = await (supabase as any).from('feedback_interactions').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      const { error } = await supabase.from('feedback_interactions').insert({
         conversation_id: conversation.id,
         assistant_id: assistant.id,
         user_id: userId,
@@ -573,7 +518,7 @@ function ChatWindow({
     if (!conversation || !assistant || !feedbackText.trim()) return
     setIsFeedbackSubmitting(true)
     try {
-      const { error } = await (supabase as any).from('feedback_interactions').insert({ // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
+      const { error } = await supabase.from('feedback_interactions').insert({
         conversation_id: conversation.id,
         assistant_id: assistant.id,
         user_id: userId,

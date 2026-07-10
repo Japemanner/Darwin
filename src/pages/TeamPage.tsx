@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/toast'
@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select } from '@/components/ui/select'
-import type { Profile, Invitation } from '@/types/database.types'
+import { useTeamMembers, useInvitations, useRevokeInvitation } from '@/hooks/queries'
+import type { Invitation } from '@/types/database.types'
 import { Users, UserPlus, Mail, Trash2 } from 'lucide-react'
 
 const ROLE_OPTIONS = [
@@ -24,30 +25,17 @@ const ROLE_OPTIONS = [
 function TeamPage() {
   const { profile } = useAuth()
   const { toast } = useToast()
-  const [members, setMembers] = useState<Profile[]>([])
-  const [invitations, setInvitations] = useState<Invitation[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: members, isPending: membersLoading } = useTeamMembers(profile?.organization_id)
+  const { data: invitations, isPending: invLoading } = useInvitations(profile?.organization_id)
+  const revokeMutation = useRevokeInvitation(profile?.organization_id ?? '')
   const [inviteOpen, setInviteOpen] = useState(false)
 
-  const loadTeam = useCallback(async () => {
-    if (!profile) return
-    const [membersRes, invRes] = await Promise.all([
-      supabase.from('profiles').select('*').eq('organization_id', profile.organization_id).order('created_at'),
-      supabase.from('invitations').select('*').eq('organization_id', profile.organization_id).eq('status', 'pending').order('created_at', { ascending: false }),
-    ])
-    if (membersRes.data) setMembers(membersRes.data)
-    if (invRes.data) setInvitations(invRes.data)
-    setIsLoading(false)
-  }, [profile])
-
-  useEffect(() => { loadTeam() }, [loadTeam])
+  const isLoading = membersLoading || invLoading
 
   const handleRevokeInvite = async (invitation: Invitation) => {
     try {
-      const { error } = await (supabase as any).from('invitations').update({ status: 'revoked' }).eq('id', invitation.id) // eslint-disable-line @typescript-eslint/no-explicit-any -- Supabase type inference limitation
-      if (error) throw error
+      await revokeMutation.mutateAsync(invitation.id)
       toast({ title: 'Uitnodiging ingetrokken' })
-      loadTeam()
     } catch (err) {
       toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
     }
@@ -76,7 +64,7 @@ function TeamPage() {
         </Button>
       </div>
 
-      {members.length === 0 ? (
+      {(members ?? []).length === 0 ? (
         <EmptyState
           icon={<Users className="h-12 w-12" />}
           title="Nog geen teamleden"
@@ -85,7 +73,7 @@ function TeamPage() {
         />
       ) : (
         <Card>
-          <CardHeader><CardTitle>Leden ({members.length})</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Leden ({(members ?? []).length})</CardTitle></CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
@@ -96,7 +84,7 @@ function TeamPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {members.map((m) => (
+                {(members ?? []).map((m) => (
                   <TableRow key={m.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -120,9 +108,9 @@ function TeamPage() {
         </Card>
       )}
 
-      {invitations.length > 0 && (
+      {(invitations ?? []).length > 0 && (
         <Card className="mt-6">
-          <CardHeader><CardTitle>Openstaande uitnodigingen ({invitations.length})</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Openstaande uitnodigingen ({(invitations ?? []).length})</CardTitle></CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
@@ -134,7 +122,7 @@ function TeamPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invitations.map((inv) => (
+                {(invitations ?? []).map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -167,7 +155,6 @@ function TeamPage() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         organizationId={profile?.organization_id ?? ''}
-        onInvited={loadTeam}
       />
     </div>
   )
@@ -177,12 +164,10 @@ function InviteModal({
   open,
   onOpenChange,
   organizationId,
-  onInvited,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   organizationId: string
-  onInvited: () => void
 }) {
   const { toast } = useToast()
   const [email, setEmail] = useState('')
@@ -198,7 +183,6 @@ function InviteModal({
       })
       if (error) throw error
       toast({ title: 'Uitnodiging verzonden', description: `Uitnodiging gestuurd naar ${email}` })
-      onInvited()
       onOpenChange(false)
       setEmail('')
       setRole('member')

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 
-interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {}
+type SpinnerProps = React.HTMLAttributes<HTMLDivElement>
 
 function Spinner({ className, ...props }: SpinnerProps) {
   return (
