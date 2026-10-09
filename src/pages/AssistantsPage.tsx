@@ -16,6 +16,7 @@ import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { MessageContent } from '@/components/chat/MessageContent'
+import { AnalysisFlow } from '@/components/analysis/AnalysisFlow'
 import {
   useAssistants,
   useKnowledgeBases,
@@ -26,10 +27,11 @@ import {
   useFeedbackInteraction,
 } from '@/hooks/queries'
 import type { AIAssistant, Conversation, Message, FeedbackInteraction } from '@/types/database.types'
-import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2, ThumbsUp, ThumbsDown, ClipboardList } from 'lucide-react'
 
 const ASSISTANT_TYPES = [
   { value: 'chat', label: '💬 Chat' },
+  { value: 'risico_analyse', label: '📋 Risico-analyse' },
 ]
 
 function AssistantsPage() {
@@ -38,6 +40,7 @@ function AssistantsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAssistant, setEditingAssistant] = useState<AIAssistant | null>(null)
   const [chatAssistant, setChatAssistant] = useState<AIAssistant | null>(null)
+  const [analysisAssistant, setAnalysisAssistant] = useState<AIAssistant | null>(null)
 
   if (isPending) {
     return (
@@ -98,9 +101,15 @@ function AssistantsPage() {
                 </p>
               </CardContent>
               <CardFooter className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => setChatAssistant(a)}>
-                  <MessagesSquare className="h-4 w-4 mr-2" /> Chat
-                </Button>
+                {a.type === 'risico_analyse' ? (
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setAnalysisAssistant(a)}>
+                    <ClipboardList className="h-4 w-4 mr-2" /> Risico-analyse starten
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setChatAssistant(a)}>
+                    <MessagesSquare className="h-4 w-4 mr-2" /> Chat
+                  </Button>
+                )}
                 <Button variant="ghost" size="icon" onClick={() => { setEditingAssistant(a); setModalOpen(true) }}>
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -124,6 +133,13 @@ function AssistantsPage() {
         userId={profile?.id ?? ''}
         organizationId={profile?.organization_id ?? ''}
       />
+
+      {analysisAssistant && (
+        <AnalysisFlow
+          assistant={analysisAssistant}
+          onClose={() => setAnalysisAssistant(null)}
+        />
+      )}
     </div>
   )
 }

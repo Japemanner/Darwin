@@ -140,6 +140,21 @@ export function useAssistantKBLinks(assistantId: string | undefined) {
   })
 }
 
+export function useAssistantKnowledgeBases(assistantId: string | undefined) {
+  return useQuery<KnowledgeBase[]>({
+    queryKey: ['assistant-knowledge-bases', assistantId],
+    enabled: !!assistantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('assistant_knowledge_bases')
+        .select('knowledge_bases(*)')
+        .eq('assistant_id', assistantId!)
+      if (error) throw error
+      return (data ?? []).map((row) => row.knowledge_bases).filter(Boolean) as KnowledgeBase[]
+    },
+  })
+}
+
 export function useConversations(userId: string | undefined, assistantId?: string, limit = 50) {
   return useQuery<ConversationWithAssistant[]>({
     queryKey: ['conversations', userId, assistantId ?? 'all', limit],
