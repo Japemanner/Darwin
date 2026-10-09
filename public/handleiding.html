@@ -193,6 +193,7 @@
     </li>
     <li><a href="#posthog">PostHog Analytics</a></li>
     <li><a href="#resend">Resend (e-mail)</a></li>
+    <li><a href="#n8n-security">Security Hardening — n8n op Contabo VPS</a></li>
     <li><a href="#problemen">Problemen oplossen</a></li>
   </ul>
 </nav>
@@ -638,6 +639,29 @@ WHERE id = '&lt;user-uuid&gt;';</code></pre>
 <div class="note warning">
   <strong>From-adres:</strong> <code>Darwin &lt;noreply@jaaphoeve.com&gt;</code> vereist dat <code>jaaphoeve.com</code> is geverifieerd in Resend. Zonder geverifieerd domein weigert Resend de e-mail te versturen.
 </div>
+
+<!-- ============================================================ -->
+<h2 id="n8n-security">Security Hardening — n8n op Contabo VPS</h2>
+
+<h3>Context</h3>
+<p>n8n draait via Docker Compose (n8n-compose stack, <code>/root/n8n-compose/compose.yaml</code>) met Traefik als reverse proxy. De n8n-container is gebonden aan <code>127.0.0.1:5678</code>, niet direct vanaf het internet bereikbaar.</p>
+
+<h3>Status per maatregel</h3>
+<table>
+  <tr><th>#</th><th>Maatregel</th><th>Status</th><th>Details</th></tr>
+  <tr><td>1</td><td>n8n-poort niet publiek</td><td><span class="badge badge-green">Gereed</span></td><td>Container bindt aan <code>127.0.0.1:5678</code>, alleen intern bereikbaar</td></tr>
+  <tr><td>2</td><td>Firewall</td><td><span class="badge badge-green">Gereed</span></td><td>Alleen Contabo Cloud Firewall in gebruik (geen UFW als tweede laag). Regels: SSH (22) beperkt tot eigen IP, HTTP (80)/HTTPS (443) publiek, poort 5678 nergens opengezet</td></tr>
+  <tr><td>3</td><td>Reverse proxy + HTTPS</td><td><span class="badge badge-green">Gereed</span></td><td>Traefik luistert op 80/443, Let's Encrypt via TLS-challenge (<code>mytlschallenge</code>)</td></tr>
+  <tr><td>4</td><td>Fail2ban — SSH</td><td><span class="badge badge-green">Gereed</span></td><td><code>jail.local</code> met sshd-jail: <code>maxretry 4</code>, <code>findtime 10m</code>, <code>bantime 1u</code></td></tr>
+  <tr><td>5</td><td>Fail2ban — n8n-login via Traefik</td><td><span class="badge badge-green">Gereed</span></td><td>Access log doorgevoerd en filter op mislukte n8n-logins afgerond</td></tr>
+  <tr><td>6</td><td>Traefik dashboard onbeveiligd</td><td><span class="badge badge-green">Gereed</span></td><td>Dashboard is uitgezet</td></tr>
+  <tr><td>7</td><td>Automatische security-updates</td><td><span class="badge badge-green">Gereed</span></td><td><code>unattended-upgrades</code>: alleen security-origins, auto-reboot 03:30 bij kernel-updates, oude kernels opgeruimd</td></tr>
+  <tr><td>8</td><td>SSH hardening (key-only, geen root-login)</td><td><span class="badge badge-gray">Bewust niet gedaan</span></td><td>Risico geaccepteerd</td></tr>
+  <tr><td>9</td><td>n8n authenticatie + 2FA</td><td><span class="badge badge-green">Gereed</span></td><td>2FA is ingeregeld op de n8n-login</td></tr>
+  <tr><td>10</td><td><code>N8N_ENCRYPTION_KEY</code> vastleggen en back-uppen</td><td><span class="badge badge-gray">Bewust niet gedaan</span></td><td>Risico geaccepteerd</td></tr>
+  <tr><td>11</td><td>Docker hardening (non-root container, image-updates)</td><td><span class="badge badge-gray">Bewust niet gedaan</span></td><td>Risico geaccepteerd</td></tr>
+  <tr><td>12</td><td>Off-site back-ups</td><td><span class="badge badge-amber">Deels gereed</span></td><td>Workflows (flows) worden via GitHub geback-upt. Let op: dit dekt alleen de workflow-definities — niet de n8n database, credentials of execution-historie</td></tr>
+</table>
 
 <!-- ============================================================ -->
 <h2 id="problemen">Problemen oplossen</h2>
