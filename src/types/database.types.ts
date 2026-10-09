@@ -97,7 +97,7 @@ export interface Database {
           description: string | null
           system_prompt: string
           icon: string
-          type: 'chat' | 'agent' | 'voice'
+          type: 'chat' | 'agent' | 'voice' | 'risico_analyse'
           n8n_webhook_url: string | null
           is_active: boolean
           created_by: string
@@ -111,7 +111,7 @@ export interface Database {
           description?: string | null
           system_prompt: string
           icon: string
-          type?: 'chat' | 'agent' | 'voice'
+          type?: 'chat' | 'agent' | 'voice' | 'risico_analyse'
           n8n_webhook_url?: string | null
           is_active?: boolean
           created_by: string
@@ -125,7 +125,7 @@ export interface Database {
           description?: string | null
           system_prompt?: string
           icon?: string
-          type?: 'chat' | 'agent' | 'voice'
+          type?: 'chat' | 'agent' | 'voice' | 'risico_analyse'
           n8n_webhook_url?: string | null
           is_active?: boolean
           created_by?: string
