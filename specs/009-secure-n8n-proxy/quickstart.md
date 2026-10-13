@@ -25,12 +25,14 @@ npx playwright test                 # e2e met page.route-mocks op de edge functi
 
 Bundle-controle (SC-001) — grep op de **waarde** van de oude sleutel (Vite
 vervangt de naam `VITE_ENCRYPTION_KEY` in de bundel door de letterlijke
-waarde; op de naam grepen geeft dus vals negatief):
+waarde; op de naam grepen geeft dus vals negatief). Voor `crypto.subtle`:
+alleen `decrypt`/`encrypt` zijn verdacht — `digest`/`importKey`/`verify`
+komen legaal uit de Supabase-auth-library (PKCE/JWKS):
 
 ```bash
 OLD_KEY=$(grep VITE_ENCRYPTION_KEY .env.local | cut -d= -f2)
-grep -rF "$OLD_KEY" dist/                 # geen treffers
-grep -r "crypto.subtle" dist/             # geen treffers
+grep -rF "$OLD_KEY" dist/                              # geen treffers
+grep -rE "crypto\.subtle\.(decrypt|encrypt)" dist/     # geen treffers
 ```
 
 ## 3. Releasevolgorde (verplicht — anders breekt de live chat)
@@ -43,7 +45,7 @@ grep -r "crypto.subtle" dist/             # geen treffers
 | 4 | Pas migratie `014_flow_configs_token_lockdown.sql` toe via de Supabase MCP (wist de gelekte tokens, trekt de leesrechten in en sluit de UPDATE-policy met `WITH CHECK`) | Pas ná de nieuwe frontend, want de oude bundle leest `flow_configs` met `*`. **Waarschuwing: tokens die tussen stap 3 en 4 via de nieuwe UI worden opgeslagen, worden door de wipe gewist — token-invoer pas ná deze stap** |
 | 5 | Per organisatie: voer het nieuwe token in via **Instellingen → Webhooks** en druk op "Verbinding testen" | Chat en documentverwerking zijn pas ná de token-invoer weer bruikbaar |
 | 6 | Verwijder `VITE_ENCRYPTION_KEY` uit de Netlify environment en deploy opnieuw | Voorkomt dat de sleutel ooit weer in de bundel belandt |
-| 7 | Controleer de productie-bundel: grep op de **oude sleutelwaarde** (zie stap 2) en op `crypto.subtle` in `dist/` → leeg | SC-001 |
+| 7 | Controleer de productie-bundel: grep op de **oude sleutelwaarde** en op `crypto.subtle.decrypt\|crypto.subtle.encrypt` in `dist/` → leeg (zie stap 2) | SC-001 |
 
 **Cutover-venster**: vanaf **stap 3** (nieuwe frontend live; de oude tokens
 zijn onleesbare hex-ciphertext voor de Edge Functions) tot en met **stap 5**
