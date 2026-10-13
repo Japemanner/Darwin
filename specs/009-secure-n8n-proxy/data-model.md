@@ -83,10 +83,10 @@ Edge Function instead of in the browser.
 
 | Secret | Used by | Notes |
 |--------|---------|-------|
-| `SUPABASE_URL` | all three new functions | existing convention |
-| `SUPABASE_ANON_KEY` | all three new functions | **new** — for the user-context client that passes the caller's JWT through so RLS applies to all domain reads |
-| `SUPABASE_SERVICE_ROLE_KEY` | all three new functions | existing convention; only for `flow_configs` reads, admin checks via profiles, signed URL creation |
-| `ALLOWED_ORIGINS` | all three new functions | **new** — comma-separated origins for CORS; `*` is forbidden (technical route A2) |
+| `VITE_SUPABASE_URL` (fallback `SUPABASE_URL`) | all three new functions | platform-default bestaat al; de functies lezen de VITE_-variant het eerst |
+| `VITE_SUPABASE_ANON_KEY` (fallback `SUPABASE_ANON_KEY`) | all three new functions | voor de user-context client die het Authorization-header van de gebruiker doorgeeft, zodat RLS geldt |
+| `VITE_SUPABASE_SERVICE_ROLE_KEY` (fallback `SUPABASE_SERVICE_ROLE_KEY`) | all three new functions | alleen voor `flow_configs`-lees/schrijf, adminchecks via profiles en signed URL's. **Nooit** een VITE_-variant hiervan in Netlify zetten — daar belandt die in de publieke bundel; in Supabase-secrets is de VITE_-naam onschadelijk |
+| `ALLOWED_ORIGINS` | all three new functions | **nieuw** — komma-gescheiden origins voor CORS; `*` is verboden (technische route A2); fail-closed: niet gezet/geen match → geen ACAO-header |
 
 `VITE_ENCRYPTION_KEY` leaves the frontend for good: removed from
 `src/vite-env.d.ts` and `.env.example`; to be deleted from the Netlify
