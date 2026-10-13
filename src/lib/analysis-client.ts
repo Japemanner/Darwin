@@ -8,6 +8,7 @@ import {
   type AnalysisRun,
   type RecentRun,
 } from './analysis-schemas'
+import { supabase } from './supabase'
 
 export interface SubmitAnalysisInput {
   run_id: string
@@ -92,6 +93,15 @@ function requireApiUrl(): string {
   return API_URL
 }
 
+// Every call carries the session JWT (contracts 008: n8n-submit.md, run-status.md).
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new AnalysisClientError('UNAUTHORIZED', 'Uw sessie is verlopen. Log opnieuw in.')
+  }
+  return { Authorization: `Bearer ${session.access_token}` }
+}
+
 function classifyStatusError(status: number): AnalysisClientError {
   if (status === 401) return new AnalysisClientError('UNAUTHORIZED', 'Uw sessie is verlopen. Log opnieuw in.')
   if (status === 404) return new AnalysisClientError('NOT_FOUND', 'De run is niet gevonden.')
@@ -143,7 +153,7 @@ export async function submitAnalysisRun(input: SubmitAnalysisInput): Promise<{ r
   try {
     res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(body),
     }, 30_000)
   } catch (err) {
@@ -165,7 +175,7 @@ export async function submitAnalysisRun(input: SubmitAnalysisInput): Promise<{ r
 export async function fetchAnalysisRun(runId: string): Promise<AnalysisRun> {
   let res: Response
   try {
-    res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs/${runId}`, { method: 'GET' }, 15_000)
+    res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs/${runId}`, { method: 'GET', headers: await authHeaders() }, 15_000)
   } catch (err) {
     if (err instanceof AnalysisClientError) throw err
     throw new AnalysisClientError('CONNECTION_ERROR', 'Kon geen verbinding maken met de risico-analyse-service.')
@@ -186,7 +196,7 @@ export async function fetchAnalysisRun(runId: string): Promise<AnalysisRun> {
 export async function fetchRecentRuns(advisorId: string, limit = 10): Promise<RecentRun[]> {
   let res: Response
   try {
-    res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs?advisor_id=${encodeURIComponent(advisorId)}&limit=${limit}`, { method: 'GET' }, 15_000)
+    res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs?advisor_id=${encodeURIComponent(advisorId)}&limit=${limit}`, { method: 'GET', headers: await authHeaders() }, 15_000)
   } catch (err) {
     if (err instanceof AnalysisClientError) throw err
     throw new AnalysisClientError('CONNECTION_ERROR', 'Kon geen verbinding maken met de risico-analyse-service.')
