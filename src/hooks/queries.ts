@@ -11,7 +11,6 @@ import type {
   Invitation,
   RoadmapFeature,
   RoadmapVote,
-  FlowConfig,
   FeedbackInteraction,
 } from '@/types/database.types'
 
@@ -275,23 +274,6 @@ export function useDashboardCounts(orgId: string | undefined) {
         knowledgeBases: kbRes.count ?? 0,
         teamMembers: membersRes.count ?? 0,
       }
-    },
-  })
-}
-
-export function useFlowConfig(orgId: string | undefined, flowType: 'rag_chat' | 'document_processing') {
-  return useQuery<FlowConfig | null>({
-    queryKey: ['flow-config', orgId, flowType],
-    enabled: !!orgId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('flow_configs')
-        .select('*')
-        .eq('flow_type', flowType)
-        .eq('organization_id', orgId!)
-        .single()
-      if (error && error.code !== 'PGRST116') throw error
-      return data
     },
   })
 }
@@ -612,49 +594,6 @@ export function useVote(featureId: string, userId: string) {
     },
     onError: () => {
       qc.invalidateQueries({ queryKey: ['roadmap-features', userId] })
-    },
-  })
-}
-
-export function useSaveFlowConfig(orgId: string, flowType: 'rag_chat' | 'document_processing') {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (payload: {
-      configId: string | null
-      webhook_url: string
-      webhook_token: string
-      webhook_auth_header: string
-      organization_id: string
-      flow_type: 'rag_chat' | 'document_processing'
-    }) => {
-      if (payload.configId) {
-        const { error } = await supabase
-          .from('flow_configs')
-          .update({
-            webhook_url: payload.webhook_url,
-            webhook_token: payload.webhook_token,
-            webhook_auth_header: payload.webhook_auth_header,
-          })
-          .eq('id', payload.configId)
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase
-          .from('flow_configs')
-          .insert({
-            flow_type: payload.flow_type,
-            webhook_url: payload.webhook_url,
-            webhook_token: payload.webhook_token,
-            webhook_auth_header: payload.webhook_auth_header,
-            organization_id: payload.organization_id,
-          })
-          .select()
-          .single()
-        if (error) throw error
-        return data
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['flow-config', orgId, flowType] })
     },
   })
 }

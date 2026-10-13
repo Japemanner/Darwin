@@ -188,6 +188,18 @@ add_result "F-16" "$SKIP" "Delegate to Snyk MCP: run snyk_code_scan on src/"
 add_result "F-17" "$SKIP" "Delegate to Snyk MCP: run snyk_sca_scan on package.json"
 
 # ─────────────────────────────────────────────
+# F-18: Geen client-side webhook-encryptie (feature 009-secure-n8n-proxy)
+# VITE_ENCRYPTION_KEY of Web Crypto encrypt/decrypt mag niet meer voorkomen
+# in src/ — het webhook-token verhuurt naar de server.
+CRYPTO_HITS=$(grep -rn "VITE_ENCRYPTION_KEY\|crypto\.subtle\." src/ 2>/dev/null | wc -l | tr -d ' ')
+if [ "$CRYPTO_HITS" -eq 0 ]; then
+  add_result "F-18" "$PASS" "No VITE_ENCRYPTION_KEY / crypto.subtle references found in src/"
+else
+  CRYPTO_DETAIL=$(grep -rn "VITE_ENCRYPTION_KEY\|crypto\.subtle\." src/ 2>/dev/null | head -5)
+  add_result "F-18" "$FAIL" "Found $CRYPTO_HITS occurrence(s): $CRYPTO_DETAIL"
+fi
+
+# ─────────────────────────────────────────────
 # TOTALEN
 FAIL_COUNT=0
 WARN_COUNT=0
