@@ -1,14 +1,65 @@
+import {
+  FunctionsHttpError,
+  FunctionsRelayError,
+  FunctionsFetchError,
+} from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { callDocumentWebhook } from './webhook'
 import type { KnowledgeBaseDocument } from '@/types/database.types'
+
+export type DocumentWebhookAction = 'index' | 'modify' | 'delete'
+
+export class DocumentWebhookError extends Error {
+  readonly code: string
+  constructor(code: string, message: string) {
+    super(message)
+    this.code = code
+  }
+}
+
+const TEXT_UNAUTHORIZED = 'Uw sessie is verlopen. Log opnieuw in.'
+const TEXT_FORBIDDEN = 'U heeft geen toegang tot dit document.'
+const TEXT_NOT_CONFIGURED = 'Er is geen koppeling geconfigureerd. Neem contact op met de beheerder.'
+const TEXT_UPSTREAM_AUTH = 'De koppeling weigert de verbinding. Controleer het token en de headernaam in de instellingen.'
+const TEXT_UPSTREAM_ERROR = 'De documentverwerking gaf een fout. Probeer het opnieuw of neem contact op met de beheerder.'
+const TEXT_UPSTREAM_TIMEOUT = 'De documentverwerking reageert niet binnen de toegestane tijd. Probeer het opnieuw.'
+const TEXT_UPSTREAM_UNREACHABLE = 'Kon geen verbinding maken met de documentverwerking.'
+
+const EDGE_ERROR_TEXTS: Record<string, string> = {
+  UNAUTHORIZED: TEXT_UNAUTHORIZED,
+  FORBIDDEN: TEXT_FORBIDDEN,
+  NOT_CONFIGURED: TEXT_NOT_CONFIGURED,
+  UPSTREAM_AUTH: TEXT_UPSTREAM_AUTH,
+  UPSTREAM_ERROR: TEXT_UPSTREAM_ERROR,
+  UPSTREAM_TIMEOUT: TEXT_UPSTREAM_TIMEOUT,
+  UPSTREAM_UNREACHABLE: TEXT_UPSTREAM_UNREACHABLE,
+}
+
+async function toDocumentWebhookError(err: unknown): Promise<DocumentWebhookError> {
+  if (err instanceof FunctionsHttpError) {
+    const body = await err.context.json().catch(() => null) as { code?: string; message?: string } | null
+    const code = body?.code ?? 'UPSTREAM_ERROR'
+    const message = body?.message ?? EDGE_ERROR_TEXTS[code] ?? TEXT_UPSTREAM_ERROR
+    return new DocumentWebhookError(code, message)
+  }
+  if (err instanceof FunctionsRelayError || err instanceof FunctionsFetchError) {
+    return new DocumentWebhookError('UPSTREAM_UNREACHABLE', TEXT_UPSTREAM_UNREACHABLE)
+  }
+  return new DocumentWebhookError('UPSTREAM_ERROR', TEXT_UPSTREAM_ERROR)
+}
+
+async function notifyDocumentWebhook(documentId: string, action: DocumentWebhookAction): Promise<void> {
+  const { error } = await supabase.functions.invoke('document-webhook', {
+    body: { document_id: documentId, action },
+  })
+  if (error) throw await toDocumentWebhookError(error)
+}
 
 export const uploadDocument = async (
   file: File,
   knowledgeBaseId: string,
-  knowledgeBaseName: string,
   userId: string,
   organizationId: string
-): Promise<{ document: KnowledgeBaseDocument; signedUrl: string }> => {
+): Promise<KnowledgeBaseDocument> => {
   const fileExt = file.name.split('.').pop()
   const filePath = `${organizationId}/${knowledgeBaseId}/${crypto.randomUUID()}.${fileExt}`
 
@@ -35,33 +86,19 @@ export const uploadDocument = async (
 
   if (insertError) throw insertError
 
-  const { data: signedUrlData } = await supabase.storage
-    .from('knowledge-documents')
-    .createSignedUrl(filePath, 900)
+  // Notify n8n via the server. On failure the file and row stay in place and
+  // the caller shows the Dutch error message (constitution V: no silent failures).
+  await notifyDocumentWebhook(document.id, 'index')
 
-  if (!signedUrlData?.signedUrl) throw new Error('Failed to generate signed URL')
-
-  await callDocumentWebhook(
-    organizationId,
-    knowledgeBaseName,
-    (document).id,
-    file.name,
-    fileExt?.toLowerCase() || 'unknown',
-    signedUrlData.signedUrl,
-    'index',
-    filePath,
-  )
-
-  return { document, signedUrl: signedUrlData.signedUrl }
+  return document
 }
 
-export const deleteDocument = async (
-  documentId: string,
-  filePath: string | null,
-  organizationId: string,
-  knowledgeBaseName: string,
-  documentName: string,
-) => {
+export const deleteDocument = async (documentId: string, filePath: string | null) => {
+  // Notify n8n FIRST — the server needs the row to exist to resolve the
+  // organization, knowledge base and the signed download URL. On failure the
+  // document stays stored (spec US2 scenario 3).
+  await notifyDocumentWebhook(documentId, 'delete')
+
   if (filePath) {
     const { error: storageError } = await supabase.storage
       .from('knowledge-documents')
@@ -76,7 +113,4 @@ export const deleteDocument = async (
     .eq('id', documentId)
 
   if (error) throw error
-
-  const fileExt = filePath?.split('.').pop()?.toLowerCase() || 'unknown'
-  await callDocumentWebhook(organizationId, knowledgeBaseName, documentId, documentName, fileExt, '', 'delete', filePath ?? '')
 }
