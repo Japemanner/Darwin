@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { callRagWebhook } from '@/lib/webhook'
+import { askAssistant, RagClientError } from '@/lib/rag-client'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -464,20 +464,23 @@ function ChatWindow({
     setIsSending(true)
 
     try {
-      const [insertResult, webhookResult] = await Promise.all([
-        supabase.from('messages').insert({
-          conversation_id: conv.id,
-          role: 'user',
-          content: userMessage.content,
-        }),
-        callRagWebhook(assistant, conv, userMessage.content, organizationId, messages),
-      ])
+      // Persist the user message first so the server-side history read is
+      // deterministic; then ask the server-side rag-chat proxy.
+      const { error: insertError } = await supabase.from('messages').insert({
+        conversation_id: conv.id,
+        role: 'user',
+        content: userMessage.content,
+      })
 
-      if (insertResult.error) {
+      if (insertError) {
         toast({ title: 'Fout bij opslaan bericht', variant: 'destructive' })
       }
 
-      const result = webhookResult
+      const result = await askAssistant({
+        assistantId: assistant.id,
+        conversationId: conv.id,
+        message: userMessage.content,
+      })
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
@@ -500,13 +503,17 @@ function ChatWindow({
       })
     } catch (err) {
       const description = err instanceof Error ? err.message : 'Kon geen antwoord krijgen'
-      const title = description.includes('verbinding maken') || description.includes('CORS')
-        ? 'Verbindingsfout'
-        : description.includes('geweigerd') || description.includes('Authenticatiefout')
+      const title = err instanceof RagClientError
+        ? err.code === 'UNAUTHORIZED'
           ? 'Authenticatiefout'
-          : description.includes('niet gevonden')
-            ? 'Webhook niet gevonden'
-            : 'Fout bij versturen'
+          : err.code === 'FORBIDDEN'
+            ? 'Geen toegang'
+            : err.code === 'NOT_CONFIGURED'
+              ? 'Configuratie ontbreekt'
+              : err.code.startsWith('UPSTREAM_')
+                ? 'Verbindingsfout'
+                : 'Fout bij versturen'
+        : 'Fout bij versturen'
       toast({
         title,
         description,

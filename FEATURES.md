@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-09_
-_Total features: 17_
+_Last updated: 2026-10-13_
+_Total features: 18_
 
 ---
 
@@ -162,11 +162,21 @@ Assistent-antwoorden worden als HTML aangeleverd (door n8n) en veilig weergegeve
 
 ### 🧪 Risico-analyse assistent UI (008)
 
-Chat-stijl vaste flow voor het nieuwe assistent-type `risico_analyse` (geen vrije chat): invoerformulier (Verzekeringsvraagstuk, Kennisbronnen multi-select, Klantsituatie, Bestanden pdf/docx/txt met limieten zichtbaar, https-only URL's, Klantreferentie, Adviseur prefilled) met groepsvalidatie; asynchrone run met statuskaart (in wachtrij/bezig/klaar/mislukt, elapsed time, polling 3s met backoff); resultatenweergave met gaps-checklist "Ontbrekende informatie voor het gesprek", interne analyse als gesanitiseerde markdown (marked naar DOMPurify, geen raw HTML), klikbare bronverwijzingen (K/R/A) met zijpaneel (document, locatie, passage), .docx-download met label "CONCEPT, door adviseur te accorderen", copy-to-clipboard, bewaartermijn-melding (7 dagen); foutafhandeling met foutcode en retry-prefill (in-memory, geen browseropslag van klantinhoud). Mock-first: run-flow tegen `scripts/mock-analysis-server.mjs` via `VITE_ANALYSIS_API_URL`; echte backend gecontracteerd in `specs/008-risico-analyse-ui/contracts/`.
+Chat-stijl vaste flow voor het nieuwe assistent-type `risico_analyse` (geen vrije chat): invoerformulier (Verzekeringsvraagstuk, Kennisbronnen multi-select, Klantsituatie, Bestanden pdf/docx/txt met limieten zichtbaar, https-only URL's, Klantreferentie, Adviseur prefilled) met groepsvalidatie; asynchrone run met statuskaart (in wachtrij/bezig/klaar/mislukt, elapsed time, polling 3s met backoff); resultatenweergave met gaps-checklist "Ontbrekende informatie voor het gesprek", interne analyse als gesanitiseerde markdown (marked naar DOMPurify, geen raw HTML), klikbare bronverwijzingen (K/R/A) met zijpaneel (document, locatie, passage), .docx-download met label "CONCEPT, door adviseur te accorderen", copy-to-clipboard, bewaartermijn-melding (7 dagen); foutafhandeling met foutcode en retry-prefill (in-memory, geen browseropslag van klantinhoud). Mock-first: run-flow tegen `scripts/mock-analysis-server.mjs` via `VITE_ANALYSIS_API_URL`; echte backend gecontracteerd in `specs/008-risico-analyse-ui/contracts/`. De client stuurt sinds feature 009 het sessie-JWT mee op alle drie de calls.
 
-**Files**: `src/components/analysis/*`, `src/lib/analysis-client.ts`, `src/lib/analysis-schemas.ts`, `src/hooks/useAnalysisRun.ts`, `src/hooks/useRecentRuns.ts`, `src/lib/sanitize.ts`, `scripts/mock-analysis-server.mjs`, `tests/e2e/analysis-form.spec.ts`, `tests/e2e/analysis-run.spec.ts`, `playwright.config.ts`
+**Files**: `src/components/analysis/*`, `src/lib/analysis-client.ts`, `src/lib/analysis-schemas.ts`, `src/hooks/useAnalysisRun.ts`, `src/hooks/useRecentRuns.ts`, `src/lib/sanitize.ts`, `scripts/mock-analysis-server.mjs`, `tests/e2e/analysis-form.spec.ts`, `tests/e2e/analysis-run.spec.ts`, `tests/e2e/analysis-jwt.spec.ts`, `playwright.config.ts`
 
 **Gap**: E2E-suite vereist testaccount (E2E_EMAIL/E2E_PASSWORD); draait verder tegen de mock server.
+
+---
+
+### 🧪 Beveiligde n8n-koppeling via de server (009)
+
+Geen geheim en geen tenant-beslissing meer in de browser. Drie Supabase Edge Functions: `rag-chat` (sessiecheck, organisatie/kennisbronnen server-side, payload met `knowledge_sources`-lijst + legacy `knowledgeSourceName`, 60s n8n-fetch, genormaliseerd antwoord met `verification`/`rewritten_query`), `document-webhook` (upload/verwijder-melding met server-gemaakte signed URL 900s; verwijderen meldt vóór de lokale delete) en `flow-config` (get/save/test voor beheerders; token platte tekst en write-only). Frontend: typed clients `rag-client.ts`/`flow-config-client.ts` + typed invoke in `storage.ts`, alle fouten Nederlandse meldingen met foutcodes, `src/lib/webhook.ts` en `VITE_ENCRYPTION_KEY` volledig verwijderd, toast-component toegankelijk gemaakt (role=status/alert, aria-live), fitness-check F-18 dwingt de client-side crypto af, migratie 014 wist gelekte tokens + trekt leesrechten in (kolom-grants) + sluit de UPDATE-policy met `WITH CHECK`. Rest-risico (geaccepteerd): de token-loze per-assistent fallback-URL blijft rechtstreeks bij n8n aanroepbaar.
+
+**Files**: `supabase/functions/rag-chat/index.ts`, `supabase/functions/document-webhook/index.ts`, `supabase/functions/flow-config/index.ts`, `src/lib/rag-client.ts`, `src/lib/flow-config-client.ts`, `src/lib/storage.ts`, `src/lib/analysis-client.ts`, `src/pages/AssistantsPage.tsx`, `src/pages/SettingsPage.tsx`, `src/pages/KnowledgePage.tsx`, `src/hooks/queries.ts`, `src/components/ui/toast.tsx`, `src/vite-env.d.ts`, `supabase/migrations/014_flow_configs_token_lockdown.sql`, `scripts/fitness-check.sh` (F-18), `tests/e2e/rag-chat.spec.ts`, `tests/e2e/document-webhook.spec.ts`, `tests/e2e/flow-config.spec.ts`
+
+**Gap**: E2E draait tegen `page.route`-mocks (vereist E2E_EMAIL/E2E_PASSWORD); rollout vereist handmatige stappen (releasevolgorde: functions → frontend → migratie 014 → token-invoer per organisatie) volgens `specs/009-secure-n8n-proxy/quickstart.md`. Leden-gate van de Instellingen is server-side afgedwongen; e2e voor het member-pad volgt met feature B (tweede testaccount).
 
 ---
 

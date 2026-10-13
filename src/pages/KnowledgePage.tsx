@@ -229,7 +229,7 @@ function KBSlideOver({
 
     setIsUploading(true)
     try {
-      await uploadDocument(file, kb.id, kb.name, userId, organizationId)
+      await uploadDocument(file, kb.id, userId, organizationId)
       toast({ title: 'Document geüpload', description: file.name })
       qc.invalidateQueries({ queryKey: ['kb-documents', kb.id] })
     } catch (err) {
@@ -242,11 +242,12 @@ function KBSlideOver({
 
   const handleDeleteDoc = async (doc: KnowledgeBaseDocument) => {
     try {
-      await deleteDocument(doc.id, doc.file_path, organizationId, kb!.name, doc.name)
+      await deleteDocument(doc.id, doc.file_path)
       toast({ title: 'Document verwijderd' })
       qc.invalidateQueries({ queryKey: ['kb-documents', kb?.id] })
-    } catch {
-      toast({ title: 'Fout bij verwijderen', variant: 'destructive' })
+    } catch (err) {
+      // Show the typed Dutch error (message + code) — no silent failures (FR-009).
+      toast({ title: 'Fout bij verwijderen', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
     }
   }
 

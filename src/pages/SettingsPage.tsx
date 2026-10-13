@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { encryptToken, decryptToken, testWebhook } from '@/lib/webhook'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,15 +11,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select } from '@/components/ui/select'
 import { Settings, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle, Building2, UserPlus } from 'lucide-react'
-import { useFlowConfig, useSaveFlowConfig } from '@/hooks/queries'
-import type { WebhookTestResult } from '@/lib/webhook'
+import { getFlowConfig, saveFlowConfig, testFlowConfig } from '@/lib/flow-config-client'
+import type { FlowConfigInfo, FlowConfigTestResult } from '@/lib/flow-config-client'
 
 interface FlowConfigFormState {
   webhookUrl: string
   webhookToken: string
   webhookAuthHeader: string
   isSaving: boolean
-  testResult: WebhookTestResult | null
+  testResult: FlowConfigTestResult | null
   isTesting: boolean
 }
 
@@ -28,17 +28,18 @@ function FlowConfigCard({
   title,
   description,
   placeholder,
-  profile,
 }: {
   flowType: 'rag_chat' | 'document_processing'
   title: string
   description: string
   placeholder: string
-  profile: { organization_id: string }
 }) {
   const { toast } = useToast()
-  const { data: config, isPending } = useFlowConfig(profile.organization_id, flowType)
-  const saveMutation = useSaveFlowConfig(profile.organization_id, flowType)
+  const qc = useQueryClient()
+  const { data: config, isPending } = useQuery<FlowConfigInfo>({
+    queryKey: ['flow-config', flowType],
+    queryFn: () => getFlowConfig(flowType),
+  })
   const [state, setState] = useState<FlowConfigFormState>({
     webhookUrl: '',
     webhookToken: '',
@@ -66,20 +67,15 @@ function FlowConfigCard({
     setState((prev) => ({ ...prev, isSaving: true, testResult: null }))
 
     try {
-      const tokenToSave = state.webhookToken.trim()
-        ? await encryptToken(state.webhookToken.trim())
-        : config?.webhook_token ?? ''
-
-      await saveMutation.mutateAsync({
-        configId: config?.id ?? null,
+      await saveFlowConfig(flowType, {
         webhook_url: state.webhookUrl.trim(),
-        webhook_token: tokenToSave,
         webhook_auth_header: state.webhookAuthHeader.trim() || 'X-Webhook-Token',
-        organization_id: profile.organization_id,
-        flow_type: flowType,
+        webhook_token: state.webhookToken.trim() || undefined,
       })
 
-      if (config) {
+      await qc.invalidateQueries({ queryKey: ['flow-config', flowType] })
+
+      if (config?.webhook_url) {
         toast({ title: 'Instellingen bijgewerkt', description: `${title} is succesvol opgeslagen` })
       } else {
         toast({ title: 'Instellingen opgeslagen', description: `${title} is aangemaakt` })
@@ -102,14 +98,11 @@ function FlowConfigCard({
     setState((prev) => ({ ...prev, isTesting: true, testResult: null }))
 
     try {
-      let tokenToTest: string | undefined
-      if (state.webhookToken.trim()) {
-        tokenToTest = state.webhookToken.trim()
-      } else if (config?.webhook_token) {
-        tokenToTest = await decryptToken(config.webhook_token)
-      }
-
-      const result = await testWebhook(state.webhookUrl.trim(), tokenToTest, state.webhookAuthHeader || 'X-Webhook-Token')
+      const result = await testFlowConfig(flowType, {
+        webhook_url: state.webhookUrl.trim(),
+        webhook_auth_header: state.webhookAuthHeader || 'X-Webhook-Token',
+        webhook_token: state.webhookToken.trim() || undefined,
+      })
       setState((prev) => ({ ...prev, testResult: result }))
 
       if (result.ok) {
@@ -186,18 +179,18 @@ function FlowConfigCard({
               type="password"
               value={state.webhookToken}
               onChange={(e) => setState((prev) => ({ ...prev, webhookToken: e.target.value }))}
-              placeholder={config ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (laat leeg om huidige token te behouden)' : 'De Header Value uit je n8n Webhook node'}
+              placeholder={config?.has_token ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (Token is ingesteld; laat leeg om te behouden)' : 'De Header Value uit je n8n Webhook node'}
             />
             <p className="text-xs text-muted-foreground">
-              {config
-                ? 'Dit is de Header Value uit je n8n Webhook node (Header Auth). De token wordt versleuteld opgeslagen. Laat leeg om de bestaande token te behouden.'
-                : 'Voer de Header Value in uit je n8n Webhook node (Header Auth). De token wordt versleuteld opgeslagen.'}
+              {config?.has_token
+                ? 'Dit is de Header Value uit je n8n Webhook node (Header Auth). De token wordt server-side opgeslagen en is na het opslaan niet meer uit te lezen. Laat leeg om de bestaande token te behouden.'
+                : 'Voer de Header Value in uit je n8n Webhook node (Header Auth). De token wordt server-side opgeslagen en is na het opslaan niet meer uit te lezen.'}
             </p>
           </div>
 
           <div className="flex gap-3">
             <Button type="submit" disabled={state.isSaving}>
-              {state.isSaving ? 'Opslaan...' : config ? 'Bijwerken' : 'Configuratie aanmaken'}
+              {state.isSaving ? 'Opslaan...' : config?.webhook_url ? 'Bijwerken' : 'Configuratie aanmaken'}
             </Button>
             <Button type="button" variant="outline" disabled={state.isTesting || !state.webhookUrl.trim()} onClick={handleTest}>
               {state.isTesting ? (
@@ -389,21 +382,32 @@ function SettingsPage() {
 
         <TabsContent value="webhooks">
           <div className="space-y-6">
-            <FlowConfigCard
-              flowType="rag_chat"
-              title="Chat assistent Configuratie"
-              description="Configureer de gedeelde n8n webhook voor alle chat assistants. Deze instelling geldt voor alle assistants van type &quot;chat&quot;."
-              placeholder="https://n8n.example.com/webhook/rag-chat"
-              profile={profile}
-            />
+            {profile.role === 'admin' ? (
+              <>
+                <FlowConfigCard
+                  flowType="rag_chat"
+                  title="Chat assistent Configuratie"
+                  description="Configureer de gedeelde n8n webhook voor alle chat assistants. Deze instelling geldt voor alle assistants van type &quot;chat&quot;."
+                  placeholder="https://n8n.example.com/webhook/rag-chat"
+                />
 
-            <FlowConfigCard
-              flowType="document_processing"
-              title="Kennisbron Documentverwerking Configuratie"
-              description="Configureer de n8n webhook voor documentverwerking. Bij elke document-upload wordt de signed download URL naar deze webhook gestuurd."
-              placeholder="https://n8n.example.com/webhook/documents"
-              profile={profile}
-            />
+                <FlowConfigCard
+                  flowType="document_processing"
+                  title="Kennisbron Documentverwerking Configuratie"
+                  description="Configureer de n8n webhook voor documentverwerking. Bij elke document-upload maakt de server de signed download URL en stuurt deze naar de webhook."
+                  placeholder="https://n8n.example.com/webhook/documents"
+                />
+              </>
+            ) : (
+              <Card className="max-w-2xl">
+                <CardHeader>
+                  <CardTitle className="text-base">Geen toegang</CardTitle>
+                  <CardDescription>
+                    Alleen beheerders kunnen de webhookconfiguratie bekijken en wijzigen. Neem contact op met de beheerder van uw organisatie.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            )}
 
             <div className="max-w-2xl">
               <Card>

@@ -43,6 +43,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
+            role={t.variant === "destructive" ? "alert" : "status"}
+            aria-live={t.variant === "destructive" ? "assertive" : "polite"}
             className={cn(
               "rounded-lg border p-4 shadow-lg bg-background animate-in slide-in-from-right-full",
               t.variant === "destructive" && "border-destructive"
@@ -53,7 +55,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 <p className="text-sm font-medium">{t.title}</p>
                 {t.description && <p className="text-xs text-muted-foreground mt-1">{t.description}</p>}
               </div>
-              <button onClick={() => dismiss(t.id)} className="text-muted-foreground hover:text-foreground shrink-0">
+              <button onClick={() => dismiss(t.id)} aria-label="Melding sluiten" className="text-muted-foreground hover:text-foreground shrink-0">
                 ✕
               </button>
             </div>
