@@ -186,7 +186,7 @@ Assistenten- en kennisbronbeheer is beheerder-only, in de UI én afgedwongen op 
 
 **Files**: `src/pages/AssistantsPage.tsx`, `src/pages/KnowledgePage.tsx`, `tests/e2e/fixtures.ts`, `tests/e2e/admin-only-management.spec.ts`, `scripts/rls-verify.mjs`, `supabase/migrations/015_admin_only_writes.sql`, `.env.example`
 
-**Gap**: migratie 015 moet via de Supabase MCP worden toegepast als release-stap ná frontend-deploy (releasevolgorde in `specs/010-admin-only-management/quickstart.md` §3); rls-verify en de member-login-e2e vereisen een member-testaccount (E2E_MEMBER_EMAIL/E2E_MEMBER_PASSWORD).
+**Gap**: migratie 015 is op 2026-10-16 toegepast op productie — maar vóór de frontend-deploy (afwijking van de verplichte releasevolgorde in `specs/010-admin-only-management/quickstart.md` §3, zie `decisions/2026-10-16-010-migratie-voor-frontend-deploy.md`). Nog open: `node scripts/rls-verify.mjs` (SC-001/002) en de §4 SQL-controles — vereisen een member-testaccount (E2E_MEMBER_EMAIL/E2E_MEMBER_PASSWORD in `.env.local`) en een geldige SUPABASE_ACCESS_TOKEN voor F-01/F-10 (huidige token: 401); de e2e-regressiesuite draait pas echt met E2E-credentials (47 skipped / 0 failed zonder).
 
 ---
 
