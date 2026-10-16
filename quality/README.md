@@ -4,9 +4,9 @@ Deze map bevat per-domein kwaliteitscriteria.
 
 ## Index
 
-| Domein       | Pad                          | Status |
-|--------------|------------------------------|--------|
-| _nog te vullen_ | `/quality/<domein>/criteria.md` | —      |
+| Domein              | Pad                                   | Status |
+|---------------------|---------------------------------------|--------|
+| secure-integration  | `/quality/secure-integration/criteria.md` | actief (sinds 2026-10-14) |
 
 ## Werkmethode
 

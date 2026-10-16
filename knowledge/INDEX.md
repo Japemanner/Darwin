@@ -4,9 +4,10 @@ Deze map bevat domein-specifieke kennis, hypothese en regels.
 
 ## Domeinen
 
-| Domein         | Pad                          | Status |
-|----------------|------------------------------|--------|
-| _nog te vullen_ | `/knowledge/<domein>/`       | —      |
+| Domein    | Pad                     | Status |
+|-----------|-------------------------|--------|
+| supabase  | `/knowledge/supabase/`  | actief (sinds 2026-10-14) |
+| n8n       | `/knowledge/n8n/`       | actief (sinds 2026-10-14) |
 
 ## Structuur per domein
 

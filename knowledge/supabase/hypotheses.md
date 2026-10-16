@@ -1,0 +1,4 @@
+# Supabase — hypothesen (nog onvoldoende bevestigd)
+
+- **Secrets zijn direct actief zonder herdeploy**: bij de 009-rollout leek een vers gezette `ALLOWED_ORIGINS` direct te werken, maar die sessie is óók herdeployd — het effect is niet geïsoleerd. Bevestiging volgt bij de volgende secret-wijziging zonder redeploy. (1 waarneming)
+- **Management-API-token in `.env.local` verloopt stil**: de `SUPABASE_ACCESS_TOKEN` werd afgewezen (401 Invalid access token) zonder dat de CLI of workflow dat eerder signaleerde. Vermoeden: tokens verlopen of zijn geroteerd; verifieer bij volgende CLI/MCP-gebruik en zet verloop-alerts. (1 waarneming)
