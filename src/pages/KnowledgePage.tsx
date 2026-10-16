@@ -28,6 +28,7 @@ import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X, FilePlus } from 'lu
 
 function KnowledgePage() {
   const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const { data: knowledgeBases, isPending } = useKnowledgeBases(profile?.organization_id)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingKB, setEditingKB] = useState<KnowledgeBase | null>(null)
@@ -53,19 +54,23 @@ function KnowledgePage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">Kennisbronnen</h1>
-          <p className="text-muted-foreground">Beheer documenten en koppel ze aan assistenten</p>
+          <p className="text-muted-foreground">
+            {isAdmin ? 'Beheer documenten en koppel ze aan assistenten' : 'Kennisbronnen en documenten van je organisatie'}
+          </p>
         </div>
-        <Button onClick={() => { setEditingKB(null); setModalOpen(true) }}>
-          <Plus className="h-4 w-4 mr-2" /> Nieuwe kennisbron
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => { setEditingKB(null); setModalOpen(true) }}>
+            <Plus className="h-4 w-4 mr-2" /> Nieuwe kennisbron
+          </Button>
+        )}
       </div>
 
       {(knowledgeBases ?? []).length === 0 ? (
         <EmptyState
           icon={<BookOpen className="h-12 w-12" />}
           title="Nog geen kennisbronnen"
-          description="Upload documenten zodat je assistenten er kennis uit kunnen putten"
-          action={{ label: 'Maak kennisbron', onClick: () => { setEditingKB(null); setModalOpen(true) } }}
+          description={isAdmin ? 'Upload documenten zodat je assistenten er kennis uit kunnen putten' : 'Nog geen kennisbronnen beschikbaar'}
+          {...(isAdmin ? { action: { label: 'Maak kennisbron', onClick: () => { setEditingKB(null); setModalOpen(true) } } } : {})}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -83,9 +88,11 @@ function KnowledgePage() {
                 </p>
               </CardContent>
               <CardFooter>
-                <Button variant="ghost" size="sm" className="ml-auto" onClick={(e) => { e.stopPropagation(); setEditingKB(kb); setModalOpen(true) }}>
-                  Bewerken
-                </Button>
+                {isAdmin && (
+                  <Button variant="ghost" size="sm" className="ml-auto" onClick={(e) => { e.stopPropagation(); setEditingKB(kb); setModalOpen(true) }}>
+                    Bewerken
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
@@ -105,6 +112,7 @@ function KnowledgePage() {
         onClose={() => setSelectedKB(null)}
         userId={profile?.id ?? ''}
         organizationId={profile?.organization_id ?? ''}
+        isAdmin={isAdmin}
       />
     </div>
   )
@@ -196,11 +204,13 @@ function KBSlideOver({
   onClose,
   userId,
   organizationId,
+  isAdmin,
 }: {
   kb: KnowledgeBase | null
   onClose: () => void
   userId: string
   organizationId: string
+  isAdmin: boolean
 }) {
   const { toast } = useToast()
   const qc = useQueryClient()
@@ -317,14 +327,16 @@ function KBSlideOver({
         <div className="flex-1 overflow-y-auto p-4">
           {tab === 'documents' && (
             <div className="space-y-3">
-              <label className="flex items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer hover:bg-accent/50 transition-colors">
-                <div className="text-center">
-                  <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm font-medium">{isUploading ? 'Uploaden...' : 'Klik om te uploaden'}</p>
-                  <p className="text-xs text-muted-foreground">PDF, TXT, DOCX</p>
-                </div>
-                <input type="file" accept=".pdf,.txt,.docx" className="hidden" onChange={handleUpload} disabled={isUploading} />
-              </label>
+              {isAdmin && (
+                <label className="flex items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer hover:bg-accent/50 transition-colors">
+                  <div className="text-center">
+                    <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">{isUploading ? 'Uploaden...' : 'Klik om te uploaden'}</p>
+                    <p className="text-xs text-muted-foreground">PDF, TXT, DOCX</p>
+                  </div>
+                  <input type="file" accept=".pdf,.txt,.docx" className="hidden" onChange={handleUpload} disabled={isUploading} />
+                </label>
+              )}
 
               {docsLoading ? (
                 <p className="text-center text-sm text-muted-foreground py-8">Laden...</p>
@@ -352,9 +364,11 @@ function KBSlideOver({
                       {doc.status === 'error' && (
                         <Badge variant="destructive">Error</Badge>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteDoc(doc)}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteDoc(doc)}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -364,7 +378,8 @@ function KBSlideOver({
 
           {tab === 'items' && (
             <div className="space-y-4">
-              <form onSubmit={handleAddItem} className="space-y-3 p-3 border rounded-lg">
+              {isAdmin && (
+                <form onSubmit={handleAddItem} className="space-y-3 p-3 border rounded-lg">
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="item-title">Titel</Label>
                   <Input
@@ -399,6 +414,7 @@ function KBSlideOver({
                   <Plus className="h-4 w-4 mr-1" /> {isSavingItem ? 'Toevoegen...' : 'Toevoegen'}
                 </Button>
               </form>
+              )}
 
               {itemsLoading ? (
                 <p className="text-center text-sm text-muted-foreground py-8">Laden...</p>
@@ -420,9 +436,11 @@ function KBSlideOver({
                       <Badge variant={item.embedding_status === 'done' ? 'default' : item.embedding_status === 'failed' ? 'destructive' : 'secondary'}>
                         {item.embedding_status === 'done' ? 'Klaar' : item.embedding_status === 'processing' ? 'Verwerken' : item.embedding_status === 'failed' ? 'Fout' : 'Wachtend'}
                       </Badge>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item)}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item)}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))

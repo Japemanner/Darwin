@@ -104,7 +104,7 @@ test.describe('document-webhook — delete', () => {
     await openFirstKnowledgeBase(page)
     await expect(page.getByText(DOC_ROW.name)).toBeVisible()
 
-    await page.locator('button:has(svg.lucide-trash-2)').first().click()
+    await page.locator('button:has(svg.lucide-trash2)').first().click()
 
     await expect(page.getByText('Document verwijderd')).toBeVisible({ timeout: 15_000 })
     expect(edgeBody).toEqual({ document_id: DOC_ROW.id, action: 'delete' })
@@ -122,7 +122,7 @@ test.describe('document-webhook — delete', () => {
     await openFirstKnowledgeBase(page)
     await expect(page.getByText(DOC_ROW.name)).toBeVisible()
 
-    await page.locator('button:has(svg.lucide-trash-2)').first().click()
+    await page.locator('button:has(svg.lucide-trash2)').first().click()
 
     await expect(page.getByText('Fout bij verwijderen')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/kon geen verbinding maken met de documentverwerking/i)).toBeVisible()

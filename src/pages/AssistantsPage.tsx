@@ -34,9 +34,20 @@ const ASSISTANT_TYPES = [
   { value: 'risico_analyse', label: '📋 Risico-analyse' },
 ]
 
+// Readable type labels shown on the assistant card badge (FR-001).
+const ASSISTANT_TYPE_LABELS: Record<string, string> = {
+  chat: 'Chat',
+  risico_analyse: 'Risico-analyse',
+}
+
 function AssistantsPage() {
   const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const { data: assistants, isPending } = useAssistants(profile?.organization_id)
+  // Members only see active assistants (FR-002); admins see all.
+  const visibleAssistants = isAdmin
+    ? (assistants ?? [])
+    : (assistants ?? []).filter((a) => a.is_active)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAssistant, setEditingAssistant] = useState<AIAssistant | null>(null)
   const [chatAssistant, setChatAssistant] = useState<AIAssistant | null>(null)
@@ -65,23 +76,27 @@ function AssistantsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">AI Assistenten</h1>
-          <p className="text-muted-foreground">Beheer je AI assistenten en hun configuratie</p>
+          <p className="text-muted-foreground">
+            {isAdmin ? 'Beheer je AI assistenten en hun configuratie' : 'Start een gesprek met een assistent'}
+          </p>
         </div>
-        <Button onClick={() => { setEditingAssistant(null); setModalOpen(true) }}>
-          <Plus className="h-4 w-4 mr-2" /> Nieuwe assistent
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => { setEditingAssistant(null); setModalOpen(true) }}>
+            <Plus className="h-4 w-4 mr-2" /> Nieuwe assistent
+          </Button>
+        )}
       </div>
 
-      {(assistants ?? []).length === 0 ? (
+      {visibleAssistants.length === 0 ? (
         <EmptyState
           icon={<Bot className="h-12 w-12" />}
           title="Nog geen assistenten"
-          description="Maak je eerste AI assistent aan om te beginnen met chatten"
-          action={{ label: 'Maak assistent', onClick: () => { setEditingAssistant(null); setModalOpen(true) } }}
+          description={isAdmin ? 'Maak je eerste AI assistent aan om te beginnen met chatten' : 'Er zijn nog geen actieve assistenten beschikbaar'}
+          {...(isAdmin ? { action: { label: 'Maak assistent', onClick: () => { setEditingAssistant(null); setModalOpen(true) } } } : {})}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(assistants ?? []).map((a) => (
+          {visibleAssistants.map((a) => (
             <Card key={a.id} className={cn("flex flex-col", !a.is_active && "opacity-60")}>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -91,13 +106,13 @@ function AssistantsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     {!a.is_active && <Badge variant="secondary">Inactief</Badge>}
-                    <Badge variant="outline" className="text-xs">{a.type}</Badge>
+                    <Badge variant="outline" className="text-xs">{ASSISTANT_TYPE_LABELS[a.type] ?? a.type}</Badge>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
                 <p className="text-sm text-muted-foreground line-clamp-3">
-                  {a.description || a.system_prompt}
+                  {a.description ?? ''}
                 </p>
               </CardContent>
               <CardFooter className="flex gap-2">
@@ -110,9 +125,11 @@ function AssistantsPage() {
                     <MessagesSquare className="h-4 w-4 mr-2" /> Chat
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => { setEditingAssistant(a); setModalOpen(true) }}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                {isAdmin && (
+                  <Button variant="ghost" size="icon" onClick={() => { setEditingAssistant(a); setModalOpen(true) }}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}

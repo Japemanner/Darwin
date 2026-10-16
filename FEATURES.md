@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-13_
-_Total features: 18_
+_Last updated: 2026-10-15_
+_Total features: 19_
 
 ---
 
@@ -50,9 +50,9 @@ Welkom met voornaam + real-time statistieken: aantal assistenten, kennisbronnen,
 
 ---
 
-### ✅ AI Assistenten — Volledig CRUD
+### ✅ AI Assistenten — Volledig CRUD (admin-only)
 
-Assistenten aanmaken, bewerken, bekijken, verwijderen. Velden: naam, emoji, beschrijving, system prompt, N8N webhook URL, actief/inactief. Per organisatie gescoped via RLS.
+Assistenten aanmaken, bewerken, bekijken, verwijderen. Velden: naam, emoji, beschrijving, system prompt, N8N webhook URL, actief/inactief. Per organisatie gescoped via RLS. Sinds feature 010 is het beheer admin-only: members zien alleen actieve assistenten (leesbare typelabels "Chat"/"Risico-analyse", omschrijving zonder system-prompt-fallback) en kunnen uitsluitend chatten/analyseren.
 
 **Files**: `src/pages/AssistantsPage.tsx`
 
@@ -68,9 +68,9 @@ Slide-out chat panel per assistent. Laadt of maakt een conversatie, stuurt beric
 
 ---
 
-### ✅ Kennisbronnen — Volledig CRUD
+### ✅ Kennisbronnen — Volledig CRUD (admin-only)
 
-Kennisbronnen aanmaken, bewerken, bekijken. Velden: naam, beschrijving. Per organisatie gescoped.
+Kennisbronnen aanmaken, bewerken, bekijken. Velden: naam, beschrijving. Per organisatie gescoped. Sinds feature 010 admin-only: members zien bronnen, documenten en statussen alleen-lezen (KBSlideOver zonder upload/bewerk/verwijderbesturing).
 
 **Files**: `src/pages/KnowledgePage.tsx` (grid + KBMappingModal)
 
@@ -177,6 +177,16 @@ Geen geheim en geen tenant-beslissing meer in de browser. Drie Supabase Edge Fun
 **Files**: `supabase/functions/rag-chat/index.ts`, `supabase/functions/document-webhook/index.ts`, `supabase/functions/flow-config/index.ts`, `src/lib/rag-client.ts`, `src/lib/flow-config-client.ts`, `src/lib/storage.ts`, `src/lib/analysis-client.ts`, `src/pages/AssistantsPage.tsx`, `src/pages/SettingsPage.tsx`, `src/pages/KnowledgePage.tsx`, `src/hooks/queries.ts`, `src/components/ui/toast.tsx`, `src/vite-env.d.ts`, `supabase/migrations/014_flow_configs_token_lockdown.sql`, `scripts/fitness-check.sh` (F-18), `tests/e2e/rag-chat.spec.ts`, `tests/e2e/document-webhook.spec.ts`, `tests/e2e/flow-config.spec.ts`
 
 **Gap**: E2E draait tegen `page.route`-mocks (vereist E2E_EMAIL/E2E_PASSWORD); rollout vereist handmatige stappen (releasevolgorde: functions → frontend → migratie 014 → token-invoer per organisatie) volgens `specs/009-secure-n8n-proxy/quickstart.md`. Leden-gate van de Instellingen is server-side afgedwongen; e2e voor het member-pad volgt met feature B (tweede testaccount).
+
+---
+
+### 🧪 Beheerfuncties alleen voor beheerders (010)
+
+Assistenten- en kennisbronbeheer is beheerder-only, in de UI én afgedwongen op databaseniveau. UI: conditioneel renderen per rol (`profile.role === 'admin'`) in AssistantsPage (geen aanmaak/bewerkknop voor members, typelabelmap chat→"Chat"/risico_analyse→"Risico-analyse", geen system-prompt-fallback, members zien alleen actieve assistenten, admins zien inactieve met badge "Inactief") en KnowledgePage/KBSlideOver (geen aanmaak/bewerk/upload/verwijder/item-formulier voor members; documentstatus en leesweergaven blijven). Database: migratie `015_admin_only_writes.sql` met helper `is_org_admin()` vervangt de schrijf-policies op `ai_assistants`, `knowledge_bases`, `knowledge_base_documents`, `knowledge_items` en `assistant_knowledge_bases` door admin-only-versies en hardent de storage-policies (INSERT/UPDATE/DELETE) van bucket `knowledge-documents`; leesrechten binnen de eigen organisatie en eigen gesprekken/berichten/feedback (`feedback_interactions`) blijven ongewijzigd. Verificatie: `scripts/rls-verify.mjs` test de 15 schrijfcombinaties + storage + positieve checks direct tegen de live database; e2e-suite `tests/e2e/admin-only-management.spec.ts` (15 tests) dekt member-leesweergave, toetsenbord-onbereikbaarheid en admin-pariteit met de `memberPage`-fixture.
+
+**Files**: `src/pages/AssistantsPage.tsx`, `src/pages/KnowledgePage.tsx`, `tests/e2e/fixtures.ts`, `tests/e2e/admin-only-management.spec.ts`, `scripts/rls-verify.mjs`, `supabase/migrations/015_admin_only_writes.sql`, `.env.example`
+
+**Gap**: migratie 015 is op 2026-10-16 toegepast op productie — maar vóór de frontend-deploy (afwijking van de verplichte releasevolgorde in `specs/010-admin-only-management/quickstart.md` §3, zie `decisions/2026-10-16-010-migratie-voor-frontend-deploy.md`). Nog open: `node scripts/rls-verify.mjs` (SC-001/002) en de §4 SQL-controles — vereisen een member-testaccount (E2E_MEMBER_EMAIL/E2E_MEMBER_PASSWORD in `.env.local`) en een geldige SUPABASE_ACCESS_TOKEN voor F-01/F-10 (huidige token: 401); de e2e-regressiesuite draait pas echt met E2E-credentials (47 skipped / 0 failed zonder).
 
 ---
 
