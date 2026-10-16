@@ -8,6 +8,7 @@ Deze map bevat domein-specifieke kennis, hypothese en regels.
 |-----------|-------------------------|--------|
 | supabase  | `/knowledge/supabase/`  | actief (sinds 2026-10-14) |
 | n8n       | `/knowledge/n8n/`       | actief (sinds 2026-10-14) |
+| tooling   | `/knowledge/tooling/`   | actief (sinds 2026-10-14) |
 
 ## Structuur per domein
 

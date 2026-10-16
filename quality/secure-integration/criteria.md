@@ -60,3 +60,42 @@ AGENTS.md en de 009-rollout):
    SUPABASE_ACCESS_TOKEN in .env.local is verlopen.
 ## Verdict: SHIP
 ```
+
+## Her-verificatie tegen de technische route (2026-10-14, tweede sessie)
+
+```
+## Output: Route-vs-code verificatie van de gemergde feature (PR #16);
+   alle routepunten aanwezig: 3 Edge Functions (auth-patroon, RLS-gebruikersclient,
+   service-role flow_configs-lees, knowledge_sources + legacy, 60s/10s time-outs,
+   foutcodes { code, message }, log code/id's/duur, fail-closed CORS), migratie 014
+   (wipe + REVOKE/GRANT exact de 7 routekolommen + WITH CHECK), rag-client.ts,
+   storage.ts (delete meldt eerst), SettingsPage write-only token, analysis-client
+   JWT op 3 calls, F-18, quickstart met rolloutvolgorde en curl 401/403/200.
+## Criteria checked:
+  1. PASS — dist/ schoon: 0 treffers VITE_ENCRYPTION_KEY en
+     crypto.subtle.(decrypt|encrypt); F-18 groen
+  2. PASS — 401/403-paden code-geverifieerd (user-context client + org-checks);
+     live curl eerder gedaan (evaluatie hierboven)
+  3. PASS — migratie 014 kolom-grants exact volgens route; geen enkele
+     flow_configs-lees meer in src/ (verdergaand dan de route)
+  4. PARTIAL — foutmatrix volledig in code en specs; Playwright 23/23 skip
+     zonder E2E-credentials (0 failed, infrastructuur werkt)
+  5. PASS — alle drie de functies loggen uitsluitend code/id's/duur
+  6. PASS — SSRF-guards in alle drie de functies + token-exfiltratie-regel
+     in flow-config 'test'
+  7. PASS — ALLOWED_ORIGINS fail-closed in alle drie de functies, nooit '*'
+  8. PASS — releasevolgorde gedocumenteerd in quickstart en uitgevoerd
+     (beslissingen-bestand)
+  9. PASS — geen nieuwe dependencies
+  10. PASS — spec/plan/contracts/quickstart/FEATURES gecommit;
+       kennis/kwaliteit/beslissingen staged op docs/009-lessons-learned
+## Score: 9/10
+## Gaps: eslint --max-warnings 0 faalt op de boom met 6 PRE-EXISTING warnings
+   (App.tsx, toast.tsx, posthog.tsx — geen daarvan van feature 009; de
+   pre-commit hook is in de praktijk niet-blokkerend voor ESLint, tegen
+   AGENTS.md in); scripts/fitness-check.sh is met core.autocrlf=true niet
+   draaibaar onder WSL-bash zonder LF-conversie (zie
+   knowledge/tooling/knowledge.md); e2e blijft credentials nodig hebben;
+   F-01/10/16/17 wachten op actieve MCP's.
+## Verdict: SHIP (feature conform route; gaps zijn geen 009-regressies)
+```
