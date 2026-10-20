@@ -386,5 +386,5 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/011-resumable-chat-page/plan.md
+specs/012-per-answer-feedback/plan.md
 <!-- SPECKIT END -->
