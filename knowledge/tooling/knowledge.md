@@ -31,3 +31,22 @@ Feiten en patronen (bevestigd door waarneming, tenzij anders vermeld).
   posthog.tsx 5x react-refresh/only-export-components) terwijl de
   documentatie anders suggereert. Fix zit in de hook of in AGENTS.md —
   nog niet doorgevoerd.
+- **Playwright-fixture-omgeving: import-volgorde is het contract** (2026-10-19,
+  012): `tests/e2e/fixtures.ts` leest `E2E_EMAIL`/`E2E_PASSWORD` op
+  moduleniveau. Een spec die `.env.local` pas in zijn eigen body laadt
+  (`process.loadEnvFile`) draait ná de fixtures — die zien de variabelen dan
+  niet en skippen alles. Oplossing (012, `answer-feedback.spec.ts`): een
+  seed-helpermodule (`feedback-seed.ts`) die `.env.local` op moduleniveau
+  laadt en als **eerste** import vóór `'./fixtures'` staat — static imports
+  evalueren in bronvolgorde. Verificatie volgt bij de eerste live run
+  (accounts nog niet gezet).
+- **Parallelle git-acties kunnen de werkmap midden in een sessie beschadigen**
+  (2026-10-19, 012-incident): een externe checkout naar een nieuwe branch
+  (zelfde commit) liet plots zes bestanden als "both modified" met
+  conflict-markers in de werkkopie achter, terwijl gestagede wijzigingen
+  intact bleven; commits gingen gewoon door op de oorspronkelijke branch.
+  Herstel zonder verlies: `git restore --staged --worktree -- <bestanden>`
+  (content stond veilig in HEAD, beide branches identiek), daarna
+  `git switch` terug. Les: vóór elke commit `git status` checken; bij
+  onverklaarde unmerged-toestand eerst reflog + branch vergelijken, niet
+  blind conflicten "oplossen".
