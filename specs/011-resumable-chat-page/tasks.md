@@ -150,7 +150,7 @@
 
 **Independent Test**: server-side gerealiseerd in T005; handmatig verifiÃ«ren via de SQL-check in quickstart.md Â§5 (titel = eerste vraag) â€” geen afzonderlijke frontend-taak.
 
-- [ ] T025 [US8] Verificatie-taak: na uitrol (quickstart.md Â§3) controleren dat nieuwe gesprekken de vraagtitel dragen (SQL uit quickstart.md Â§5); bestaande gesprekken behouden "Chat met <assistent>" (geen backfill â€” spec-aanname)
+- [ ] T025 [US8] Verificatie-taak: na uitrol (quickstart.md Â§3) controleren dat nieuwe gesprekken de vraagtitel dragen (SQL uit quickstart.md Â§5); bestaande gesprekken behouden "Chat met <assistent>" (geen backfill â€” spec-aanname) _(uitrol 2026-10-20 voltooid; check vereist nieuw live gespreksgebruik, nog open)_
 
 **Checkpoint**: US8 is server-side volledig afgedekt
 
@@ -183,7 +183,7 @@
 
 - [x] T029 Draai `npx tsc --noEmit`, `npx eslint src/ --max-warnings 0` en `npm run build` â€” allemaal groen
 - [x] T030 Draai `npx playwright test` (volledige suite: nieuwe + herwerkte specs + regressie) â€” groen (of skip met reden bij ontbrekende e2e-accounts)
-- [ ] T031 Voer quickstart.md Â§3-Â§5 uit (migratie + Edge Function via Supabase MCP, frontend-release, handmatige live-verificatie, SQL-checks) â€” voor Jaap na de code-review
+- [ ] T031 Voer quickstart.md Â§3-Â§5 uit (migratie + Edge Function via Supabase MCP, frontend-release, handmatige live-verificatie, SQL-checks) â€” voor Jaap na de code-review _(2026-10-20: migratie 016 + rag-chat v2 toegepast via de Supabase-webUI i.p.v. MCP (token 401; MCP-deploy kapt het 19 KB-bestand af, zie knowledge/tooling/knowledge.md); frontend via PR #22 -> develop -> PR #23 -> main, Netlify-deploy getriggerd; open: handmatige live-verificatie par. 4 + SQL-checks par. 5)_
 - [x] T032 Fitness checks (`scripts/fitness-check.sh` + F-01/F-10 via Supabase MCP) en FEATURES.md-update via `@feature-tracker` â€” na implementatie _(2026-10-19: script FAIL:0/PASS:13/WARN:1; eslint 0 errors, build groen, Playwright 51 skipped/0 failed; FEATURES.md + FITNESS.md bijgewerkt; F-01/F-10/F-16/F-17 SKIP â€” Supabase/Snyk MCP niet actief in sessie, achterstand gedocumenteerd in FITNESS.md)_
 
 ---
