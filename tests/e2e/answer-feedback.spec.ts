@@ -81,3 +81,51 @@ test.describe('answer-feedback — thumbs up per answer', () => {
     }
   })
 })
+
+test.describe('answer-feedback — reason form on thumbs down', () => {
+  test('thumbs down with a reason and no comment saves reason=incomplete; cancel saves nothing', async ({ page }) => {
+    const ctx = await setup(page)
+    test.skip(!ctx, SKIP_REASON)
+    if (!ctx) return
+    const { seed, seeded } = ctx
+
+    try {
+      await expect(page.getByText('E2E antwoord 1 — de polis dekt schade aan eigendommen.')).toBeVisible({ timeout: 15_000 })
+
+      // Thumbs down opens the reason form at the answer (FR-003).
+      const downButtons = page.getByRole('button', { name: 'Antwoord is niet nuttig' })
+      await downButtons.first().click()
+      await expect(page.getByText('Wat ging er mis?')).toBeVisible()
+      await expect(page.getByRole('radio', { name: 'Onvolledig' })).toBeVisible()
+
+      // Versturen is blocked without a reason (FR-003).
+      const submit = page.getByRole('button', { name: 'Versturen' })
+      await expect(submit).toBeDisabled()
+
+      // Choose a reason, leave the comment empty, submit (US2: no mandatory text).
+      await page.getByRole('radio', { name: 'Onvolledig' }).check()
+      await expect(submit).toBeEnabled()
+      await submit.click()
+
+      // Database check: one negative row with the reason and no comment (FR-004).
+      await expect.poll(async () => (await getFeedbackRows(seed, seeded.conversationId)).length).toBe(1)
+      const rows = await getFeedbackRows(seed, seeded.conversationId)
+      expect(rows[0].message_id).toBe(seeded.answer1Id)
+      expect(rows[0].thumbs_up).toBe(false)
+      expect(rows[0].reason).toBe('incomplete')
+      expect(rows[0].feedback).toBeNull()
+
+      // The down button reflects the stored rating.
+      await expect(downButtons.first()).toHaveAttribute('aria-pressed', 'true')
+
+      // Cancel path on answer 2: nothing is saved, the old state stays.
+      await downButtons.nth(1).click()
+      await page.getByRole('radio', { name: 'Onjuist' }).check()
+      await page.getByRole('button', { name: 'Annuleren' }).click()
+      await expect(page.getByText('Wat ging er mis?')).toBeHidden()
+      expect(await getFeedbackRows(seed, seeded.conversationId)).toHaveLength(1)
+    } finally {
+      await deleteConversation(seed, seeded.conversationId)
+    }
+  })
+})
