@@ -21,6 +21,23 @@
 ## Gaps: geen
 ## Verdict: SHIP
 
+## Evaluatie 2026-10-19 — 012-per-answer-feedback
+
+## Output: Feature spec 012-per-answer-feedback (5 stories, FR-001 t/m FR-012, 7 succescriteria) + quality checklist
+## Criteria checked:
+- Volledig (geen placeholders/markers): PASS — grep-controle leeg; alle verplichte secties + Scope-sectie gevuld
+- Toetsbaar: PASS — exacte aantallen (5 redenen, max 1 oordeel, 100% van nieuwe antwoorden), expliciete UI-toestanden (actieve duim, aria-pressed)
+- Wat-niet-hoe: PASS — RLS/aria-pressed/databasefunctie komen uitsluitend uit de eigen input van de opdrachtgever (getraceerd in checklist Notes); geen frameworks/talen in eisen
+- Acceptatiecriteria uit input: PASS — alle 5 expliciete criteria gemapt (FR-005/SC-003, FR-007/SC-006, FR-009, FR-011/SC-005, FR-012/SC-007); alle 5 user stories overgenomen met originele prioriteit
+- Constitution I–VI: PASS — I (u-vorm, aanname), II (CONCEPT ongewijzigd, aanname), III (geen inhoud in adressen/logs, aanname), IV (FR-012/SC-007), V (FR-008 + edge case), VI (Scope-sectie, 5 buiten-scope-items)
+- Scope begrensd: PASS — buiten-scope-lijst conform input plus 2 gemotiveerde afbakeningen (geen UI-weergave van metadata, geen migratie van oude feedback)
+- Nederlands voor stakeholders: PASS — zakelijk Nederlands, actors adviseur/beheerder herkenbaar
+- Onafhankelijk testbare stories: PASS — P1-stories vormen levensvatbare MVP; P2's (data-vastlegging, beheerdersoverzicht) elk zelfstandig testbaar
+- Aannames gedocumenteerd: PASS — 12 aannames, incl. interpretatie van story 4 (opslag bij het antwoord, geen UI-weergave) en opname van herschreven zoekvraag + responstijd in het overzicht
+## Score: 9/9
+## Gaps: geen
+## Verdict: SHIP
+
 ## Wat is een goede spec in dit project?
 
 1. **Volledig**: alle verplichte template-secties gevuld, geen placeholders, geen [NEEDS CLARIFICATION].
