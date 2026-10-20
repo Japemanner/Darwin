@@ -1,22 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { ThumbsDown, ThumbsUp, X } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { useAssistant, useConversation, useConversationMessages, useFeedbackInteraction } from '@/hooks/queries'
+import { useAssistant, useConversation, useConversationMessages } from '@/hooks/queries'
 import { askAssistant, RagClientError } from '@/lib/rag-client'
-import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/toast'
 import { ChatComposer, type ChatComposerHandle } from '@/components/chat/ChatComposer'
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState'
 import { ChatHeader } from '@/components/chat/ChatHeader'
 import { MessageList } from '@/components/chat/MessageList'
 import type { ChatMessage } from '@/components/chat/MessageBubble'
-import type { FeedbackInteraction } from '@/types/database.types'
 
 const SLOW_NOTICE_MS = 15_000
 const GENERIC_SEND_ERROR = 'Er ging iets mis bij het versturen. Probeer het opnieuw.'
@@ -36,9 +30,6 @@ function ChatPage() {
   const location = useLocation()
   const qc = useQueryClient()
   const { toast } = useToast()
-  const { profile } = useAuth()
-  const userId = profile?.id ?? ''
-  const organizationId = profile?.organization_id ?? ''
 
   // Mode data: /chat/new/:assistantId or /chat/:conversationId.
   const { data: newAssistant, isPending: assistantPending } = useAssistant(isNew ? assistantId : undefined)
@@ -77,15 +68,11 @@ function ChatPage() {
   // locally added messages survive until the server data arrives.
   const skipResetRef = useRef(false)
 
-  // Feedback bar state (moved unchanged from the former ChatWindow).
-  const [feedbackText, setFeedbackText] = useState('')
-  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false)
-  const [showFeedbackInput, setShowFeedbackInput] = useState(false)
-  const [thumbsUpSelected, setThumbsUpSelected] = useState(false)
-  const [thumbsDownSelected, setThumbsDownSelected] = useState(false)
-  const [existingFeedback, setExistingFeedback] = useState<FeedbackInteraction | null>(null)
-  const activeConversationId = isNew ? undefined : routeConversationId
-  const { data: feedback } = useFeedbackInteraction(activeConversationId, userId)
+  // Conversation id from the latest successful answer — the router param is
+  // not yet updated in the frames between the first answer and the
+  // navigate(replace) to /chat/:id, so per-answer feedback needs this
+  // fallback (specs/012-per-answer-feedback/research.md #8).
+  const [resultConversationId, setResultConversationId] = useState<string | null>(null)
 
   const resetChatState = useCallback(() => {
     setMessages([])
@@ -96,17 +83,8 @@ function ChatPage() {
       clearTimeout(slowTimerRef.current)
       slowTimerRef.current = null
     }
-    setExistingFeedback(null)
-    setFeedbackText('')
-    setIsFeedbackSubmitting(false)
-    setShowFeedbackInput(false)
-    setThumbsUpSelected(false)
-    setThumbsDownSelected(false)
+    setResultConversationId(null)
   }, [])
-
-  useEffect(() => {
-    if (feedback !== undefined) setExistingFeedback(feedback)
-  }, [feedback])
 
   // Reset local state when the route target changes (US7: "Nieuw gesprek",
   // browser back/forward between conversations).
@@ -180,6 +158,7 @@ function ChatPage() {
         )
         qc.invalidateQueries({ queryKey: ['messages', result.conversationId] })
         qc.invalidateQueries({ queryKey: ['conversations'] })
+        setResultConversationId(result.conversationId)
         if (!routeConversationId) {
           // First answer: the conversation gets its permanent address (US1).
           skipResetRef.current = true
@@ -256,64 +235,6 @@ function ChatPage() {
     [toast],
   )
 
-  // Feedback handlers (moved unchanged from the former ChatWindow).
-  const handleThumbsUp = async () => {
-    if (!activeConversationId || !viewAssistant || existingFeedback) return
-    setThumbsUpSelected(true)
-    try {
-      const { error } = await supabase.from('feedback_interactions').insert({
-        conversation_id: activeConversationId,
-        assistant_id: viewAssistant.id,
-        user_id: userId,
-        organization_id: organizationId,
-        thumbs_up: true,
-        feedback: null,
-      })
-      if (error) throw error
-      setExistingFeedback({ id: '', conversation_id: activeConversationId, assistant_id: viewAssistant.id, user_id: userId, organization_id: organizationId, thumbs_up: true, feedback: null, created_at: new Date().toISOString() } as FeedbackInteraction)
-    } catch (err: unknown) {
-      setThumbsUpSelected(false)
-      toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Kon feedback niet opslaan', variant: 'destructive' })
-    }
-  }
-
-  const handleThumbsDownClick = () => {
-    if (existingFeedback) return
-    setThumbsDownSelected(true)
-    setShowFeedbackInput(true)
-  }
-
-  const handleThumbsDownCancel = () => {
-    setThumbsDownSelected(false)
-    setShowFeedbackInput(false)
-    setFeedbackText('')
-  }
-
-  const handleThumbsDownSubmit = async () => {
-    if (!activeConversationId || !viewAssistant || !feedbackText.trim()) return
-    setIsFeedbackSubmitting(true)
-    try {
-      const { error } = await supabase.from('feedback_interactions').insert({
-        conversation_id: activeConversationId,
-        assistant_id: viewAssistant.id,
-        user_id: userId,
-        organization_id: organizationId,
-        thumbs_up: false,
-        feedback: feedbackText.trim(),
-      })
-      if (error) throw error
-      setExistingFeedback({ id: '', conversation_id: activeConversationId, assistant_id: viewAssistant.id, user_id: userId, organization_id: organizationId, thumbs_up: false, feedback: feedbackText.trim(), created_at: new Date().toISOString() } as FeedbackInteraction)
-      setShowFeedbackInput(false)
-      setFeedbackText('')
-    } catch (err: unknown) {
-      toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Kon feedback niet opslaan', variant: 'destructive' })
-    } finally {
-      setIsFeedbackSubmitting(false)
-    }
-  }
-
-  const hasAssistantMessages = messages.some((msg) => msg.role === 'assistant')
-  const feedbackSubmitted = !!existingFeedback
   const showEmptyState = messages.length === 0 && !isSending && (isNew || !!conversationMessages)
 
   // --- Loading state
@@ -376,99 +297,11 @@ function ChatPage() {
           messages={messages}
           isSending={isSending}
           slowNotice={slowNotice}
+          conversationId={routeConversationId ?? resultConversationId ?? undefined}
+          assistantId={viewAssistant.id}
           onRetry={retryMessage}
           onCopy={handleCopy}
         />
-      )}
-
-      {hasAssistantMessages && (
-        <div className="border-t px-4 py-3 flex flex-col gap-2">
-          {!feedbackSubmitted ? (
-            <>
-              {!showFeedbackInput ? (
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleThumbsUp}
-                    disabled={thumbsDownSelected}
-                    className={cn(
-                      "p-2 rounded-full transition-colors",
-                      thumbsUpSelected
-                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                        : "hover:bg-accent text-muted-foreground hover:text-foreground"
-                    )}
-                    title="Goed antwoord"
-                  >
-                    <ThumbsUp className={cn("h-5 w-5", thumbsUpSelected && "fill-current")} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleThumbsDownClick}
-                    disabled={thumbsUpSelected}
-                    className={cn(
-                      "p-2 rounded-full transition-colors",
-                      thumbsDownSelected
-                        ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                        : "hover:bg-accent text-muted-foreground hover:text-foreground"
-                    )}
-                    title="Niet goed — geef feedback"
-                  >
-                    <ThumbsDown className={cn("h-5 w-5", thumbsDownSelected && "fill-current")} />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleThumbsDownCancel}
-                      className="text-muted-foreground hover:text-foreground"
-                      title="Annuleren"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                    <span className="text-sm text-muted-foreground">Wat ging er mis?</span>
-                  </div>
-                  <Textarea
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder="Beschrijf wat er niet goed was aan dit antwoord..."
-                    rows={2}
-                    className="resize-none"
-                    autoFocus
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleThumbsDownCancel}
-                      disabled={isFeedbackSubmitting}
-                    >
-                      Annuleren
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleThumbsDownSubmit}
-                      disabled={isFeedbackSubmitting || !feedbackText.trim()}
-                    >
-                      {isFeedbackSubmitting ? 'Versturen...' : 'Feedback versturen'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground py-1">
-              {existingFeedback.thumbs_up ? (
-                <><ThumbsUp className="h-4 w-4 fill-current text-green-500" /> <span>Bedankt voor je feedback!</span></>
-              ) : (
-                <><ThumbsDown className="h-4 w-4 fill-current text-red-500" /> <span>Bedankt, we gaan hiermee aan de slag.</span></>
-              )}
-            </div>
-          )}
-        </div>
       )}
 
       <ChatComposer

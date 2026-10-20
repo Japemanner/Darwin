@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 import type {
   AIAssistant,
   KnowledgeBase,
@@ -322,19 +323,59 @@ export function useDashboardCounts(orgId: string | undefined) {
   })
 }
 
-export function useFeedbackInteraction(conversationId: string | undefined, userId: string | undefined) {
-  return useQuery<FeedbackInteraction | null>({
-    queryKey: ['feedback', conversationId, userId],
-    enabled: !!conversationId && !!userId,
+export function useMessageFeedback(conversationId: string | undefined) {
+  const { profile } = useAuth()
+  return useQuery<FeedbackInteraction[]>({
+    queryKey: ['message-feedback', conversationId],
+    enabled: !!conversationId && !!profile?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('feedback_interactions')
         .select('*')
         .eq('conversation_id', conversationId!)
-        .eq('user_id', userId!)
-        .maybeSingle()
+        .eq('user_id', profile!.id)
+        .not('message_id', 'is', null)
       if (error) throw error
       return data
+    },
+  })
+}
+
+export interface MessageFeedbackPayload {
+  message_id: string
+  assistant_id: string
+  thumbs_up: boolean
+  reason: string | null
+  feedback: string | null
+}
+
+// Full-payload upsert on (message_id, user_id): changing a rating overwrites
+// the previous one completely — thumbs up sends reason/feedback null so a
+// former thumbs-down reason is cleared (FR-005).
+export function useUpsertMessageFeedback(conversationId: string) {
+  const { profile } = useAuth()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: MessageFeedbackPayload) => {
+      const { error } = await supabase
+        .from('feedback_interactions')
+        .upsert(
+          {
+            message_id: payload.message_id,
+            conversation_id: conversationId,
+            assistant_id: payload.assistant_id,
+            user_id: profile!.id,
+            organization_id: profile!.organization_id,
+            thumbs_up: payload.thumbs_up,
+            reason: payload.reason,
+            feedback: payload.feedback,
+          },
+          { onConflict: 'message_id,user_id' },
+        )
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['message-feedback', conversationId] })
     },
   })
 }

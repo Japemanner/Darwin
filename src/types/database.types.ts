@@ -317,6 +317,9 @@ export interface Database {
           role: 'user' | 'assistant'
           content: string
           sources: Record<string, unknown> | null
+          rewritten_query: string | null
+          verification: Record<string, unknown> | null
+          latency_ms: number | null
           created_at: string
         }
         Insert: {
@@ -325,6 +328,9 @@ export interface Database {
           role: 'user' | 'assistant'
           content: string
           sources?: Record<string, unknown> | null
+          rewritten_query?: string | null
+          verification?: Record<string, unknown> | null
+          latency_ms?: number | null
           created_at?: string
         }
         Update: {
@@ -333,6 +339,9 @@ export interface Database {
           role?: 'user' | 'assistant'
           content?: string
           sources?: Record<string, unknown> | null
+          rewritten_query?: string | null
+          verification?: Record<string, unknown> | null
+          latency_ms?: number | null
           created_at?: string
         }
         Relationships: [
@@ -379,35 +388,45 @@ export interface Database {
           id: string
           conversation_id: string
           assistant_id: string
+          message_id: string | null
           user_id: string
           organization_id: string
           thumbs_up: boolean
+          reason: string | null
           feedback: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           conversation_id: string
           assistant_id: string
+          message_id?: string | null
           user_id: string
           organization_id: string
           thumbs_up: boolean
+          reason?: string | null
           feedback?: string | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           conversation_id?: string
           assistant_id?: string
+          message_id?: string | null
           user_id?: string
           organization_id?: string
           thumbs_up?: boolean
+          reason?: string | null
           feedback?: string | null
           created_at?: string
+          updated_at?: string
         }
         Relationships: [
           { foreignKeyName: 'feedback_interactions_conversation_id_fkey'; columns: ['conversation_id']; referencedRelation: 'conversations'; referencedColumns: ['id'] },
           { foreignKeyName: 'feedback_interactions_assistant_id_fkey'; columns: ['assistant_id']; referencedRelation: 'ai_assistants'; referencedColumns: ['id'] },
+          { foreignKeyName: 'feedback_interactions_message_id_fkey'; columns: ['message_id']; referencedRelation: 'messages'; referencedColumns: ['id'] },
           { foreignKeyName: 'feedback_interactions_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
         ]
       }
@@ -516,7 +535,27 @@ export interface Database {
         Relationships: []
       }
     }
-    Functions: Record<string, never>
+    Functions: {
+      get_feedback_review: {
+        Args: Record<string, never>
+        Returns: {
+          feedback_id: string
+          message_id: string | null
+          conversation_id: string
+          assistant_id: string
+          assistant_name: string
+          reason: string | null
+          feedback: string | null
+          question: string | null
+          answer: string
+          verification: Record<string, unknown> | null
+          rewritten_query: string | null
+          latency_ms: number | null
+          created_at: string
+          updated_at: string
+        }[]
+      }
+    }
     Enums: Record<string, never>
   }
 }
