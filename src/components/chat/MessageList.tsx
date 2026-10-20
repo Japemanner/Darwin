@@ -6,11 +6,13 @@ interface MessageListProps {
   messages: ChatMessage[]
   isSending: boolean
   slowNotice: boolean
+  conversationId: string | undefined
+  assistantId: string | undefined
   onRetry: (message: ChatMessage) => void
   onCopy: (content: string) => void
 }
 
-export function MessageList({ messages, isSending, slowNotice, onRetry, onCopy }: MessageListProps) {
+export function MessageList({ messages, isSending, slowNotice, conversationId, assistantId, onRetry, onCopy }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -20,7 +22,14 @@ export function MessageList({ messages, isSending, slowNotice, onRetry, onCopy }
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} onRetry={onRetry} onCopy={onCopy} />
+        <MessageBubble
+          key={message.id}
+          message={message}
+          conversationId={conversationId}
+          assistantId={assistantId}
+          onRetry={onRetry}
+          onCopy={onCopy}
+        />
       ))}
       {isSending && (
         <div className="flex justify-start" aria-live="polite">

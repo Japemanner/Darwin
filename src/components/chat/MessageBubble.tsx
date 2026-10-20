@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MessageContent } from './MessageContent'
+import { AnswerFeedback } from './AnswerFeedback'
 
 // In-memory chat message: persisted fields plus UI-only status. The id of a
 // user message is the client-generated message_id reused on retry (FR-009).
@@ -28,11 +29,15 @@ interface Source {
 
 interface MessageBubbleProps {
   message: ChatMessage
+  // Feedback context: only present once the conversation id is known — after
+  // the first answer (v2 response) or on an existing-conversation page.
+  conversationId: string | undefined
+  assistantId: string | undefined
   onRetry: (message: ChatMessage) => void
   onCopy: (content: string) => void
 }
 
-export function MessageBubble({ message, onRetry, onCopy }: MessageBubbleProps) {
+export function MessageBubble({ message, conversationId, assistantId, onRetry, onCopy }: MessageBubbleProps) {
   const [sourcesExpanded, setSourcesExpanded] = useState(false)
   const sources = Array.isArray(message.sources) ? (message.sources as Source[]) : []
   const isUser = message.role === 'user'
@@ -97,6 +102,9 @@ export function MessageBubble({ message, onRetry, onCopy }: MessageBubbleProps) 
           >
             <Copy className="h-3.5 w-3.5 mr-1.5" /> Kopiëren
           </Button>
+        )}
+        {!isUser && message.status === 'sent' && conversationId && assistantId && (
+          <AnswerFeedback conversationId={conversationId} assistantId={assistantId} messageId={message.id} />
         )}
       </div>
     </div>

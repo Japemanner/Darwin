@@ -419,7 +419,13 @@ Deno.serve(async (req: Request) => {
     const normalized = normalizeWebhookResponse(raw);
 
     // --- v2: persist the assistant message and touch the conversation.
+    // Answer provenance (feature 012, FR-010): n8n already delivers the
+    // rewritten query and the verification verdict — now stored with the
+    // answer instead of dropped. latency_ms is the turnaround from request
+    // start to the completed answer. Missing parts are stored as NULL,
+    // never an error (research #6). The response contract is unchanged.
     if (isV2) {
+      const latencyMs = Date.now() - started;
       const { data: assistantMessageRow, error: assistantInsertError } = await serviceClient
         .from("messages")
         .insert({
@@ -427,6 +433,9 @@ Deno.serve(async (req: Request) => {
           role: "assistant",
           content: normalized.answer,
           sources: normalized.sources,
+          rewritten_query: normalized.rewritten_query,
+          verification: normalized.verification,
+          latency_ms: latencyMs,
         })
         .select("id, created_at")
         .single();
