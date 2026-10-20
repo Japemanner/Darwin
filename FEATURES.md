@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-19_
-_Total features: 20_
+_Last updated: 2026-10-20_
+_Total features: 21_
 
 ---
 
@@ -197,6 +197,16 @@ De chat verhuist uit het verwijderde zijpaneel naar een eigen pagina op volle br
 **Files**: `src/pages/ChatPage.tsx`, `src/components/chat/ChatHeader.tsx`, `src/components/chat/ChatEmptyState.tsx`, `src/components/chat/MessageList.tsx`, `src/components/chat/MessageBubble.tsx`, `src/components/chat/ChatComposer.tsx`, `src/pages/AssistantsPage.tsx`, `src/App.tsx`, `src/lib/rag-client.ts`, `src/hooks/queries.ts`, `src/types/database.types.ts`, `supabase/functions/rag-chat/index.ts`, `supabase/migrations/016_assistant_example_questions.sql`, `tests/e2e/chat-page.spec.ts`, `tests/e2e/rag-chat.spec.ts`, `tests/e2e/admin-only-management.spec.ts`
 
 **Gap**: uitrol staat open volgens `specs/011-resumable-chat-page/quickstart.md` §3-§5 (migratie 016 + `rag-chat` v2 via Supabase MCP, frontend-release, handmatige live-verificatie, titel-SQL-check T025) — voor Jaap na de code-review; de e2e-suite (51 tests, incl. 4 nieuwe chat-page-gevallen) draait pas echt met E2E_EMAIL/E2E_PASSWORD in `.env.local`; F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie.
+
+---
+
+### 🧪 Feedback per antwoord, en vastleggen hoe een antwoord tot stand kwam (012)
+
+Duim omhoog/omlaag per individueel antwoord (niet langer per gesprek): onder elk afgeronden assistentbericht staat `AnswerFeedback` met `aria-pressed` en NL-toegankelijke labels ("Antwoord is nuttig"/"Antwoord is niet nuttig"); omhoog slaat direct op (één klik), omlaag opent een inline redenscherm (fieldset/legend "Wat ging er mis?", vijf native radios Onjuist/Onvolledig/Bron klopt niet/Vraag niet begrepen/Anders, optionele toelichting, knoppen Versturen/Annuleren — Versturen geblokkeerd zonder reden, annuleren slaat niets op). Eén oordeel per gebruiker per antwoord: unieke index `(message_id, user_id)` + upsert op de PostgREST-conflict-target overschrijft volledig (omhoog wist reden en toelichting); na herladen is het oordeel per antwoord zichtbaar en wijzigbaar (één query per gesprek via `useMessageFeedback` met react-query-deduplicatie, aria-pressed komt uitsluitend uit de opgeslagen rij). De gespreksbrede feedbackbalk en `useFeedbackInteraction` zijn verwijderd; bestaande gespreksbrede rijen (`message_id IS NULL`) blijven ongemoeid in de database. Antwoordherkomst: `rag-chat` v2 slaat bij elk nieuw assistentbericht `rewritten_query`, `verification` (grounded/confidence/issues) en `latency_ms` op — gegevens die n8n al meelevert en die eerder bij het opslaan verloren gingen. Beheerdersoverzicht `get_feedback_review()` (SECURITY DEFINER, vaste `search_path`, `is_org_admin()`- + `get_user_org_id()`-checks, geen view want bericht-RLS zou hem leeg maken) retourneert alle negatieve antwoordoordelen van de eigen organisatie met reden, toelichting, vraag, antwoord, verificatie, herschreven zoekvraag, responstijd, assistent en datums — databasefunctie zonder UI (buiten scope). Migratie 017: drie nullable berichtkolommen, `message_id`/`reason` (CHECK vijf codes)/`updated_at` (trigger) op feedback_interactions, constraint één-per-gesprek vervalt, INSERT-policy vervangen + UPDATE-policy nieuw (het bericht moet in een gesprek van `auth.uid()` zitten, afgedwongen via de bestaande bericht-RLS).
+
+**Files**: `src/components/chat/AnswerFeedback.tsx`, `src/components/chat/MessageBubble.tsx`, `src/components/chat/MessageList.tsx`, `src/pages/ChatPage.tsx`, `src/hooks/queries.ts`, `src/types/database.types.ts`, `supabase/functions/rag-chat/index.ts`, `supabase/migrations/017_per_answer_feedback.sql`, `tests/e2e/answer-feedback.spec.ts`, `tests/e2e/feedback-seed.ts`
+
+**Gap**: migratie 017 is toegepast op productie (2026-10-20 door Jaap via de Supabase-webUI; REST-controle bevestigt kolommen en functie, anon krijgt een lege set) en `rag-chat` is herdeployd — de frontend-release (develop → main/Netlify) staat open en sluit het breekraam: de oude productiebalk kan sinds de migratie geen nieuwe gespreksfeedback opslaan (specs/012-per-answer-feedback/research.md #13). De real-DB e2e-suite `answer-feedback.spec.ts` (4 scenario's, seeding via het testaccount met cascade-cleanup) draait pas met E2E_EMAIL/E2E_PASSWORD in `.env.local` — Jaap heeft (nog) geen testaccount (2026-10-20); de admin/member-check van `get_feedback_review()` (T014) en handmatige live-verificatie (quickstart §4) lopen dan mee. F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie.
 
 ---
 
