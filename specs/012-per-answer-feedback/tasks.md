@@ -100,7 +100,7 @@
 
 **Independent Test**: handmatig na uitrol — quickstart §4.5 + SQL-check §5 (antwoord heeft `rewritten_query`/`verification`/`latency_ms`); geen e2e (route: seeding zonder rag-chat, research #12).
 
-- [ ] T013 [P] [US4] Breid `supabase/functions/rag-chat/index.ts` uit (alleen het v2-pad, research #6): bereken direct vóór de assistentbericht-insert `latency_ms = Date.now() - started` en voeg aan de bestaande insert (regel ~423-432) toe: `rewritten_query: normalized.rewritten_query`, `verification: normalized.verification`, `latency_ms`; ontbrekende velden worden `null` opgeslagen (FR-010, geen fout); v1-legacy-pad, respons-contract en logging (code + id's + duur, constitution III) blijven ongewijzigd; deploy gebeurt pas via Supabase MCP in T018
+- [x] T013 [P] [US4] Breid `supabase/functions/rag-chat/index.ts` uit (alleen het v2-pad, research #6): bereken direct vóór de assistentbericht-insert `latency_ms = Date.now() - started` en voeg aan de bestaande insert (regel ~423-432) toe: `rewritten_query: normalized.rewritten_query`, `verification: normalized.verification`, `latency_ms`; ontbrekende velden worden `null` opgeslagen (FR-010, geen fout); v1-legacy-pad, respons-contract en logging (code + id's + duur, constitution III) blijven ongewijzigd; deploy gebeurt pas via Supabase MCP in T018
 
 **Checkpoint**: US4 is server-side afgedekt; onafhankelijk van US1-US3 (ander bestand)
 
