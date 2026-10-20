@@ -61,6 +61,50 @@ export function useAssistantOptions(orgId: string | undefined) {
   })
 }
 
+export function useAssistant(assistantId: string | undefined) {
+  return useQuery<AIAssistant | null>({
+    queryKey: ['assistants', 'detail', assistantId],
+    enabled: !!assistantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_assistants')
+        .select('*')
+        .eq('id', assistantId!)
+        .maybeSingle()
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export interface ConversationContext extends Conversation {
+  ai_assistants: {
+    id: string
+    name: string
+    icon: string
+    description: string | null
+    example_questions: string[]
+    is_active: boolean
+    type: AIAssistant['type']
+  } | null
+}
+
+export function useConversation(conversationId: string | undefined) {
+  return useQuery<ConversationContext | null>({
+    queryKey: ['conversations', 'detail', conversationId],
+    enabled: !!conversationId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*, ai_assistants(id, name, icon, description, example_questions, is_active, type)')
+        .eq('id', conversationId!)
+        .maybeSingle()
+      if (error) throw error
+      return data as ConversationContext | null
+    },
+  })
+}
+
 export function useKnowledgeBases(orgId: string | undefined) {
   return useQuery<KnowledgeBase[]>({
     queryKey: ['knowledge-bases', orgId],
@@ -306,6 +350,7 @@ export function useCreateAssistant(orgId: string) {
       icon: string
       type: string
       n8n_webhook_url: string | null
+      example_questions: string[]
       is_active: boolean
       created_by: string
       kbIds: string[]
@@ -320,6 +365,7 @@ export function useCreateAssistant(orgId: string) {
           icon: payload.icon,
           type: payload.type as 'chat' | 'agent' | 'voice',
           n8n_webhook_url: payload.n8n_webhook_url,
+          example_questions: payload.example_questions,
           is_active: payload.is_active,
           created_by: payload.created_by,
         })
@@ -352,6 +398,7 @@ export function useUpdateAssistant(orgId: string) {
       type: string
       icon: string
       n8n_webhook_url: string | null
+      example_questions: string[]
       is_active: boolean
       kbIds: string[]
     }) => {
@@ -363,6 +410,7 @@ export function useUpdateAssistant(orgId: string) {
           type: payload.type as 'chat' | 'agent' | 'voice',
           icon: payload.icon,
           n8n_webhook_url: payload.n8n_webhook_url,
+          example_questions: payload.example_questions,
           is_active: payload.is_active,
         })
         .eq('id', payload.id)

@@ -7,7 +7,9 @@ import {
 import { supabase } from './supabase'
 
 // Typed client for the rag-chat Edge Function (constitution V: typed external
-// clients, no silent failures). Contract: specs/009-secure-n8n-proxy/contracts/rag-chat.md
+// clients, no silent failures). Contract: specs/011-resumable-chat-page/contracts/rag-chat.md
+// v2: client-generated message_id, optional conversation_id (first turn creates
+// the conversation server-side), persisted answer in the response.
 
 export type RagErrorCode =
   | 'UNAUTHORIZED'
@@ -45,9 +47,17 @@ const RagSourceSchema = z.object({
   score: z.number().optional(),
 })
 
-const RagResponseSchema = z.object({
-  answer: z.string(),
+const RagAssistantMessageSchema = z.object({
+  id: z.string(),
+  content: z.string(),
   sources: z.array(RagSourceSchema).nullable().optional(),
+  created_at: z.string(),
+})
+
+const RagResponseSchema = z.object({
+  conversation_id: z.string(),
+  user_message_id: z.string(),
+  assistant_message: RagAssistantMessageSchema,
   verification: z
     .object({
       grounded: z.boolean(),
@@ -72,11 +82,19 @@ export interface RagVerification {
   issues: string[]
 }
 
-export interface RagChatResult {
-  answer: string
+export interface RagAssistantMessage {
+  id: string
+  content: string
   sources: RagSource[] | null
+  created_at: string
+}
+
+export interface RagChatResult {
+  conversationId: string
+  userMessageId: string
+  assistantMessage: RagAssistantMessage
   verification: RagVerification | null
-  rewritten_query: string | null
+  rewrittenQuery: string | null
 }
 
 const GENERIC_ERROR = ERROR_TEXTS.UPSTREAM_ERROR
@@ -88,7 +106,7 @@ async function toRagClientError(err: unknown): Promise<RagClientError> {
     if (code && code in ERROR_TEXTS) {
       return new RagClientError(code, body?.message || ERROR_TEXTS[code])
     }
-    // Unknown server code (e.g. INTERNAL_ERROR) -> generic Dutch message.
+    // Unknown server code (e.g., INTERNAL_ERROR) -> generic Dutch message.
     return new RagClientError('UPSTREAM_ERROR', GENERIC_ERROR)
   }
   if (err instanceof FunctionsRelayError || err instanceof FunctionsFetchError) {
@@ -99,13 +117,17 @@ async function toRagClientError(err: unknown): Promise<RagClientError> {
 
 export async function askAssistant(input: {
   assistantId: string
-  conversationId: string
+  /** Omit on the first turn of a new conversation; the server creates it. */
+  conversationId?: string
+  /** Client-generated uuid; reuse the same id when retrying a failed turn. */
+  messageId: string
   message: string
 }): Promise<RagChatResult> {
   const { data, error } = await supabase.functions.invoke('rag-chat', {
     body: {
       assistant_id: input.assistantId,
-      conversation_id: input.conversationId,
+      ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
+      message_id: input.messageId,
       message: input.message,
     },
   })
@@ -118,9 +140,15 @@ export async function askAssistant(input: {
   }
 
   return {
-    answer: parsed.data.answer,
-    sources: parsed.data.sources ?? null,
+    conversationId: parsed.data.conversation_id,
+    userMessageId: parsed.data.user_message_id,
+    assistantMessage: {
+      id: parsed.data.assistant_message.id,
+      content: parsed.data.assistant_message.content,
+      sources: parsed.data.assistant_message.sources ?? null,
+      created_at: parsed.data.assistant_message.created_at,
+    },
     verification: parsed.data.verification ?? null,
-    rewritten_query: parsed.data.rewritten_query ?? null,
+    rewrittenQuery: parsed.data.rewritten_query ?? null,
   }
 }

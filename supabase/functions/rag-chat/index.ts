@@ -1,7 +1,12 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// rag-chat — server-side proxy for the n8n RAG chat webhook.
-// Contract: specs/009-secure-n8n-proxy/contracts/rag-chat.md
+// rag-chat — server-side proxy for the n8n RAG chat webhook, v2.
+// Contract: specs/011-resumable-chat-page/contracts/rag-chat.md
+// v2: requests with a client-generated `message_id` persist conversation,
+// user message and assistant message server-side (service role, only after
+// ownership checks) and receive the v2 response. Requests WITHOUT a
+// `message_id` follow the legacy v1 path (no persistence, v1 response) —
+// remove the legacy path when the next feature touches this function.
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
 // ALLOWED_ORIGINS (comma-separated; fail-closed CORS, never '*').
 
@@ -11,7 +16,8 @@ const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") ?? Deno.env.get("SUPABASE
 const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("VITE_SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Service-role client: only for flow_configs reads and auth.getUser.
+// Service-role client: for flow_configs reads, auth.getUser and (v2) message/
+// conversation persistence after ownership checks.
 const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Fail-closed CORS: only origins listed in ALLOWED_ORIGINS get an ACAO header.
@@ -106,6 +112,14 @@ function isAllowedWebhookUrl(rawUrl: string): boolean {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Conversation titles come from the first question: trimmed, capped at 80
+// characters, ellipsis only when actually truncated (FR-017).
+function titleFromQuestion(question: string): string {
+  return question.length > 80 ? question.slice(0, 80) + "…" : question;
+}
+
 interface NormalizedResponse {
   answer: string;
   sources: Array<Record<string, unknown>> | null;
@@ -171,13 +185,25 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => null) as {
       assistant_id?: string;
       conversation_id?: string;
+      message_id?: string;
       message?: string;
     } | null;
     const assistantId = body?.assistant_id?.trim() ?? "";
-    const conversationId = body?.conversation_id?.trim() ?? "";
+    const requestConversationId = body?.conversation_id?.trim() ?? "";
+    const messageId = body?.message_id?.trim() ?? "";
     const message = body?.message?.trim() ?? "";
 
-    if (!assistantId || !conversationId || !message) {
+    // v2 clients send a message_id; requests without one follow the legacy
+    // v1 path (conversation_id required, no persistence, v1 response).
+    const isV2 = messageId !== "";
+
+    if (!assistantId || !message) {
+      return errorResponse("VALIDATION", cors);
+    }
+    if (!isV2 && !requestConversationId) {
+      return errorResponse("VALIDATION", cors);
+    }
+    if (isV2 && !UUID_RE.test(messageId)) {
       return errorResponse("VALIDATION", cors);
     }
     if (message.length > 10_000) {
@@ -219,6 +245,39 @@ Deno.serve(async (req: Request) => {
       return errorResponse("FORBIDDEN", cors);
     }
 
+    // --- v2: resolve the conversation before the ownership check.
+    // A retry reuses the conversation of the existing message (the error
+    // response of the failed attempt carries no conversation_id, so the client
+    // cannot know it) — the message row is the idempotency key.
+    let conversationId = requestConversationId;
+    let userMessageExisted = false;
+    if (isV2) {
+      const { data: existingMessage } = await serviceClient
+        .from("messages")
+        .select("id, conversation_id")
+        .eq("id", messageId)
+        .maybeSingle();
+      if (existingMessage) {
+        conversationId = existingMessage.conversation_id as string;
+        userMessageExisted = true;
+      } else if (!conversationId) {
+        const { data: created, error: convError } = await serviceClient
+          .from("conversations")
+          .insert({
+            user_id: user.id,
+            assistant_id: assistantId,
+            title: titleFromQuestion(message),
+          })
+          .select("id")
+          .single();
+        if (convError || !created) {
+          logCode("INTERNAL_ERROR", assistantId, undefined, started);
+          return errorResponse("INTERNAL_ERROR", cors);
+        }
+        conversationId = created.id as string;
+      }
+    }
+
     // --- AuthZ: conversation belongs to the caller and to this assistant.
     const { data: conversation } = await userClient
       .from("conversations")
@@ -227,6 +286,22 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (!conversation || conversation.user_id !== user.id || conversation.assistant_id !== assistantId) {
       return errorResponse("FORBIDDEN", cors);
+    }
+
+    // --- v2: persist the user message (idempotent on message_id,
+    // ON CONFLICT DO NOTHING) before the history read so the n8n history
+    // deterministically includes the current question.
+    if (isV2 && !userMessageExisted) {
+      const { error: userInsertError } = await serviceClient
+        .from("messages")
+        .insert(
+          { id: messageId, conversation_id: conversationId, role: "user", content: message },
+          { ignoreDuplicates: true },
+        );
+      if (userInsertError) {
+        logCode("INTERNAL_ERROR", assistantId, conversationId, started);
+        return errorResponse("INTERNAL_ERROR", cors);
+      }
     }
 
     // --- Knowledge bases linked to the assistant (RLS-scoped).
@@ -343,6 +418,48 @@ Deno.serve(async (req: Request) => {
     const raw = await upstream.json().catch(() => null);
     const normalized = normalizeWebhookResponse(raw);
 
+    // --- v2: persist the assistant message and touch the conversation.
+    if (isV2) {
+      const { data: assistantMessageRow, error: assistantInsertError } = await serviceClient
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          role: "assistant",
+          content: normalized.answer,
+          sources: normalized.sources,
+        })
+        .select("id, created_at")
+        .single();
+      if (assistantInsertError || !assistantMessageRow) {
+        logCode("INTERNAL_ERROR", assistantId, conversationId, started);
+        return errorResponse("INTERNAL_ERROR", cors);
+      }
+      const { error: convUpdateError } = await serviceClient
+        .from("conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", conversationId);
+      if (convUpdateError) {
+        logCode("INTERNAL_ERROR", assistantId, conversationId, started);
+        return errorResponse("INTERNAL_ERROR", cors);
+      }
+      return new Response(
+        JSON.stringify({
+          conversation_id: conversationId,
+          user_message_id: messageId,
+          assistant_message: {
+            id: assistantMessageRow.id,
+            content: normalized.answer,
+            sources: normalized.sources,
+            created_at: assistantMessageRow.created_at,
+          },
+          verification: normalized.verification,
+          rewritten_query: normalized.rewritten_query,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...cors } },
+      );
+    }
+
+    // --- Legacy v1 response (no persistence).
     return new Response(JSON.stringify(normalized), {
       status: 200,
       headers: { "Content-Type": "application/json", ...cors },

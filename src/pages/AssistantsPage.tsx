@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
-import { askAssistant, RagClientError } from '@/lib/rag-client'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +14,6 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { MessageContent } from '@/components/chat/MessageContent'
 import { AnalysisFlow } from '@/components/analysis/AnalysisFlow'
 import {
   useAssistants,
@@ -24,15 +22,25 @@ import {
   useCreateAssistant,
   useUpdateAssistant,
   useDeleteAssistant,
-  useFeedbackInteraction,
 } from '@/hooks/queries'
-import type { AIAssistant, Conversation, Message, FeedbackInteraction } from '@/types/database.types'
-import { Bot, Plus, Pencil, MessagesSquare, X, Send, ChevronDown, ChevronUp, Trash2, ThumbsUp, ThumbsDown, ClipboardList } from 'lucide-react'
+import type { AIAssistant } from '@/types/database.types'
+import { Bot, Plus, Pencil, MessagesSquare, Trash2, ClipboardList } from 'lucide-react'
 
 const ASSISTANT_TYPES = [
-  { value: 'chat', label: '💬 Chat' },
-  { value: 'risico_analyse', label: '📋 Risico-analyse' },
+  { value: 'chat', label: 'ðŸ’¬ Chat' },
+  { value: 'risico_analyse', label: 'ðŸ“‹ Risico-analyse' },
 ]
+
+// Max number of example questions per assistant (FR-013).
+const MAX_EXAMPLE_QUESTIONS = 4
+
+// One per line, trimmed, empty lines dropped.
+function parseExampleQuestions(text: string): string[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
 
 // Readable type labels shown on the assistant card badge (FR-001).
 const ASSISTANT_TYPE_LABELS: Record<string, string> = {
@@ -42,6 +50,7 @@ const ASSISTANT_TYPE_LABELS: Record<string, string> = {
 
 function AssistantsPage() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin'
   const { data: assistants, isPending } = useAssistants(profile?.organization_id)
   // Members only see active assistants (FR-002); admins see all.
@@ -50,7 +59,6 @@ function AssistantsPage() {
     : (assistants ?? []).filter((a) => a.is_active)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAssistant, setEditingAssistant] = useState<AIAssistant | null>(null)
-  const [chatAssistant, setChatAssistant] = useState<AIAssistant | null>(null)
   const [analysisAssistant, setAnalysisAssistant] = useState<AIAssistant | null>(null)
 
   if (isPending) {
@@ -121,7 +129,7 @@ function AssistantsPage() {
                     <ClipboardList className="h-4 w-4 mr-2" /> Risico-analyse starten
                   </Button>
                 ) : (
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setChatAssistant(a)}>
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate(`/chat/new/${a.id}`)}>
                     <MessagesSquare className="h-4 w-4 mr-2" /> Chat
                   </Button>
                 )}
@@ -142,13 +150,6 @@ function AssistantsPage() {
         assistant={editingAssistant}
         organizationId={profile?.organization_id ?? ''}
         userId={profile?.id ?? ''}
-      />
-
-      <ChatWindow
-        assistant={chatAssistant}
-        onClose={() => setChatAssistant(null)}
-        userId={profile?.id ?? ''}
-        organizationId={profile?.organization_id ?? ''}
       />
 
       {analysisAssistant && (
@@ -183,10 +184,12 @@ function AssistantModal({
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [icon, setIcon] = useState('🤖')
+  const [icon, setIcon] = useState('ðŸ¤–')
   const [type, setType] = useState('chat')
   const [webhookUrl, setWebhookUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
+  const [exampleQuestions, setExampleQuestions] = useState('')
+  const [exampleQuestionsError, setExampleQuestionsError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -196,21 +199,33 @@ function AssistantModal({
     if (assistant) {
       setName(assistant.name)
       setDescription(assistant.description ?? '')
-      setIcon(assistant.icon ?? '🤖')
+      setIcon(assistant.icon ?? 'ðŸ¤–')
       setType(assistant.type ?? 'chat')
       setWebhookUrl(assistant.n8n_webhook_url ?? '')
       setIsActive(assistant.is_active);
+      setExampleQuestions((assistant.example_questions ?? []).join('\n'))
       setSelectedKBIds(linkedKBIds ?? new Set())
     } else {
       setName('')
       setDescription('')
-      setIcon('🤖')
+      setIcon('ðŸ¤–')
       setType('chat')
       setWebhookUrl('')
       setIsActive(true)
+      setExampleQuestions('')
       setSelectedKBIds(new Set())
     }
+    setExampleQuestionsError(null)
   }, [assistant, open, linkedKBIds])
+
+  const handleExampleQuestionsChange = (value: string) => {
+    setExampleQuestions(value)
+    setExampleQuestionsError(
+      parseExampleQuestions(value).length > MAX_EXAMPLE_QUESTIONS
+        ? `Maximaal ${MAX_EXAMPLE_QUESTIONS} voorbeeldvragen.`
+        : null,
+    )
+  }
 
   const toggleKB = (id: string) => {
     setSelectedKBIds((prev) => {
@@ -223,6 +238,11 @@ function AssistantModal({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    const parsedExampleQuestions = parseExampleQuestions(exampleQuestions)
+    if (parsedExampleQuestions.length > MAX_EXAMPLE_QUESTIONS) {
+      setExampleQuestionsError(`Maximaal ${MAX_EXAMPLE_QUESTIONS} voorbeeldvragen.`)
+      return
+    }
     setIsSaving(true)
 
     const payload = {
@@ -230,9 +250,10 @@ function AssistantModal({
       name,
       description: description || null,
       system_prompt: assistant?.system_prompt ?? '',
-      icon: icon || '🤖',
+      icon: icon || 'ðŸ¤–',
       type,
       n8n_webhook_url: webhookUrl.trim() || null,
+      example_questions: parsedExampleQuestions,
       is_active: isActive,
       created_by: userId,
       kbIds: [...selectedKBIds],
@@ -247,6 +268,7 @@ function AssistantModal({
           type: payload.type,
           icon: payload.icon,
           n8n_webhook_url: payload.n8n_webhook_url,
+          example_questions: payload.example_questions,
           is_active: payload.is_active,
           kbIds: payload.kbIds,
         })
@@ -289,7 +311,7 @@ function AssistantModal({
           <div className="flex gap-4">
             <div className="flex flex-col gap-2 w-20">
               <Label htmlFor="icon">Icoon</Label>
-              <Input id="icon" value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🤖" maxLength={4} className="text-center text-xl" />
+              <Input id="icon" value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="ðŸ¤–" maxLength={4} className="text-center text-xl" />
             </div>
             <div className="flex flex-col gap-2 flex-1">
               <Label htmlFor="name">Naam</Label>
@@ -303,6 +325,22 @@ function AssistantModal({
           <div className="flex flex-col gap-2">
             <Label htmlFor="desc">Beschrijving</Label>
             <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Korte omschrijving" rows={2} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="example-questions">Voorbeeldvragen (Ã©Ã©n per regel, maximaal 4)</Label>
+            <Textarea
+              id="example-questions"
+              value={exampleQuestions}
+              onChange={(e) => handleExampleQuestionsChange(e.target.value)}
+              placeholder={'Wat dekt mijn polis?\nHoe meld ik schade?'}
+              rows={4}
+              aria-invalid={!!exampleQuestionsError}
+            />
+            {exampleQuestionsError ? (
+              <p className="text-xs text-destructive" role="alert">{exampleQuestionsError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Deze vragen staan als knoppen bij een nieuw gesprek.</p>
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="webhook-url">N8N Webhook URL</Label>
@@ -351,7 +389,7 @@ function AssistantModal({
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
-              <Button type="submit" disabled={isSaving}>{isSaving ? 'Opslaan...' : 'Opslaan'}</Button>
+              <Button type="submit" disabled={isSaving || !!exampleQuestionsError}>{isSaving ? 'Opslaan...' : 'Opslaan'}</Button>
             </div>
           </div>
         </DialogFooter>
@@ -377,404 +415,6 @@ function AssistantModal({
         </Dialog>
       )}
     </Dialog>
-  )
-}
-
-interface Source {
-  knowledge_item_id?: string
-  title?: string
-  excerpt?: string
-  score?: number
-}
-
-function ChatWindow({
-  assistant,
-  onClose,
-  userId,
-  organizationId,
-}: {
-  assistant: AIAssistant | null
-  onClose: () => void
-  userId: string
-  organizationId: string
-}) {
-  const { toast } = useToast()
-  const [conversation, setConversation] = useState<Conversation | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [isSending, setIsSending] = useState(false)
-  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set())
-  const [feedbackText, setFeedbackText] = useState('')
-  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false)
-  const [showFeedbackInput, setShowFeedbackInput] = useState(false)
-  const [thumbsUpSelected, setThumbsUpSelected] = useState(false)
-  const [thumbsDownSelected, setThumbsDownSelected] = useState(false)
-  const [existingFeedback, setExistingFeedback] = useState<FeedbackInteraction | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const { data: feedback } = useFeedbackInteraction(conversation?.id, userId)
-
-  useEffect(() => {
-    if (feedback !== undefined) setExistingFeedback(feedback)
-  }, [feedback])
-
-  useEffect(() => {
-    if (!assistant) return
-    setMessages([])
-    setConversation(null)
-    setInput('')
-    setExistingFeedback(null)
-    setFeedbackText('')
-    setIsFeedbackSubmitting(false)
-    setShowFeedbackInput(false)
-    setThumbsUpSelected(false)
-    setThumbsDownSelected(false)
-  }, [assistant])
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages])
-
-  const toggleSources = (messageId: string) => {
-    setExpandedSources((prev) => {
-      const next = new Set(prev)
-      if (next.has(messageId)) next.delete(messageId)
-      else next.add(messageId)
-      return next
-    })
-  }
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || !assistant || isSending) return
-
-    let conv = conversation
-
-    if (!conv) {
-      const { data: created, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          user_id: userId,
-          assistant_id: assistant.id,
-          title: `Chat met ${assistant.name}`,
-        })
-        .select()
-        .single()
-      if (convError) {
-        toast({ title: 'Fout bij aanmaken gesprek', variant: 'destructive' })
-        return
-      }
-      conv = created
-      setConversation(conv)
-    }
-
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      conversation_id: conv.id,
-      role: 'user',
-      content: input.trim(),
-      created_at: new Date().toISOString(),
-      sources: null,
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput('')
-    setIsSending(true)
-
-    try {
-      // Persist the user message first so the server-side history read is
-      // deterministic; then ask the server-side rag-chat proxy.
-      const { error: insertError } = await supabase.from('messages').insert({
-        conversation_id: conv.id,
-        role: 'user',
-        content: userMessage.content,
-      })
-
-      if (insertError) {
-        toast({ title: 'Fout bij opslaan bericht', variant: 'destructive' })
-      }
-
-      const result = await askAssistant({
-        assistantId: assistant.id,
-        conversationId: conv.id,
-        message: userMessage.content,
-      })
-
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        conversation_id: conv.id,
-        role: 'assistant',
-        content: result.answer,
-        created_at: new Date().toISOString(),
-        sources: result.sources as Record<string, unknown> | null,
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
-
-      supabase.from('messages').insert({
-        conversation_id: conv.id,
-        role: 'assistant',
-        content: result.answer,
-        sources: result.sources as Record<string, unknown> | null,
-      }).then(({ error }) => {
-        if (error) console.error('[chat] Failed to persist assistant message:', error.message)
-      })
-    } catch (err) {
-      const description = err instanceof Error ? err.message : 'Kon geen antwoord krijgen'
-      const title = err instanceof RagClientError
-        ? err.code === 'UNAUTHORIZED'
-          ? 'Authenticatiefout'
-          : err.code === 'FORBIDDEN'
-            ? 'Geen toegang'
-            : err.code === 'NOT_CONFIGURED'
-              ? 'Configuratie ontbreekt'
-              : err.code.startsWith('UPSTREAM_')
-                ? 'Verbindingsfout'
-                : 'Fout bij versturen'
-        : 'Fout bij versturen'
-      toast({
-        title,
-        description,
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSending(false)
-    }
-  }
-
-  const handleThumbsUp = async () => {
-    if (!conversation || !assistant || existingFeedback) return
-    setThumbsUpSelected(true)
-    try {
-      const { error } = await supabase.from('feedback_interactions').insert({
-        conversation_id: conversation.id,
-        assistant_id: assistant.id,
-        user_id: userId,
-        organization_id: organizationId,
-        thumbs_up: true,
-        feedback: null,
-      })
-      if (error) throw error
-      setExistingFeedback({ id: '', conversation_id: conversation.id, assistant_id: assistant.id, user_id: userId, organization_id: organizationId, thumbs_up: true, feedback: null, created_at: new Date().toISOString() } as FeedbackInteraction)
-    } catch (err: unknown) {
-      setThumbsUpSelected(false)
-      toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Kon feedback niet opslaan', variant: 'destructive' })
-    }
-  }
-
-  const handleThumbsDownClick = () => {
-    if (existingFeedback) return
-    setThumbsDownSelected(true)
-    setShowFeedbackInput(true)
-  }
-
-  const handleThumbsDownCancel = () => {
-    setThumbsDownSelected(false)
-    setShowFeedbackInput(false)
-    setFeedbackText('')
-  }
-
-  const handleThumbsDownSubmit = async () => {
-    if (!conversation || !assistant || !feedbackText.trim()) return
-    setIsFeedbackSubmitting(true)
-    try {
-      const { error } = await supabase.from('feedback_interactions').insert({
-        conversation_id: conversation.id,
-        assistant_id: assistant.id,
-        user_id: userId,
-        organization_id: organizationId,
-        thumbs_up: false,
-        feedback: feedbackText.trim(),
-      })
-      if (error) throw error
-      setExistingFeedback({ id: '', conversation_id: conversation.id, assistant_id: assistant.id, user_id: userId, organization_id: organizationId, thumbs_up: false, feedback: feedbackText.trim(), created_at: new Date().toISOString() } as FeedbackInteraction)
-      setShowFeedbackInput(false)
-      setFeedbackText('')
-    } catch (err: unknown) {
-      toast({ title: 'Fout', description: err instanceof Error ? err.message : 'Kon feedback niet opslaan', variant: 'destructive' })
-    } finally {
-      setIsFeedbackSubmitting(false)
-    }
-  }
-
-  const hasAssistantMessages = messages.some((msg) => msg.role === 'assistant')
-  const feedbackSubmitted = !!existingFeedback
-
-  if (!assistant) return null
-
-  return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-background border-l shadow-2xl z-40 flex flex-col">
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{assistant.icon}</span>
-          <div>
-            <h2 className="font-semibold">{assistant.name}</h2>
-            <p className="text-xs text-muted-foreground">{assistant.description}</p>
-          </div>
-        </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-5 w-5" />
-        </Button>
-      </div>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <p className="text-center text-muted-foreground text-sm mt-8">
-            Stuur een bericht om het gesprek te starten met {assistant.name}
-          </p>
-        )}
-        {messages.map((msg) => (
-          <div key={msg.id} className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-            <div className="flex flex-col gap-1 max-w-[80%]">
-              <div className={cn(
-                "rounded-lg px-4 py-2 text-sm",
-                msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              )}>
-                <MessageContent content={msg.content} />
-              </div>
-              {msg.role === 'assistant' && msg.sources && Array.isArray(msg.sources) && (msg.sources as Source[]).length > 0 && (
-                <div className="text-xs">
-                  <button
-                    onClick={() => toggleSources(msg.id)}
-                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {expandedSources.has(msg.id) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                    Bronnen ({(msg.sources as Source[]).length})
-                  </button>
-                  {expandedSources.has(msg.id) && (
-                    <div className="mt-2 space-y-2">
-                      {(msg.sources as Source[]).map((source, idx) => (
-                        <div key={idx} className="bg-accent/50 rounded p-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-foreground">{source.title ?? 'Zonder titel'}</span>
-                            {source.score !== undefined && (
-                              <Badge variant="secondary" className="text-xs">{Math.round(source.score * 100)}%</Badge>
-                            )}
-                          </div>
-                          {source.excerpt && (
-                            <p className="text-muted-foreground line-clamp-3">{source.excerpt}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-        {isSending && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-4 py-2 text-sm flex items-center gap-2">
-              <Spinner className="h-3 w-3" /> Typen...
-            </div>
-          </div>
-        )}
-      </div>
-
-      {hasAssistantMessages && (
-        <div className="border-t px-4 py-3 flex flex-col gap-2">
-          {!feedbackSubmitted ? (
-            <>
-              {!showFeedbackInput ? (
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleThumbsUp}
-                    disabled={thumbsDownSelected}
-                    className={cn(
-                      "p-2 rounded-full transition-colors",
-                      thumbsUpSelected
-                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                        : "hover:bg-accent text-muted-foreground hover:text-foreground"
-                    )}
-                    title="Goed antwoord"
-                  >
-                    <ThumbsUp className={cn("h-5 w-5", thumbsUpSelected && "fill-current")} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleThumbsDownClick}
-                    disabled={thumbsUpSelected}
-                    className={cn(
-                      "p-2 rounded-full transition-colors",
-                      thumbsDownSelected
-                        ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                        : "hover:bg-accent text-muted-foreground hover:text-foreground"
-                    )}
-                    title="Niet goed — geef feedback"
-                  >
-                    <ThumbsDown className={cn("h-5 w-5", thumbsDownSelected && "fill-current")} />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleThumbsDownCancel}
-                      className="text-muted-foreground hover:text-foreground"
-                      title="Annuleren"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                    <span className="text-sm text-muted-foreground">Wat ging er mis?</span>
-                  </div>
-                  <Textarea
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder="Beschrijf wat er niet goed was aan dit antwoord..."
-                    rows={2}
-                    className="resize-none"
-                    autoFocus
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleThumbsDownCancel}
-                      disabled={isFeedbackSubmitting}
-                    >
-                      Annuleren
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleThumbsDownSubmit}
-                      disabled={isFeedbackSubmitting || !feedbackText.trim()}
-                    >
-                      {isFeedbackSubmitting ? 'Versturen...' : 'Feedback versturen'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground py-1">
-              {existingFeedback.thumbs_up ? (
-                <><ThumbsUp className="h-4 w-4 fill-current text-green-500" /> <span>Bedankt voor je feedback!</span></>
-              ) : (
-                <><ThumbsDown className="h-4 w-4 fill-current text-red-500" /> <span>Bedankt, we gaan hiermee aan de slag.</span></>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <form onSubmit={handleSend} className="p-4 border-t flex gap-2">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Typ je bericht..."
-          disabled={isSending}
-        />
-        <Button type="submit" size="icon" disabled={isSending || !input.trim()}>
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
-    </div>
   )
 }
 

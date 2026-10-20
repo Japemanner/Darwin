@@ -31,6 +31,7 @@ const ACTIVE_ASSISTANT = {
   icon: '💬',
   type: 'chat',
   n8n_webhook_url: null,
+  example_questions: [] as string[],
   is_active: true,
   created_by: USER_ID,
   created_at: '2026-01-02T00:00:00Z',
@@ -46,6 +47,7 @@ const INACTIVE_ASSISTANT = {
   icon: '📋',
   type: 'risico_analyse',
   n8n_webhook_url: null,
+  example_questions: [] as string[],
   is_active: false,
   created_by: USER_ID,
   created_at: '2026-01-01T00:00:00Z',
@@ -92,13 +94,6 @@ const PROCESSING_DOC = {
   updated_at: '2026-01-03T00:00:00Z',
 }
 
-const RAG_ANSWER = {
-  answer: 'Ja, volgens de polisvoorwaarden geldt dat.',
-  sources: [],
-  verification: { grounded: true, confidence: 0.9, issues: [] },
-  rewritten_query: 'polisvoorwaarden',
-}
-
 const CONV_ROW = {
   id: '11111111-1111-4111-8111-111111111111',
   user_id: USER_ID,
@@ -106,6 +101,19 @@ const CONV_ROW = {
   title: 'Chat met Actieve Klantenservice',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
+}
+
+const RAG_ANSWER = {
+  conversation_id: CONV_ROW.id,
+  user_message_id: '990e8400-e29b-41d4-a716-446655440009',
+  assistant_message: {
+    id: 'aa0e8400-e29b-41d4-a716-446655440010',
+    content: 'Ja, volgens de polisvoorwaarden geldt dat.',
+    sources: [] as unknown[],
+    created_at: '2026-01-02T00:00:00Z',
+  },
+  verification: { grounded: true, confidence: 0.9, issues: [] },
+  rewritten_query: 'polisvoorwaarden',
 }
 
 async function restful(page: Page, pattern: string, rows: unknown) {
@@ -130,7 +138,20 @@ async function mockRest(page: Page, opts: {
       body: JSON.stringify(single ? opts.profile : [opts.profile]),
     })
   })
-  await restful(page, '**/rest/v1/ai_assistants**', opts.assistants)
+  // ai_assistants: list queries get the array, detail queries (.maybeSingle,
+  // e.g. the chat page) get a single row matched on the requested id.
+  await page.route('**/rest/v1/ai_assistants**', async (route) => {
+    const accept = route.request().headers()['accept'] ?? ''
+    const single = accept.includes('vnd.pgrst.object+json')
+    if (single) {
+      const url = new URL(route.request().url())
+      const id = url.searchParams.get('id')?.replace('eq.', '')
+      const row = opts.assistants.find((a) => (a as Record<string, unknown>).id === id) ?? null
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(row) })
+    } else {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(opts.assistants) })
+    }
+  })
   await restful(page, '**/rest/v1/knowledge_bases**', opts.knowledgeBases)
   await restful(page, '**/rest/v1/knowledge_base_documents**', opts.documents ?? [])
   await restful(page, '**/rest/v1/knowledge_items**', opts.items ?? [])
@@ -138,14 +159,22 @@ async function mockRest(page: Page, opts: {
 }
 
 async function mockChat(page: Page) {
+  // The v2 chat flow persists server-side; the browser only reads.
   await page.route('**/rest/v1/conversations**', async (route) => {
-    if (route.request().method() === 'POST') {
-      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify([CONV_ROW]) })
-    } else {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+    const accept = route.request().headers()['accept'] ?? ''
+    const single = accept.includes('vnd.pgrst.object+json')
+    const detailRow = {
+      ...CONV_ROW,
+      ai_assistants: { id: ACTIVE_ASSISTANT.id, name: ACTIVE_ASSISTANT.name, icon: ACTIVE_ASSISTANT.icon, description: null, example_questions: [] as string[], is_active: true, type: 'chat' },
     }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(single ? detailRow : [CONV_ROW]),
+    })
   })
   await restful(page, '**/rest/v1/messages**', [])
+  await restful(page, '**/rest/v1/feedback_interactions**', null)
   await restful(page, '**/functions/v1/rag-chat**', RAG_ANSWER)
 }
 
@@ -263,8 +292,9 @@ test.describe('admin-only-management — US1 member assistants view', () => {
 
     await memberPage.getByRole('button', { name: /^chat$/i }).first().click()
 
-    await expect(memberPage.getByPlaceholder('Typ je bericht...')).toBeVisible()
-    await expect(memberPage.getByRole('heading', { level: 2, name: ACTIVE_ASSISTANT.name })).toBeVisible()
+    await expect(memberPage).toHaveURL(new RegExp(`/chat/new/${ACTIVE_ASSISTANT.id}$`))
+    await expect(memberPage.getByPlaceholder('Typ uw bericht…')).toBeVisible()
+    await expect(memberPage.getByRole('heading', { level: 1, name: ACTIVE_ASSISTANT.name })).toBeVisible()
   })
 
   test('never shows the system prompt as the card description', async ({ memberPage }) => {

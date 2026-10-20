@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-15_
-_Total features: 19_
+_Last updated: 2026-10-19_
+_Total features: 20_
 
 ---
 
@@ -58,13 +58,13 @@ Assistenten aanmaken, bewerken, bekijken, verwijderen. Velden: naam, emoji, besc
 
 ---
 
-### 🧪 AI Chat — Gesprek met Assistent
+### ❌ AI Chat — Gesprek met Assistent (zijpaneel)
 
 Slide-out chat panel per assistent. Laadt of maakt een conversatie, stuurt berichten naar N8N webhook, toont antwoord. Alle berichten worden opgeslagen in de database.
 
 **Files**: `src/pages/AssistantsPage.tsx` (ChatWindow component)
 
-**Gap**: Geen retry bij gefaalde webhook, geen webhook validatie bij opslaan assistent.
+_Removed: 2026-10-19 — vervangen door feature 011 "Chat als eigen pagina met hervatbare gesprekken" (zie hieronder). De "geen retry"-gap is daarin opgelost; webhook-validatie bij opslaan van een assistent blijft een open punt._
 
 ---
 
@@ -187,6 +187,16 @@ Assistenten- en kennisbronbeheer is beheerder-only, in de UI én afgedwongen op 
 **Files**: `src/pages/AssistantsPage.tsx`, `src/pages/KnowledgePage.tsx`, `tests/e2e/fixtures.ts`, `tests/e2e/admin-only-management.spec.ts`, `scripts/rls-verify.mjs`, `supabase/migrations/015_admin_only_writes.sql`, `.env.example`
 
 **Gap**: migratie 015 is op 2026-10-16 toegepast op productie — maar vóór de frontend-deploy (afwijking van de verplichte releasevolgorde in `specs/010-admin-only-management/quickstart.md` §3, zie `decisions/2026-10-16-010-migratie-voor-frontend-deploy.md`). Nog open: `node scripts/rls-verify.mjs` (SC-001/002) en de §4 SQL-controles — vereisen een member-testaccount (E2E_MEMBER_EMAIL/E2E_MEMBER_PASSWORD in `.env.local`) en een geldige SUPABASE_ACCESS_TOKEN voor F-01/F-10 (huidige token: 401); de e2e-regressiesuite draait pas echt met E2E-credentials (47 skipped / 0 failed zonder).
+
+---
+
+### 🧪 Chat als eigen pagina met hervatbare gesprekken (011)
+
+De chat verhuist uit het verwijderde zijpaneel naar een eigen pagina op volle breedte met vaste adressen: `/chat/new/:assistantId` opent een leeg gesprek, na de eerste vraag vervangt de client de URL door `/chat/:conversationId` (id-only — herladen, terug-/vooruitnavigatie en later voortzetten werken; bestaande gesprekken seeden opnieuw via `useConversation`/`useConversationMessages`, met niet-gevonden-states en terugkeerlink). Meerregelige composer: Enter verstuurt, Shift+Enter geeft een nieuwe regel, auto-grow tot ±8 regels, uitgeschakeld tijdens versturen, focus keert na elke versturing terug. Foutafhandeling: een mislukt antwoord laat de vraag staan met inline NL-reden en knop "Opnieuw proberen" — retry hergebruikt exact hetzelfde `message_id` (geen dubbele vragen, geen toast-fouten bij versturen). Voorbeeldvragen: beheerders stellen per assistent maximaal 4 vragen in (AssistantModal, één per regel, >4 blokkeert opslaan met inline melding); een nieuw gesprek toont omschrijving en voorbeeldvragen als knoppen die direct versturen. Verder: kopieerknop onder elk antwoord ("Gekopieerd"/"Kopiëren is mislukt"), "Nieuw gesprek" behoudt het eerdere gesprek (browser-terug keert ernaar terug), wachtmelding "Dit duurt langer dan gebruikelijk." na 15 s binnen de aria-live-regio (gecleared bij succes, fout én unmount). Server: `rag-chat` v2 — `message_id`-uuid-validatie, message-first gespreksresolutie (bericht-lookup is autoritatief t.o.v. request-`conversation_id`), gebruikersbericht-upsert `ON CONFLICT DO NOTHING`, assistentbericht-insert, `conversations.updated_at`-update, v2-respons; titel van een nieuw gesprek is de eerste vraag (getrimd, afgekapt op 80 tekens, '…' alleen bij afkapping); legacy v1-pad blijft tijdelijk bestaan (verwijderingsnotitie in de functie). Migratie 016 voegt `ai_assistants.example_questions TEXT[] NOT NULL DEFAULT '{}'` toe.
+
+**Files**: `src/pages/ChatPage.tsx`, `src/components/chat/ChatHeader.tsx`, `src/components/chat/ChatEmptyState.tsx`, `src/components/chat/MessageList.tsx`, `src/components/chat/MessageBubble.tsx`, `src/components/chat/ChatComposer.tsx`, `src/pages/AssistantsPage.tsx`, `src/App.tsx`, `src/lib/rag-client.ts`, `src/hooks/queries.ts`, `src/types/database.types.ts`, `supabase/functions/rag-chat/index.ts`, `supabase/migrations/016_assistant_example_questions.sql`, `tests/e2e/chat-page.spec.ts`, `tests/e2e/rag-chat.spec.ts`, `tests/e2e/admin-only-management.spec.ts`
+
+**Gap**: uitrol staat open volgens `specs/011-resumable-chat-page/quickstart.md` §3-§5 (migratie 016 + `rag-chat` v2 via Supabase MCP, frontend-release, handmatige live-verificatie, titel-SQL-check T025) — voor Jaap na de code-review; de e2e-suite (51 tests, incl. 4 nieuwe chat-page-gevallen) draait pas echt met E2E_EMAIL/E2E_PASSWORD in `.env.local`; F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie.
 
 ---
 

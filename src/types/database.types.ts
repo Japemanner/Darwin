@@ -99,6 +99,7 @@ export interface Database {
           icon: string
           type: 'chat' | 'agent' | 'voice' | 'risico_analyse'
           n8n_webhook_url: string | null
+          example_questions: string[]
           is_active: boolean
           created_by: string
           created_at: string
@@ -113,6 +114,7 @@ export interface Database {
           icon: string
           type?: 'chat' | 'agent' | 'voice' | 'risico_analyse'
           n8n_webhook_url?: string | null
+          example_questions?: string[]
           is_active?: boolean
           created_by: string
           created_at?: string
@@ -127,6 +129,7 @@ export interface Database {
           icon?: string
           type?: 'chat' | 'agent' | 'voice' | 'risico_analyse'
           n8n_webhook_url?: string | null
+          example_questions?: string[]
           is_active?: boolean
           created_by?: string
           created_at?: string
