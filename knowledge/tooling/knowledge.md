@@ -50,3 +50,15 @@ Feiten en patronen (bevestigd door waarneming, tenzij anders vermeld).
   `git switch` terug. Les: vóór elke commit `git status` checken; bij
   onverklaarde unmerged-toestand eerst reflog + branch vergelijken, niet
   blind conflicten "oplossen".
+- **Supabase MCP-deploy kapt grote Edge Function-bestanden af**
+  (2026-10-20, 011-rollout waargenomen): `rag-chat` v2 (472 regels /
+  19 KB, lokaal syntactisch gaaf) arriveerde server-side afgekapt op ~75%
+  — de bundler meldde "Unexpected eof" bij het NOT_CONFIGURED-blok
+  (regel ~355) en de publicatie ging niet door (productie bleef op v1,
+  dus geen schade). Deploy is daarna via de dashboard-editor gelukt
+  (volledig bestand copy-pasten, v2-markers visueel geverifieerd); ook
+  012 is zo via de webUI uitgerold. Oorzaak van de truncatie onbekend
+  (vermoeden: payload-limiet in het deploy-kanaal, afgekapt rond ~14,5 KB).
+  Advies: functies groter dan ±15 KB deployen via Supabase CLI
+  (`supabase functions deploy` — bundelt lokaal) of de webUI-editor; de
+  MCP-route eerst op een kleine functie valideren.
