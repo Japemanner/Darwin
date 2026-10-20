@@ -129,3 +129,88 @@ test.describe('answer-feedback — reason form on thumbs down', () => {
     }
   })
 })
+
+test.describe('answer-feedback — changing a rating', () => {
+  test('down to up clears reason and comment; down again overwrites with the new reason', async ({ page }) => {
+    const ctx = await setup(page)
+    test.skip(!ctx, SKIP_REASON)
+    if (!ctx) return
+    const { seed, seeded } = ctx
+
+    try {
+      await expect(page.getByText('E2E antwoord 1 — de polis dekt schade aan eigendommen.')).toBeVisible({ timeout: 15_000 })
+
+      // Rate answer 1 down with a reason and a comment.
+      await page.getByRole('button', { name: 'Antwoord is niet nuttig' }).first().click()
+      await page.getByRole('radio', { name: 'Onjuist' }).check()
+      const comment = page.getByLabel('Toelichting (optioneel)')
+      await comment.fill('De premie klopt niet met de polisvoorwaarden')
+      await page.getByRole('button', { name: 'Versturen' }).click()
+      await expect.poll(async () => (await getFeedbackRows(seed, seeded.conversationId)).length).toBe(1)
+
+      // Change to thumbs up: full overwrite — reason and comment are cleared
+      // (FR-005), still exactly one row.
+      await page.getByRole('button', { name: 'Antwoord is nuttig' }).first().click()
+      await expect
+        .poll(async () => (await getFeedbackRows(seed, seeded.conversationId))[0]?.thumbs_up)
+        .toBe(true)
+      const afterUp = await getFeedbackRows(seed, seeded.conversationId)
+      expect(afterUp).toHaveLength(1)
+      expect(afterUp[0].message_id).toBe(seeded.answer1Id)
+      expect(afterUp[0].reason).toBeNull()
+      expect(afterUp[0].feedback).toBeNull()
+
+      // Change back down with a different reason: the new judgment replaces
+      // the old one completely, no second row ever (FR-005).
+      await page.getByRole('button', { name: 'Antwoord is niet nuttig' }).first().click()
+      await page.getByRole('radio', { name: 'Vraag niet begrepen' }).check()
+      await page.getByRole('button', { name: 'Versturen' }).click()
+      await expect
+        .poll(async () => (await getFeedbackRows(seed, seeded.conversationId))[0]?.reason)
+        .toBe('misunderstood')
+      const afterRedown = await getFeedbackRows(seed, seeded.conversationId)
+      expect(afterRedown).toHaveLength(1)
+      expect(afterRedown[0].thumbs_up).toBe(false)
+      expect(afterRedown[0].reason).toBe('misunderstood')
+    } finally {
+      await deleteConversation(seed, seeded.conversationId)
+    }
+  })
+})
+
+test.describe('answer-feedback — rating persists after reload', () => {
+  test('ratings of both answers are restored with the correct active thumb', async ({ page }) => {
+    const ctx = await setup(page)
+    test.skip(!ctx, SKIP_REASON)
+    if (!ctx) return
+    const { seed, seeded } = ctx
+
+    try {
+      await expect(page.getByText('E2E antwoord 1 — de polis dekt schade aan eigendommen.')).toBeVisible({ timeout: 15_000 })
+
+      // Answer 1 up, answer 2 down with a reason.
+      await page.getByRole('button', { name: 'Antwoord is nuttig' }).first().click()
+      await page.getByRole('button', { name: 'Antwoord is niet nuttig' }).nth(1).click()
+      await page.getByRole('radio', { name: 'Bron klopt niet' }).check()
+      await page.getByRole('button', { name: 'Versturen' }).click()
+      await expect.poll(async () => (await getFeedbackRows(seed, seeded.conversationId)).length).toBe(2)
+
+      // Reload: the ratings are visible in the correct state (FR-006).
+      await page.reload()
+      await expect(page.getByText('E2E antwoord 2 — u meldt schade via het formulier.')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByRole('button', { name: 'Antwoord is nuttig' }).first()).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByRole('button', { name: 'Antwoord is niet nuttig' }).first()).toHaveAttribute('aria-pressed', 'false')
+      await expect(page.getByRole('button', { name: 'Antwoord is niet nuttig' }).nth(1)).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByRole('button', { name: 'Antwoord is nuttig' }).nth(1)).toHaveAttribute('aria-pressed', 'false')
+      // The reason form is closed after reload; only the active thumbs show.
+      await expect(page.getByText('Wat ging er mis?')).toBeHidden()
+
+      const rows = await getFeedbackRows(seed, seeded.conversationId)
+      expect(rows).toHaveLength(2)
+      expect(rows.find((row) => row.message_id === seeded.answer1Id)?.thumbs_up).toBe(true)
+      expect(rows.find((row) => row.message_id === seeded.answer2Id)?.reason).toBe('wrong_source')
+    } finally {
+      await deleteConversation(seed, seeded.conversationId)
+    }
+  })
+})

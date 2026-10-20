@@ -84,11 +84,11 @@
 
 ### Tests for User Story 3
 
-- [ ] T011 [US3] Voeg scenario's (c) + (d) toe aan `tests/e2e/answer-feedback.spec.ts` (zelfde scaffold): (c) wijzigen — beoordeel antwoord omlaag met reden + toelichting → klik omhoog → DB-check: nog steeds precies één rij, nu `thumbs_up = true, reason = null, feedback = null`; klik opnieuw omlaag, kies een andere reden → rij overschreven met de nieuwe reden; (d) herladen — beoordeel twee antwoorden verschillend → `page.reload()` → `aria-pressed` staat per antwoord op de juiste duim. Verifieer FAIL vóór implementatie
+- [x] T011 [US3] Voeg scenario's (c) + (d) toe aan `tests/e2e/answer-feedback.spec.ts` (zelfde scaffold): (c) wijzigen — beoordeel antwoord omlaag met reden + toelichting → klik omhoog → DB-check: nog steeds precies één rij, nu `thumbs_up = true, reason = null, feedback = null`; klik opnieuw omlaag, kies een andere reden → rij overschreven met de nieuwe reden; (d) herladen — beoordeel twee antwoorden verschillend → `page.reload()` → `aria-pressed` staat per antwoord op de juiste duim. Verifieer FAIL vóór implementatie
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] Voltooi de wijzigflows in `src/components/chat/AnswerFeedback.tsx` (FR-005/FR-006): de actieve toestand komt volledig uit de opgeslagen rij via `useMessageFeedback` (na herladen én na invalidatie) — `aria-pressed="true"` op de beoordeelde duim, `false` op de andere; omlaag→omhoog: upsert met `thumbs_up: true, reason: null, feedback: null` (volledige overschrijving); omhoog→omlaag: opent het redenformulier zonder prefill (T010); omlaag→omlaag: opent het formulier, bevestigen overschrijft reden en toelichting volledig; geen tweede rij ooit (unieke index + upsert)
+- [x] T012 [US3] Voltooi de wijzigflows in `src/components/chat/AnswerFeedback.tsx` (FR-005/FR-006) _(verificatie 2026-10-19: de flows zijn door het T006/T010-ontwerp volledig afgedekt — handleThumbsUp stuurt altijd reason:null/feedback:null (omlaag→omhoog wist volledig), handleThumbsDown opent het formulier zonder prefill voor élke wijzigrichting, aria-pressed komt uitsluitend uit de opgeslagen rij via useMessageFeedback; geen code-aanvulling nodig)_: de actieve toestand komt volledig uit de opgeslagen rij via `useMessageFeedback` (na herladen én na invalidatie) — `aria-pressed="true"` op de beoordeelde duim, `false` op de andere; omlaag→omhoog: upsert met `thumbs_up: true, reason: null, feedback: null` (volledige overschrijving); omhoog→omlaag: opent het redenformulier zonder prefill (T010); omlaag→omlaag: opent het formulier, bevestigen overschrijft reden en toelichting volledig; geen tweede rij ooit (unieke index + upsert)
 
 **Checkpoint**: US1-US3 samen: het complete per-antwoord feedback-MVP is zelfstandig testbaar
 
