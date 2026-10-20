@@ -13,6 +13,7 @@ import type {
   RoadmapFeature,
   RoadmapVote,
   FeedbackInteraction,
+  FeedbackReason,
 } from '@/types/database.types'
 
 export interface ConversationWithAssistant extends Conversation {
@@ -345,7 +346,7 @@ export interface MessageFeedbackPayload {
   message_id: string
   assistant_id: string
   thumbs_up: boolean
-  reason: string | null
+  reason: FeedbackReason | null
   feedback: string | null
 }
 

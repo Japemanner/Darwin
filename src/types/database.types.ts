@@ -392,7 +392,7 @@ export interface Database {
           user_id: string
           organization_id: string
           thumbs_up: boolean
-          reason: string | null
+          reason: FeedbackReason | null
           feedback: string | null
           created_at: string
           updated_at: string
@@ -405,7 +405,7 @@ export interface Database {
           user_id: string
           organization_id: string
           thumbs_up: boolean
-          reason?: string | null
+          reason?: FeedbackReason | null
           feedback?: string | null
           created_at?: string
           updated_at?: string
@@ -418,7 +418,7 @@ export interface Database {
           user_id?: string
           organization_id?: string
           thumbs_up?: boolean
-          reason?: string | null
+          reason?: FeedbackReason | null
           feedback?: string | null
           created_at?: string
           updated_at?: string
@@ -570,6 +570,8 @@ export type FlowConfig = Database['public']['Tables']['flow_configs']['Row']
 export type Conversation = Database['public']['Tables']['conversations']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
 export type Invitation = Database['public']['Tables']['invitations']['Row']
+export type FeedbackReason = 'incorrect' | 'incomplete' | 'wrong_source' | 'misunderstood' | 'other'
+
 export type FeedbackInteraction = Database['public']['Tables']['feedback_interactions']['Row']
 export type RoadmapFeature = Database['public']['Tables']['roadmap_features']['Row']
 export type RoadmapVote = Database['public']['Tables']['roadmap_votes']['Row']
