@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-20_
-_Total features: 21_
+_Last updated: 2026-10-29_
+_Total features: 22_
 
 ---
 
@@ -156,7 +156,9 @@ Assistent-antwoorden worden als HTML aangeleverd (door n8n) en veilig weergegeve
 
 **Files**: `src/components/chat/MessageContent.tsx`, `src/lib/sanitize.ts`, `src/pages/AssistantsPage.tsx`, `src/pages/HistoryPage.tsx`
 
-**Gap**: Playwright-tests (XSS-preventie, visuele-identiek check) nog te schrijven — tests/ directory ontbreekt.
+**Gap**: Playwright-tests (XSS-preventie, visueel-identiek check) nog te schrijven — tests/ directory ontbreekt.
+
+_Updated 2026-10-29 — feature 013 vervangt deze weergave: assistent-antwoorden renderen nu via `sanitizeMarkdown` (echte markdown-opmaak), gebruikersberichten letterlijk als platte tekst; `sanitizeHtml` is verwijderd. Zie "Antwoorden leesbaar, controleerbaar en als CONCEPT gemarkeerd (013)" hieronder._
 
 ---
 
@@ -207,6 +209,16 @@ Duim omhoog/omlaag per individueel antwoord (niet langer per gesprek): onder elk
 **Files**: `src/components/chat/AnswerFeedback.tsx`, `src/components/chat/MessageBubble.tsx`, `src/components/chat/MessageList.tsx`, `src/pages/ChatPage.tsx`, `src/hooks/queries.ts`, `src/types/database.types.ts`, `supabase/functions/rag-chat/index.ts`, `supabase/migrations/017_per_answer_feedback.sql`, `tests/e2e/answer-feedback.spec.ts`, `tests/e2e/feedback-seed.ts`
 
 **Gap**: migratie 017 is toegepast op productie (2026-10-20 door Jaap via de Supabase-webUI; REST-controle bevestigt kolommen en functie, anon krijgt een lege set) en `rag-chat` is herdeployd; de frontend-release is dezelfde dag fast-track naar `main` gegaan op eigenaarsinstructie (PR #24 → develop → main; develop-preview overgeslagen om het breekraam te sluiten, zie `decisions/2026-10-20-012-directe-main-release.md`) — het breekraam (oude productiebalk kon geen nieuwe gespreksfeedback opslaan, research.md #13) is daarmee gesloten. Open: real-DB e2e-suite `answer-feedback.spec.ts` (4 scenario's) draait pas met E2E_EMAIL/E2E_PASSWORD in `.env.local` — Jaap heeft (nog) geen testaccount (2026-10-20); admin/member-check van `get_feedback_review()` (T014) en handmatige live-verificatie (quickstart §4) lopen dan mee. F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie.
+
+---
+
+### 🧪 Antwoorden leesbaar, controleerbaar en als CONCEPT gemarkeerd (013)
+
+Chatantwoorden renderen via de bestaande `sanitizeMarkdown`-pijplijn (marked + DOMPurify) met echte opmaak — alinea's, opsommingen, vet en tabellen, gestyled via Tailwind-arbitrary-variants op de container (bewust géén `@tailwindcss/typography`); links openen in een nieuw tabblad met `rel="noopener noreferrer"` (bestaande DOMPurify-hook). Gebruikersvragen staan letterlijk in de chat (React-escaping, regeleinden via `whitespace-pre-wrap`) — ingetypte tags zijn zichtbare tekst, geen opmaak; `sanitizeHtml` is uit `src/lib/sanitize.ts` verwijderd. Nieuw `AnswerMeta` onder elk assistentbericht: de CONCEPT-badge ("CONCEPT, door adviseur te accorderen", constitution II), de verificatieregel op basis van `message.verification` — live uit de rag-chat-respons én na herladen genarrowd uit de jsonb-kolom via `parseVerification` (waarschuwing "Dit antwoord is niet volledig onderbouwd door de bronnen." met de gevonden problemen bij `grounded = false` óf `confidence < 0,7`, drempel als benoemde constante `CONFIDENCE_THRESHOLD`; "Gecontroleerd tegen de bronnen" bij een onderbouwd antwoord; géén regel en géén foutmelding zonder verificatiegegevens) — en de bronnen als genummerde knoppen `[1]`, `[2]` met documentnaam. Bronknoppen openen het hergebruikte analyse-`SourcePanel` als zijpaneel (Referentie, Document, letterlijke passage; Locatie verborgen zolang leeg — de enige SourcePanel-wijziging); Escape sluit het paneel en de focus keert terug naar de bronknop, één paneel tegelijk (state in `MessageList`, sluit ook bij gesprekwissel). Score-badges en de uitklapbare bronnenlijst zijn uit de chatweergave verwijderd — nergens percentages meer bij bronnen; `rag-client` kreeg een optioneel `page`-veld bij bronnen klaar voor een toekomstige n8n-locatie. Frontend-only: geen migraties, Edge Function- of dependency-wijzigingen; de Geschiedenis-pagina kreeg alleen de verplichte `role`-doorgeef van de gedeelde `MessageContent`-component.
+
+**Files**: `src/components/chat/AnswerMeta.tsx` (nieuw), `src/components/chat/MessageContent.tsx`, `src/components/chat/MessageBubble.tsx`, `src/components/chat/MessageList.tsx`, `src/pages/ChatPage.tsx`, `src/pages/HistoryPage.tsx` (alleen role-doorgeef), `src/lib/rag-client.ts`, `src/lib/sanitize.ts` (sanitizeHtml verwijderd), `src/components/analysis/SourcePanel.tsx` (Locatie-conditional), `tests/e2e/answer-presentation.spec.ts` (nieuw, 9 gemockte scenario's), `tests/e2e/rag-chat.spec.ts` (bron-assertie bijgewerkt)
+
+**Gap**: de e2e-suite (9 nieuwe scenario's + de bijgewerkte rag-chat-assertie) draait pas echt zodra `E2E_EMAIL`/`E2E_PASSWORD` in `.env.local` staan (2026-10-29: nog afwezig — 18 skipped / 0 failed, zelfde gedocumenteerde staat als 011/012); handmatige live-verificatie volgens `specs/013-readable-verifiable-answers/quickstart.md` §4 open; F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie; bron-locaties (paginanummers) verschijnen pas zodra n8n die meelevert (bewust buiten scope van 013).
 
 ---
 
