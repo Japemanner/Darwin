@@ -311,3 +311,23 @@ test.describe('answer-presentation — verification verdict (US3)', () => {
     await expect(page.getByRole('alert')).toHaveCount(0)
   })
 })
+
+test.describe('answer-presentation — literal question (US5)', () => {
+  test('shows the question exactly as typed, with tags as text', async ({ page }) => {
+    const server: ChatServerState = { question: null, answer: null }
+    await mockRagChat(page, server, ragSuccess())
+    await mockChatRest(page, server)
+
+    await page.goto(`/chat/new/${ASSISTANT_ID}`)
+    const composer = page.getByLabel('Bericht')
+    await composer.fill('Eerste regel')
+    await composer.press('Shift+Enter')
+    await composer.type('Tweede regel <b>test</b>')
+    await composer.press('Enter')
+
+    await expect(page.getByText('Eerste punt')).toBeVisible({ timeout: 15_000 })
+    // The question is visible literally: typed tags stay text, not markup.
+    await expect(page.getByText('Tweede regel <b>test</b>')).toBeVisible()
+    await expect(page.locator('b')).toHaveCount(0)
+  })
+})

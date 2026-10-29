@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { sanitizeHtml, sanitizeMarkdown } from '@/lib/sanitize'
+import { sanitizeMarkdown } from '@/lib/sanitize'
 import { cn } from '@/lib/utils'
 
 interface MessageContentProps {
@@ -23,14 +23,18 @@ const MARKDOWN_STYLES = cn(
 
 export function MessageContent({ content, role }: MessageContentProps) {
   const html = useMemo(
-    () => (role === 'assistant' ? sanitizeMarkdown(content) : sanitizeHtml(content)),
+    () => (role === 'assistant' ? sanitizeMarkdown(content) : ''),
     [content, role],
   )
 
+  // User input renders literally: React escapes markup so typed tags stay
+  // visible as text (US5); line breaks come from whitespace-pre-wrap on the
+  // user bubble.
+  if (role === 'user') {
+    return <div>{content}</div>
+  }
+
   return (
-    <div
-      className={role === 'assistant' ? MARKDOWN_STYLES : undefined}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div className={MARKDOWN_STYLES} dangerouslySetInnerHTML={{ __html: html }} />
   )
 }
