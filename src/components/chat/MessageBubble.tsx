@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Copy, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import type { RagVerification } from '@/lib/rag-client'
 import { MessageContent } from './MessageContent'
 import { AnswerFeedback } from './AnswerFeedback'
 import { AnswerMeta } from './AnswerMeta'
@@ -16,6 +17,10 @@ export interface ChatMessage {
   // Sources arrive either from a persisted message row (JSONB) or from the
   // rag-chat response (RagSource[]); consumers narrow with Array.isArray.
   sources: unknown
+  // Verification verdict from n8n: live from the rag-chat response, on
+  // reload narrowed from the JSONB column (parseVerification). Absent or
+  // null renders no verdict line (FR-007).
+  verification?: RagVerification | null
   created_at: string
   status: 'pending' | 'sent' | 'failed'
   error?: { code: string; message: string }
@@ -64,7 +69,7 @@ export function MessageBubble({ message, conversationId, assistantId, onRetry, o
             </Button>
           </div>
         )}
-        {!isUser && <AnswerMeta />}
+        {!isUser && <AnswerMeta verification={message.verification} />}
         {!isUser && sources.length > 0 && (
           <div className="text-xs">
             <button

@@ -186,3 +186,66 @@ test.describe('answer-presentation — CONCEPT label (US2)', () => {
     await expect(page.getByText('CONCEPT, door adviseur te accorderen')).toBeVisible()
   })
 })
+
+test.describe('answer-presentation — verification verdict (US3)', () => {
+  test('shows a warning with issues when the answer is not grounded', async ({ page }) => {
+    const server: ChatServerState = { question: null, answer: null }
+    await mockRagChat(
+      page,
+      server,
+      ragSuccess({
+        verification: {
+          grounded: false,
+          confidence: 0.9,
+          issues: ['De genoemde termijn komt niet in de bronnen voor'],
+        },
+      }),
+    )
+
+    await openNewChatAndAsk(page, server, 'Geldt dat ook voor parttime medewerkers?')
+
+    await expect(
+      page.getByText('Dit antwoord is niet volledig onderbouwd door de bronnen.'),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('De genoemde termijn komt niet in de bronnen voor')).toBeVisible()
+    await expect(page.getByText('Gecontroleerd tegen de bronnen')).toHaveCount(0)
+  })
+
+  test('shows a warning when confidence is below the threshold', async ({ page }) => {
+    const server: ChatServerState = { question: null, answer: null }
+    await mockRagChat(
+      page,
+      server,
+      ragSuccess({ verification: { grounded: true, confidence: 0.5, issues: [] } }),
+    )
+
+    await openNewChatAndAsk(page, server, 'Geldt dat ook voor parttime medewerkers?')
+
+    await expect(
+      page.getByText('Dit antwoord is niet volledig onderbouwd door de bronnen.'),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Gecontroleerd tegen de bronnen')).toHaveCount(0)
+  })
+
+  test('shows the verdict for reloaded answers and nothing for old ones', async ({ page }) => {
+    const server: ChatServerState = {
+      question: null,
+      answer: null,
+      rows: [
+        { id: USER_MSG_ID, conversation_id: CONV_ID, role: 'user', content: 'Vraag één', sources: null, verification: null, created_at: '2026-01-01T00:00:00Z' },
+        { id: ASSISTANT_MSG_ID, conversation_id: CONV_ID, role: 'assistant', content: MARKDOWN_CONTENT, sources: null, verification: { grounded: true, confidence: 0.9, issues: [] }, created_at: '2026-01-01T00:00:01Z' },
+        { id: 'bb0e8400-e29b-41d4-a716-446655440020', conversation_id: CONV_ID, role: 'user', content: 'Vraag twee', sources: null, verification: null, created_at: '2026-01-01T00:00:02Z' },
+        { id: 'cc0e8400-e29b-41d4-a716-446655440030', conversation_id: CONV_ID, role: 'assistant', content: 'Oud antwoord zonder verificatie.', sources: null, verification: null, created_at: '2026-01-01T00:00:03Z' },
+      ],
+    }
+    await mockChatRest(page, server)
+    await page.goto(`/chat/${CONV_ID}`)
+
+    await expect(page.getByText('Eerste punt')).toBeVisible({ timeout: 15_000 })
+    // One verdict line: only for the answer with stored verification.
+    await expect(page.getByText('Gecontroleerd tegen de bronnen')).toHaveCount(1)
+    await expect(page.getByText('Oud antwoord zonder verificatie.')).toBeVisible()
+    // No error for messages without verification data (FR-007).
+    await expect(page.getByRole('alert')).toHaveCount(0)
+  })
+})

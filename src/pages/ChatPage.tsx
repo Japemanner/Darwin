@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAssistant, useConversation, useConversationMessages } from '@/hooks/queries'
-import { askAssistant, RagClientError } from '@/lib/rag-client'
+import { askAssistant, RagClientError, parseVerification } from '@/lib/rag-client'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
@@ -110,6 +110,7 @@ function ChatPage() {
         role: m.role,
         content: m.content,
         sources: m.sources,
+        verification: parseVerification(m.verification),
         created_at: m.created_at,
         status: 'sent' as const,
       })),
@@ -148,6 +149,7 @@ function ChatPage() {
           role: 'assistant',
           content: result.assistantMessage.content,
           sources: result.assistantMessage.sources,
+          verification: result.verification,
           created_at: result.assistantMessage.created_at,
           status: 'sent',
         }
