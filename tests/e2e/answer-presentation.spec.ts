@@ -174,3 +174,15 @@ test.describe('answer-presentation — markdown rendering (US1)', () => {
     ).toBeUndefined()
   })
 })
+
+test.describe('answer-presentation — CONCEPT label (US2)', () => {
+  test('shows the CONCEPT label under each answer', async ({ page }) => {
+    const server: ChatServerState = { question: null, answer: null }
+    await mockRagChat(page, server, ragSuccess())
+
+    await openNewChatAndAsk(page, server, 'Geldt dat ook voor parttime medewerkers?')
+
+    await expect(page.getByText('Eerste punt')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('CONCEPT, door adviseur te accorderen')).toBeVisible()
+  })
+})

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MessageContent } from './MessageContent'
 import { AnswerFeedback } from './AnswerFeedback'
+import { AnswerMeta } from './AnswerMeta'
 
 // In-memory chat message: persisted fields plus UI-only status. The id of a
 // user message is the client-generated message_id reused on retry (FR-009).
@@ -63,6 +64,7 @@ export function MessageBubble({ message, conversationId, assistantId, onRetry, o
             </Button>
           </div>
         )}
+        {!isUser && <AnswerMeta />}
         {!isUser && sources.length > 0 && (
           <div className="text-xs">
             <button
