@@ -45,6 +45,18 @@ const RagSourceSchema = z.object({
   title: z.string().optional(),
   excerpt: z.string().optional(),
   score: z.number().optional(),
+  // Future n8n source location (out of scope for n8n itself); zod strips
+  // unknown keys, so the field needs to be declared to survive the live
+  // path (specs/013-readable-verifiable-answers/contracts/chat-source-display.md §1).
+  page: z.string().optional(),
+})
+
+// Verification verdict passed through by n8n and persisted as jsonb on
+// messages.verification (feature 012, migration 017).
+const RagVerificationSchema = z.object({
+  grounded: z.boolean(),
+  confidence: z.number(),
+  issues: z.array(z.string()),
 })
 
 const RagAssistantMessageSchema = z.object({
@@ -58,14 +70,7 @@ const RagResponseSchema = z.object({
   conversation_id: z.string(),
   user_message_id: z.string(),
   assistant_message: RagAssistantMessageSchema,
-  verification: z
-    .object({
-      grounded: z.boolean(),
-      confidence: z.number(),
-      issues: z.array(z.string()),
-    })
-    .nullable()
-    .optional(),
+  verification: RagVerificationSchema.nullable().optional(),
   rewritten_query: z.string().nullable().optional(),
 })
 
@@ -74,12 +79,22 @@ export interface RagSource {
   title?: string
   excerpt?: string
   score?: number
+  page?: string
 }
 
 export interface RagVerification {
   grounded: boolean
   confidence: number
   issues: string[]
+}
+
+// Narrows the untyped messages.verification jsonb column (Record<string,
+// unknown> | null) to RagVerification. Absent or malformed data returns
+// null — the UI then renders no verdict line and no error (FR-007, spec
+// edge case; not a swallowed failure: null is the documented behavior).
+export function parseVerification(value: unknown): RagVerification | null {
+  const parsed = RagVerificationSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
 }
 
 export interface RagAssistantMessage {

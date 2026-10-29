@@ -192,7 +192,7 @@ function ConversationDrawer({
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted'
                 )}>
-                  <MessageContent content={msg.content} />
+                  <MessageContent content={msg.content} role={msg.role} />
                 </div>
                 {msg.role === 'assistant' && msg.sources && Array.isArray(msg.sources) && (msg.sources as Source[]).length > 0 && (
                   <div className="text-xs">

@@ -53,7 +53,7 @@ export function MessageBubble({ message, conversationId, assistantId, onRetry, o
               : 'bg-muted',
           )}
         >
-          <MessageContent content={message.content} />
+          <MessageContent content={message.content} role={message.role} />
         </div>
         {isUser && message.status === 'failed' && message.error && (
           <div role="alert" className="flex flex-col items-end gap-1.5">
