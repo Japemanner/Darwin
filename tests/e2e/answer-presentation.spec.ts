@@ -187,6 +187,68 @@ test.describe('answer-presentation — CONCEPT label (US2)', () => {
   })
 })
 
+// Two sources with scores: the scores must not appear anywhere (FR-008).
+const SOURCES = [
+  { knowledge_item_id: 'kb-item-1', title: 'Personeelshandboek', excerpt: 'Vakantiedagen naar rato van de contracturen…', score: 0.92 },
+  { knowledge_item_id: 'kb-item-2', title: 'CAO-regeling', excerpt: 'Artikel 4 lid 2…', score: 0.88 },
+]
+
+test.describe('answer-presentation — source buttons and panel (US4)', () => {
+  test('shows numbered source buttons without scores and opens the panel', async ({ page }) => {
+    const server: ChatServerState = { question: null, answer: null }
+    await mockRagChat(page, server, ragSuccess({ sources: SOURCES }))
+
+    await openNewChatAndAsk(page, server, 'Geldt dat ook voor parttime medewerkers?')
+
+    const bronKnop1 = page.getByRole('button', { name: '[1] Personeelshandboek' })
+    await expect(bronKnop1).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: '[2] CAO-regeling' })).toBeVisible()
+    // No percentage or score is displayed at any source (FR-008).
+    await expect(page.getByText('%')).toHaveCount(0)
+
+    // Clicking a source button opens the side panel with the literal passage.
+    await bronKnop1.click()
+    const panel = page.getByRole('dialog', { name: 'Bronverwijzing' })
+    await expect(panel).toBeVisible()
+    await expect(panel.getByText('Personeelshandboek')).toBeVisible()
+    await expect(panel.getByText('Vakantiedagen naar rato van de contracturen…')).toBeVisible()
+    // No location is known yet, so the Locatie block stays hidden.
+    await expect(panel.getByText('Locatie')).toHaveCount(0)
+
+    // Escape closes the panel and returns focus to the source button (FR-010).
+    await page.keyboard.press('Escape')
+    await expect(page.locator('[data-side-panel]')).toHaveAttribute('aria-hidden', 'true')
+    await expect(bronKnop1).toBeFocused()
+  })
+
+  test('opens the panel with the keyboard and switches to another source', async ({ page }) => {
+    const server: ChatServerState = { question: null, answer: null }
+    await mockRagChat(page, server, ragSuccess({ sources: SOURCES }))
+
+    await openNewChatAndAsk(page, server, 'Geldt dat ook voor parttime medewerkers?')
+
+    const bronKnop1 = page.getByRole('button', { name: '[1] Personeelshandboek' })
+    const bronKnop2 = page.getByRole('button', { name: '[2] CAO-regeling' })
+    await expect(bronKnop1).toBeVisible({ timeout: 15_000 })
+
+    // Keyboard activation opens the panel (FR-010).
+    await bronKnop2.focus()
+    await page.keyboard.press('Enter')
+    const panel = page.getByRole('dialog', { name: 'Bronverwijzing' })
+    await expect(panel).toBeVisible()
+    await expect(panel.getByText('CAO-regeling')).toBeVisible()
+
+    // Activating another source button switches the panel content — only
+    // one panel exists at a time (FR-012).
+    await bronKnop1.click()
+    await expect(panel.getByText('Personeelshandboek')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(page.locator('[data-side-panel]')).toHaveAttribute('aria-hidden', 'true')
+    await expect(bronKnop1).toBeFocused()
+  })
+})
+
 test.describe('answer-presentation — verification verdict (US3)', () => {
   test('shows a warning with issues when the answer is not grounded', async ({ page }) => {
     const server: ChatServerState = { question: null, answer: null }
