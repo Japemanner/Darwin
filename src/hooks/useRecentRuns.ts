@@ -8,7 +8,14 @@ export function useRecentRuns(advisorId: string | undefined) {
     enabled: !!advisorId,
     queryFn: () => fetchRecentRuns(advisorId!, 10),
     staleTime: 5_000,
-    refetchInterval: 10_000,
+    // Poll only while analyses are actually running (feature 014, FR-007):
+    // no periodic requests once every run in the list is finished.
+    refetchInterval: (query) => {
+      const runs = query.state.data
+      if (!runs) return false
+      const hasRunning = runs.some((run) => run.status === 'queued' || run.status === 'running')
+      return hasRunning ? 10_000 : false
+    },
   })
 }
 

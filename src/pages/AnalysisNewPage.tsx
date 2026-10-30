@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAssistant } from '@/hooks/queries'
 import { useAuth } from '@/hooks/useAuth'
+import { useRecentRuns } from '@/hooks/useRecentRuns'
+import { useAnalysisSeenStore } from '@/store/analysisSeenStore'
 import { submitAnalysisRun, AnalysisClientError } from '@/lib/analysis-client'
 import { getRetrySnapshot, saveRetrySnapshot } from '@/lib/analysis-retry'
 import { randomUUID } from '@/lib/uuid'
@@ -25,6 +27,19 @@ function AnalysisNewPage() {
 
   const retryRunId = (location.state as { retryRunId?: string } | null)?.retryRunId ?? null
   const retrySnapshot = retryRunId ? getRetrySnapshot(retryRunId) : undefined
+
+  // Viewing the analyses resets the notification count (US2): every finished
+  // run in the list is marked seen. Same queryKey as the panel — no extra
+  // request.
+  const { data: recentRuns } = useRecentRuns(profile?.id)
+  const markSeen = useAnalysisSeenStore((state) => state.markSeen)
+  useEffect(() => {
+    if (!recentRuns) return
+    const finished = recentRuns
+      .filter((run) => run.status === 'succeeded' || run.status === 'failed')
+      .map((run) => run.id)
+    if (finished.length > 0) markSeen(finished)
+  }, [recentRuns, markSeen])
 
   const handleSubmit = useCallback(async (values: AnalysisFormValues) => {
     if (!profile) {

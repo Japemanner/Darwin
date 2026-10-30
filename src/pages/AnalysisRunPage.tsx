@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAnalysisRun } from '@/hooks/useAnalysisRun'
+import { useAnalysisSeenStore } from '@/store/analysisSeenStore'
 import { hasRetrySnapshot } from '@/lib/analysis-retry'
 import { RunCard } from '@/components/analysis/RunCard'
 import { ResultView } from '@/components/analysis/ResultView'
@@ -13,6 +15,14 @@ function AnalysisRunPage() {
   const { runId } = useParams()
   const navigate = useNavigate()
   const { run, isLoading, error } = useAnalysisRun(runId ?? null)
+  const markSeen = useAnalysisSeenStore((state) => state.markSeen)
+
+  // Viewing a finished analysis marks it seen (US2) — also when it finishes
+  // while the advisor is watching this page.
+  useEffect(() => {
+    if (!run) return
+    if (run.status === 'succeeded' || run.status === 'failed') markSeen([run.id])
+  }, [run, markSeen])
 
   if (isLoading && !run) {
     return <p className="text-sm text-muted-foreground">Analyse wordt geladen…</p>
