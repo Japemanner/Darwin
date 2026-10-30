@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 import { useAssistantKnowledgeBases } from '@/hooks/queries'
 import {
   ALLOWED_FILE_EXTENSIONS,
@@ -51,6 +52,7 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
   const [urls, setUrls] = useState<string[]>(initial?.urls ?? [])
   const [urlInput, setUrlInput] = useState('')
   const [klantreferentie, setKlantreferentie] = useState(initial?.klantreferentie ?? '')
+  const [isDragging, setIsDragging] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -194,6 +196,7 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
           value={verzekeringsvraagstuk}
           onChange={(e) => setVerzekeringsvraagstuk(e.target.value)}
           rows={4}
+          placeholder="Bijvoorbeeld: de klant twijfelt of een aansprakelijkheidsverzekering voor zijn eenmanszaak nodig is."
           aria-describedby={errors.verzekeringsvraagstuk ? 'verzekeringsvraagstuk-error' : undefined}
           aria-invalid={Boolean(errors.verzekeringsvraagstuk)}
           required
@@ -247,10 +250,26 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
           Optioneel. pdf, docx of txt — maximaal {formatBytes(MAX_FILE_SIZE_BYTES)} per bestand,
           totaal {formatBytes(MAX_TOTAL_FILE_SIZE_BYTES)}.
         </p>
-        <label htmlFor="bestanden" className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm hover:bg-accent">
+        <Label
+          htmlFor="bestanden"
+          onDragOver={(e) => {
+            e.preventDefault()
+            setIsDragging(true)
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setIsDragging(false)
+            addFiles(e.dataTransfer.files)
+          }}
+          className={cn(
+            'flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-accent',
+            isDragging && 'border-primary bg-accent',
+          )}
+        >
           <Paperclip className="h-4 w-4" aria-hidden="true" />
           <span>Bestanden kiezen</span>
-        </label>
+        </Label>
         <input
           id="bestanden"
           type="file"

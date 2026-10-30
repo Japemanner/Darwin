@@ -84,6 +84,51 @@ test.describe('Analysis form — knowledge sources default (US4)', () => {
   })
 })
 
+test.describe('Analysis form — drag and drop + placeholder (US7)', () => {
+  test('accepts a file dropped on the upload box with the same validation', async ({ page }) => {
+    await openAnalysisForm(page)
+
+    // Drop a valid file via an in-page DataTransfer (Playwright recipe).
+    const validFile = await page.evaluateHandle(() => {
+      const dt = new DataTransfer()
+      dt.items.add(new File(['polisinformatie'], 'situatie.pdf', { type: 'application/pdf' }))
+      return dt
+    })
+    const uploadZone = page.locator('label[for="bestanden"]')
+    await uploadZone.dispatchEvent('dragover', { dataTransfer: validFile })
+    await uploadZone.dispatchEvent('drop', { dataTransfer: validFile })
+    await expect(page.getByText('situatie.pdf')).toBeVisible()
+
+    // Dropped files run through the same validation as the button path (US7).
+    const invalidFile = await page.evaluateHandle(() => {
+      const dt = new DataTransfer()
+      dt.items.add(new File(['risky'], 'tool.exe', { type: 'application/octet-stream' }))
+      return dt
+    })
+    await uploadZone.dispatchEvent('dragover', { dataTransfer: invalidFile })
+    await uploadZone.dispatchEvent('drop', { dataTransfer: invalidFile })
+    await expect(page.getByText(/alleen pdf, docx, txt/i)).toBeVisible()
+    await expect(page.getByText('tool.exe')).toHaveCount(0)
+
+    // The button remains the keyboard alternative (acceptance criterion).
+    await page.locator('#bestanden').setInputFiles({
+      name: 'toeslag.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.alloc(128),
+    })
+    await expect(page.getByText('toeslag.txt')).toBeVisible()
+  })
+
+  test('shows the example text in the empty Verzekeringsvraagstuk field', async ({ page }) => {
+    await openAnalysisForm(page)
+
+    await expect(page.getByLabel(/verzekeringsvraagstuk/i)).toHaveAttribute(
+      'placeholder',
+      'Bijvoorbeeld: de klant twijfelt of een aansprakelijkheidsverzekering voor zijn eenmanszaak nodig is.',
+    )
+  })
+})
+
 test.describe('Analysis form — happy path submit', () => {
   test('submits valid minimal input and shows run card in wachtrij/bezig', async ({ page }) => {
     await openAnalysisForm(page)
