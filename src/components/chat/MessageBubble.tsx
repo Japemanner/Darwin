@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Copy, RotateCcw } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Copy, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import type { BronRef } from '@/lib/analysis-schemas'
+import type { RagSource, RagVerification } from '@/lib/rag-client'
 import { MessageContent } from './MessageContent'
 import { AnswerFeedback } from './AnswerFeedback'
+import { AnswerMeta } from './AnswerMeta'
 
 // In-memory chat message: persisted fields plus UI-only status. The id of a
 // user message is the client-generated message_id reused on retry (FR-009).
@@ -15,16 +16,13 @@ export interface ChatMessage {
   // Sources arrive either from a persisted message row (JSONB) or from the
   // rag-chat response (RagSource[]); consumers narrow with Array.isArray.
   sources: unknown
+  // Verification verdict from n8n: live from the rag-chat response, on
+  // reload narrowed from the JSONB column (parseVerification). Absent or
+  // null renders no verdict line (FR-007).
+  verification?: RagVerification | null
   created_at: string
   status: 'pending' | 'sent' | 'failed'
   error?: { code: string; message: string }
-}
-
-interface Source {
-  knowledge_item_id?: string
-  title?: string
-  excerpt?: string
-  score?: number
 }
 
 interface MessageBubbleProps {
@@ -35,11 +33,12 @@ interface MessageBubbleProps {
   assistantId: string | undefined
   onRetry: (message: ChatMessage) => void
   onCopy: (content: string) => void
+  // Opens the shared side panel for the sources of this answer (FR-009).
+  onOpenBron: (bronnen: BronRef[], bronId: string, trigger: HTMLButtonElement) => void
 }
 
-export function MessageBubble({ message, conversationId, assistantId, onRetry, onCopy }: MessageBubbleProps) {
-  const [sourcesExpanded, setSourcesExpanded] = useState(false)
-  const sources = Array.isArray(message.sources) ? (message.sources as Source[]) : []
+export function MessageBubble({ message, conversationId, assistantId, onRetry, onCopy, onOpenBron }: MessageBubbleProps) {
+  const sources = Array.isArray(message.sources) ? (message.sources as RagSource[]) : []
   const isUser = message.role === 'user'
 
   return (
@@ -53,7 +52,7 @@ export function MessageBubble({ message, conversationId, assistantId, onRetry, o
               : 'bg-muted',
           )}
         >
-          <MessageContent content={message.content} />
+          <MessageContent content={message.content} role={message.role} />
         </div>
         {isUser && message.status === 'failed' && message.error && (
           <div role="alert" className="flex flex-col items-end gap-1.5">
@@ -63,34 +62,8 @@ export function MessageBubble({ message, conversationId, assistantId, onRetry, o
             </Button>
           </div>
         )}
-        {!isUser && sources.length > 0 && (
-          <div className="text-xs">
-            <button
-              type="button"
-              onClick={() => setSourcesExpanded((prev) => !prev)}
-              className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {sourcesExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              Bronnen ({sources.length})
-            </button>
-            {sourcesExpanded && (
-              <div className="mt-2 space-y-2">
-                {sources.map((source, idx) => (
-                  <div key={idx} className="bg-accent/50 rounded p-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-foreground">{source.title ?? 'Zonder titel'}</span>
-                      {source.score !== undefined && (
-                        <Badge variant="secondary" className="text-xs">{Math.round(source.score * 100)}%</Badge>
-                      )}
-                    </div>
-                    {source.excerpt && (
-                      <p className="text-muted-foreground line-clamp-3">{source.excerpt}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        {!isUser && (
+          <AnswerMeta verification={message.verification} sources={sources} onOpenBron={onOpenBron} />
         )}
         {!isUser && (
           <Button

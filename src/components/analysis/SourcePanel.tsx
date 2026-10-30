@@ -53,10 +53,14 @@ export function SourcePanel({ bronId, bronnen, onClose }: SourcePanelProps) {
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Document</p>
               <p className="text-sm font-medium">{bron.document}</p>
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Locatie</p>
-              <p className="text-sm">{bron.locatie}</p>
-            </div>
+            {/* Chat sources have no location yet (feature 013); hide the
+                block instead of showing an empty value. */}
+            {bron.locatie && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Locatie</p>
+                <p className="text-sm">{bron.locatie}</p>
+              </div>
+            )}
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Letterlijke passage</p>
               <blockquote className="border-l-2 border-primary/40 pl-3 text-sm italic">{bron.passage}</blockquote>
