@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select } from '@/components/ui/select'
 import { Settings, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle, Building2, UserPlus } from 'lucide-react'
 import { getFlowConfig, saveFlowConfig, testFlowConfig } from '@/lib/flow-config-client'
+import { ROLE_LABELS } from '@/lib/labels'
 import type { FlowConfigInfo, FlowConfigTestResult } from '@/lib/flow-config-client'
 
 interface FlowConfigFormState {
@@ -91,7 +92,7 @@ function FlowConfigCard({
 
   const handleTest = async () => {
     if (!state.webhookUrl.trim()) {
-      toast({ title: 'Voer eerst een webhook URL in', variant: 'destructive' })
+      toast({ title: 'Voer eerst een webhook-URL in', variant: 'destructive' })
       return
     }
 
@@ -160,7 +161,7 @@ function FlowConfigCard({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${flowType}-auth-header`}>Auth Header Naam</Label>
+            <Label htmlFor={`${flowType}-auth-header`}>Naam autorisatieheader</Label>
             <Input
               id={`${flowType}-auth-header`}
               value={state.webhookAuthHeader}
@@ -168,7 +169,7 @@ function FlowConfigCard({
               placeholder="X-Webhook-Token"
             />
             <p className="text-xs text-muted-foreground">
-              De HTTP-header naam die n8n verwacht. Standaard: <code>X-Webhook-Token</code>. Dit moet overeenkomen met de Header Auth instelling in je n8n Webhook node.
+              De naam van de HTTP-header die n8n verwacht. Standaard: <code>X-Webhook-Token</code>. Dit moet overeenkomen met de instelling Header Auth in uw n8n Webhook node.
             </p>
           </div>
 
@@ -179,12 +180,12 @@ function FlowConfigCard({
               type="password"
               value={state.webhookToken}
               onChange={(e) => setState((prev) => ({ ...prev, webhookToken: e.target.value }))}
-              placeholder={config?.has_token ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (Token is ingesteld; laat leeg om te behouden)' : 'De Header Value uit je n8n Webhook node'}
+              placeholder={config?.has_token ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (Token is ingesteld; laat leeg om te behouden)' : 'De Header Value uit uw n8n Webhook node'}
             />
             <p className="text-xs text-muted-foreground">
               {config?.has_token
-                ? 'Dit is de Header Value uit je n8n Webhook node (Header Auth). De token wordt server-side opgeslagen en is na het opslaan niet meer uit te lezen. Laat leeg om de bestaande token te behouden.'
-                : 'Voer de Header Value in uit je n8n Webhook node (Header Auth). De token wordt server-side opgeslagen en is na het opslaan niet meer uit te lezen.'}
+                ? 'Dit is de Header Value uit uw n8n Webhook node (Header Auth). De token wordt aan de serverkant opgeslagen en is na het opslaan niet meer uit te lezen. Laat leeg om de bestaande token te behouden.'
+                : 'Voer de Header Value in uit uw n8n Webhook node (Header Auth). De token wordt aan de serverkant opgeslagen en is na het opslaan niet meer uit te lezen.'}
             </p>
           </div>
 
@@ -214,8 +215,8 @@ function FlowConfigCard({
 }
 
 const TENANT_ROLE_OPTIONS = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'member', label: 'Lid' },
+  { value: 'admin', label: ROLE_LABELS.admin },
+  { value: 'member', label: ROLE_LABELS.member },
 ]
 
 function CreateTenantCard() {
@@ -249,7 +250,7 @@ function CreateTenantCard() {
       if (!data?.success) throw new Error(data?.error || 'Onbekende fout bij aanmaken organisatie')
 
       setResult(data)
-      toast({ title: 'Organisatie aangemaakt', description: `${data.organization.name} is succesvol aangemaakt met admin ${data.user.email}` })
+      toast({ title: 'Organisatie aangemaakt', description: `${data.organization.name} is succesvol aangemaakt met beheerder ${data.user.email}` })
       setOrgName('')
       setUserName('')
       setUserEmail('')
@@ -267,10 +268,10 @@ function CreateTenantCard() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Building2 className="h-5 w-5 text-primary" />
-          <CardTitle>Nieuwe Organisatie &amp; Gebruiker</CardTitle>
+          <CardTitle>Nieuwe organisatie en gebruiker</CardTitle>
         </div>
         <CardDescription>
-          Maak een nieuwe tenant (organisatie) aan met een admin-gebruiker. De gebruiker kan direct inloggen met het opgegeven wachtwoord.
+          Maak een nieuwe organisatie aan met een beheerdersaccount. De gebruiker kan direct inloggen met het opgegeven wachtwoord.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -347,8 +348,8 @@ function CreateTenantCard() {
               <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Organisatie aangemaakt</p>
-                <p className="text-xs mt-1">Org ID: <code>{result.organization.id}</code></p>
-                <p className="text-xs">Gebruiker: <code>{result.user.email}</code> (ID: <code>{result.user.id}</code>)</p>
+                <p className="text-xs mt-1">Organisatiecode: <code>{result.organization.id}</code></p>
+                <p className="text-xs">Gebruiker: <code>{result.user.email}</code> (code: <code>{result.user.id}</code>)</p>
               </div>
             </div>
           )}
@@ -376,7 +377,7 @@ function SettingsPage() {
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
           <TabsTrigger value="tenant">
             <Building2 className="h-4 w-4 mr-1.5" />
-            Nieuwe Organisatie
+            Nieuwe organisatie
           </TabsTrigger>
         </TabsList>
 
@@ -386,15 +387,15 @@ function SettingsPage() {
               <>
                 <FlowConfigCard
                   flowType="rag_chat"
-                  title="Chat assistent Configuratie"
-                  description="Configureer de gedeelde n8n webhook voor alle chat assistants. Deze instelling geldt voor alle assistants van type &quot;chat&quot;."
+                  title="Chatassistent-configuratie"
+                  description="Configureer de gedeelde n8n-webhook voor alle chatassistenten. Deze instelling geldt voor alle assistenten van het type &quot;chat&quot;."
                   placeholder="https://n8n.example.com/webhook/rag-chat"
                 />
 
                 <FlowConfigCard
                   flowType="document_processing"
-                  title="Kennisbron Documentverwerking Configuratie"
-                  description="Configureer de n8n webhook voor documentverwerking. Bij elke document-upload maakt de server de signed download URL en stuurt deze naar de webhook."
+                  title="Configuratie kennisbron-documentverwerking"
+                  description="Configureer de n8n-webhook voor documentverwerking. Bij elke documentaanlevering maakt de server de ondertekende ophaal-URL en stuurt die naar de webhook."
                   placeholder="https://n8n.example.com/webhook/documents"
                 />
               </>
@@ -412,7 +413,7 @@ function SettingsPage() {
             <div className="max-w-2xl">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">n8n Webhook Configuratie Handleiding</CardTitle>
+                  <CardTitle className="text-base">Handleiding n8n-webhookconfiguratie</CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground space-y-3">
                   <div>
@@ -429,12 +430,12 @@ function SettingsPage() {
                     <p>Stel in n8n de Header Name in op <code>X-Webhook-Token</code> en de Header Value op een token naar keuze. Vul dezelfde waarden hierboven in.</p>
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">4. Workflow activeren</p>
-                    <p>Zorg dat de n8n workflow op <strong>Active</strong> staat, anders is de webhook URL niet bereikbaar.</p>
+                    <p className="font-medium text-foreground">4. Werkstroom activeren</p>
+                    <p>Zorg dat de n8n-werkstroom op <strong>Active</strong> staat, anders is de webhook-URL niet bereikbaar.</p>
                   </div>
                   <div>
                     <p className="font-medium text-foreground">5. Documentverwerking</p>
-                    <p>Maak een aparte n8n workflow voor documentverwerking. Deze webhook ontvangt bij elke upload een payload met <code>tenantId</code>, <code>knowledgeSourceName</code>, <code>document_name</code>, <code>document_type</code> en <code>download_url</code>. De download URL is 15 minuten geldig.</p>
+                    <p>Maak een aparte n8n-werkstroom voor documentverwerking. Deze webhook ontvangt bij elke aanlevering een bericht met <code>tenantId</code>, <code>knowledgeSourceName</code>, <code>document_name</code>, <code>document_type</code> en <code>download_url</code>. De ophaal-URL is 15 minuten geldig.</p>
                   </div>
                 </CardContent>
               </Card>

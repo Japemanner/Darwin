@@ -376,6 +376,7 @@ test.describe('admin-only-management — US3 admin parity', () => {
     await mockAdminData(page)
     await page.goto('/assistants')
 
+    await expect(page.locator('aside').getByText('Beheerder', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /nieuwe assistent/i })).toBeVisible()
     await expect(page.getByText(ACTIVE_ASSISTANT.name)).toBeVisible()
     await expect(page.getByText(INACTIVE_ASSISTANT.name)).toBeVisible()

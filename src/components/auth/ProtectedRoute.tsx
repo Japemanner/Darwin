@@ -21,7 +21,7 @@ function ProtectedRoute() {
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center space-y-2">
             <p className="text-destructive font-semibold">Sessie verlopen</p>
-            <p className="text-muted-foreground text-sm">Je sessie is verlopen. Log opnieuw in.</p>
+            <p className="text-muted-foreground text-sm">Uw sessie is verlopen. Log opnieuw in.</p>
             <Link to="/login" className="text-primary text-sm hover:underline">Naar inloggen</Link>
           </div>
         </div>

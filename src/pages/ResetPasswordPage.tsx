@@ -58,7 +58,7 @@ function ResetPasswordPage() {
     if (password.length < 8) {
       toast({
         title: 'Wachtwoord te kort',
-        description: 'Je wachtwoord moet minimaal 8 tekens bevatten.',
+        description: 'Uw wachtwoord moet minimaal 8 tekens bevatten.',
         variant: 'destructive',
       })
       return
@@ -79,20 +79,20 @@ function ResetPasswordPage() {
       const result = await Promise.race([
         supabase.auth.updateUser({ password }),
         new Promise<{ error: Error }>((_, reject) =>
-          setTimeout(() => reject(new Error('Aanvraag duurt te lang, probeer opnieuw')), 10000)
+          setTimeout(() => reject(new Error('De aanvraag duurt te lang. Probeer het opnieuw.')), 10000)
         ),
       ])
       if ((result as { error?: Error }).error) throw (result as { error: Error }).error
       toast({
         title: 'Wachtwoord aangepast',
-        description: 'Je kunt nu inloggen met je nieuwe wachtwoord.',
+        description: 'U kunt nu inloggen met uw nieuwe wachtwoord.',
       })
       await supabase.auth.signOut()
       navigate('/login')
-    } catch (err) {
+    } catch {
       toast({
         title: 'Fout bij aanpassen',
-        description: err instanceof Error ? err.message : 'Onbekende fout',
+        description: 'Aanpassen mislukt. Probeer het opnieuw.',
         variant: 'destructive',
       })
     } finally {
@@ -113,14 +113,14 @@ function ResetPasswordPage() {
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle className="text-2xl">Link verlopen</CardTitle>
+            <CardTitle className="text-2xl">Koppeling verlopen</CardTitle>
             <CardDescription>
-              Deze reset-link is verlopen of ongeldig. Vraag een nieuwe aan.
+              Deze herstelkoppeling is verlopen of ongeldig. Vraag een nieuwe aan.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Link to="/forgot-password">
-              <Button>Nieuwe reset-link aanvragen</Button>
+              <Button>Nieuwe herstelkoppeling aanvragen</Button>
             </Link>
           </CardContent>
         </Card>
@@ -134,7 +134,7 @@ function ResetPasswordPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Nieuw wachtwoord</CardTitle>
           <CardDescription>
-            Kies een nieuw wachtwoord voor je account.
+            Kies een nieuw wachtwoord voor uw account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -155,7 +155,7 @@ function ResetPasswordPage() {
               <Input
                 id="confirm"
                 type="password"
-                placeholder="Herhaal je wachtwoord"
+                placeholder="Herhaal uw wachtwoord"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 required

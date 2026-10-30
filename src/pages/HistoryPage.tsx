@@ -49,7 +49,7 @@ function HistoryPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">Geschiedenis</h1>
-          <p className="text-muted-foreground">Alle eerdere runs van je assistenten</p>
+          <p className="text-muted-foreground">Alle eerdere gesprekken van uw assistenten</p>
         </div>
         <div className="w-48">
           <Select
@@ -78,8 +78,8 @@ function HistoryPage() {
       ) : (conversations ?? []).length === 0 ? (
         <EmptyState
           icon={<History className="h-12 w-12" />}
-          title="Nog geen runs"
-          description="Zodra je met een assistent chatten, verschijnen de runs hier"
+          title="Nog geen gesprekken"
+          description="Zodra u met een assistent chat, verschijnen de gesprekken hier"
         />
       ) : (
         <div className="space-y-2">
@@ -180,7 +180,7 @@ function ConversationDrawer({
           </div>
         ) : (messages ?? []).length === 0 ? (
           <p className="text-center text-muted-foreground text-sm mt-8">
-            Geen berichten in deze run
+            Geen berichten in dit gesprek
           </p>
         ) : (
           (messages ?? []).map((msg: Message) => (

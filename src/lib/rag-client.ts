@@ -35,7 +35,7 @@ const ERROR_TEXTS: Record<RagErrorCode, string> = {
   NOT_CONFIGURED: 'Er is geen koppeling geconfigureerd. Neem contact op met de beheerder.',
   UPSTREAM_AUTH: 'De koppeling weigert de verbinding. Controleer het token en de headernaam in de instellingen.',
   UPSTREAM_ERROR: 'De assistent-service gaf een fout. Probeer het opnieuw of neem contact op met de beheerder.',
-  UPSTREAM_TIMEOUT: 'De assistant reageert niet binnen de toegestane tijd. Probeer het opnieuw.',
+  UPSTREAM_TIMEOUT: 'De assistent reageert niet binnen de toegestane tijd. Probeer het opnieuw.',
   UPSTREAM_UNREACHABLE: 'Kon geen verbinding maken met de assistent-service.',
   INVALID_RESPONSE: 'Er ging iets mis bij het verwerken van het antwoord. Probeer het opnieuw.',
 }

@@ -67,7 +67,7 @@ test.describe('document-webhook — upload', () => {
       buffer: Buffer.alloc(1024),
     })
 
-    await expect(page.getByText('Document geüpload')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Document toegevoegd')).toBeVisible({ timeout: 15_000 })
     expect(edgeBody).toEqual({ document_id: DOC_ROW.id, action: 'index' })
   })
 
@@ -86,7 +86,7 @@ test.describe('document-webhook — upload', () => {
       buffer: Buffer.alloc(1024),
     })
 
-    await expect(page.getByText('Upload mislukt')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Toevoegen mislukt')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/kon geen verbinding maken met de documentverwerking/i)).toBeVisible()
   })
 })

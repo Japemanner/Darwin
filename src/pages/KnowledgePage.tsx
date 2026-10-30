@@ -44,7 +44,7 @@ interface UploadItem {
 
 const UPLOAD_STATUS_LABELS: Record<UploadStatus, string> = {
   waiting: 'Wachten',
-  uploading: 'Uploaden...',
+  uploading: 'Toevoegen...',
   done: 'Klaar',
   error: 'Fout',
 }
@@ -99,7 +99,7 @@ function KnowledgePage() {
         <EmptyState
           icon={<BookOpen className="h-12 w-12" />}
           title="Nog geen kennisbronnen"
-          description={isAdmin ? 'Upload documenten zodat uw assistenten er kennis uit kunnen putten' : 'Nog geen kennisbronnen beschikbaar'}
+          description={isAdmin ? 'Voeg documenten toe zodat uw assistenten er kennis uit kunnen putten' : 'Nog geen kennisbronnen beschikbaar'}
           {...(isAdmin ? { action: { label: 'Maak kennisbron', onClick: () => { setEditingKB(null); setModalOpen(true) } } } : {})}
         />
       ) : (
@@ -313,12 +313,12 @@ function KBSlideOver({
       try {
         await uploadDocument(item.file, kb.id, userId, organizationId)
         updateUploadItem(item.id, { status: 'done' })
-        toast({ title: 'Document geüpload', description: item.file.name })
+        toast({ title: 'Document toegevoegd', description: item.file.name })
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Onbekende fout'
         const documentId = err instanceof DocumentUploadError ? err.documentId ?? undefined : undefined
         updateUploadItem(item.id, { status: 'error', error: message, documentId, retryable: true })
-        toast({ title: 'Upload mislukt', description: message, variant: 'destructive' })
+        toast({ title: 'Toevoegen mislukt', description: message, variant: 'destructive' })
       } finally {
         qc.invalidateQueries({ queryKey: ['kb-documents', kb.id] })
         qc.invalidateQueries({ queryKey: ['kb-stats', organizationId] })
@@ -518,7 +518,7 @@ function KBSlideOver({
               {docsLoading ? (
                 <p className="text-center text-sm text-muted-foreground py-8">Laden...</p>
               ) : (documents ?? []).length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-8">Nog geen documenten geüpload</p>
+                <p className="text-center text-sm text-muted-foreground py-8">Nog geen documenten toegevoegd</p>
               ) : (
                 (documents ?? []).map((doc) => (
                   <div key={doc.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border">
@@ -586,7 +586,7 @@ function KBSlideOver({
                       id="item-content"
                       value={itemForm.content}
                       onChange={(e) => setItemForm((prev) => ({ ...prev, content: e.target.value }))}
-                      placeholder="De tekst die naar de vector database gestuurd wordt..."
+                      placeholder="De tekst die naar de kennisindex gestuurd wordt..."
                       rows={5}
                       required
                     />

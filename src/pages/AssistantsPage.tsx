@@ -81,9 +81,9 @@ function AssistantsPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold">AI Assistenten</h1>
+          <h1 className="text-2xl font-bold">AI-assistenten</h1>
           <p className="text-muted-foreground">
-            {isAdmin ? 'Beheer je AI assistenten en hun configuratie' : 'Start een gesprek met een assistent'}
+            {isAdmin ? 'Beheer uw AI-assistenten en hun configuratie' : 'Start een gesprek met een assistent'}
           </p>
         </div>
         {isAdmin && (
@@ -97,7 +97,7 @@ function AssistantsPage() {
         <EmptyState
           icon={<Bot className="h-12 w-12" />}
           title="Nog geen assistenten"
-          description={isAdmin ? 'Maak je eerste AI assistent aan om te beginnen met chatten' : 'Er zijn nog geen actieve assistenten beschikbaar'}
+          description={isAdmin ? 'Maak uw eerste AI-assistent aan om te beginnen met chatten' : 'Er zijn nog geen actieve assistenten beschikbaar'}
           {...(isAdmin ? { action: { label: 'Maak assistent', onClick: () => { setEditingAssistant(null); setModalOpen(true) } } } : {})}
         />
       ) : (
@@ -336,7 +336,7 @@ function AssistantModal({
           <div className="flex flex-col gap-2">
             <Label htmlFor="webhook-url">N8N Webhook URL</Label>
             <Input id="webhook-url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://n8n.example.com/webhook/mijn-flow" />
-            <p className="text-xs text-muted-foreground">Optioneel. Als ingevuld, gebruikt deze assistent zijn eigen webhook URL i.p.v. de gedeelde RAG-configuratie.</p>
+            <p className="text-xs text-muted-foreground">Optioneel. Als ingevuld, gebruikt deze assistent zijn eigen webhook-URL in plaats van de gedeelde configuratie.</p>
           </div>
           <div className="flex flex-col gap-2">
             <Label>Kennisbronnen</Label>
@@ -393,7 +393,7 @@ function AssistantModal({
               <DialogTitle>Assistent verwijderen</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
-              Weet je zeker dat je <strong>{assistant?.name}</strong> wilt verwijderen? Dit verwijdert ook alle gekoppelde conversaties en kennisbronkoppelingen.
+              Weet u zeker dat u <strong>{assistant?.name}</strong> wilt verwijderen? Dit verwijdert ook alle gekoppelde gesprekken en kennisbronkoppelingen.
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>Annuleren</Button>

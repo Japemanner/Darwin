@@ -21,17 +21,17 @@ export function RecentRunsPanel({ advisorId, onOpenRun }: RecentRunsPanelProps) 
   const { data: runs, error } = useRecentRuns(advisorId)
 
   return (
-    <section aria-label="Recente runs" className="flex flex-col gap-2">
+    <section aria-label="Recente uitvoeringen" className="flex flex-col gap-2">
       <h2 className="flex items-center gap-2 text-base font-semibold">
-        <History className="h-4 w-4" aria-hidden="true" /> Recente runs
+        <History className="h-4 w-4" aria-hidden="true" /> Recente uitvoeringen
       </h2>
       {error && (
         <p role="alert" className="text-sm text-destructive">
-          Recente runs konden niet worden opgehaald. Controleer de verbinding.
+          Recente uitvoeringen konden niet worden opgehaald. Controleer de verbinding.
         </p>
       )}
       {!error && (!runs || runs.length === 0) && (
-        <p className="text-sm text-muted-foreground">Nog geen runs gestart.</p>
+        <p className="text-sm text-muted-foreground">Nog geen uitvoeringen gestart.</p>
       )}
       {runs && runs.length > 0 && (
         <ul className="space-y-1">

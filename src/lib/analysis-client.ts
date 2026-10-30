@@ -88,7 +88,7 @@ const API_URL = import.meta.env.VITE_ANALYSIS_API_URL
 
 function requireApiUrl(): string {
   if (!API_URL) {
-    throw new AnalysisClientError('CONNECTION_ERROR', 'De risico-analyse API is niet geconfigureerd.')
+    throw new AnalysisClientError('CONNECTION_ERROR', 'De risico-analysevoorziening is niet geconfigureerd.')
   }
   return API_URL
 }
@@ -104,7 +104,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 function classifyStatusError(status: number): AnalysisClientError {
   if (status === 401) return new AnalysisClientError('UNAUTHORIZED', 'Uw sessie is verlopen. Log opnieuw in.')
-  if (status === 404) return new AnalysisClientError('NOT_FOUND', 'De run is niet gevonden.')
+  if (status === 404) return new AnalysisClientError('NOT_FOUND', 'De uitvoering is niet gevonden.')
   if (status === 413) return new AnalysisClientError('FILE_TOO_LARGE', 'De bestanden overschrijden de toegestane grootte.')
   if (status === 422) return new AnalysisClientError('GROUP_VALIDATION', 'De ingediende gegevens voldoen niet aan de validatie.')
   return new AnalysisClientError('BACKEND_ERROR', 'Er trad een fout op bij de risico-analyse-service.')
@@ -188,7 +188,7 @@ export async function fetchAnalysisRun(runId: string): Promise<AnalysisRun> {
   const raw: unknown = await res.json().catch(() => null)
   const parsed = AnalysisRunSchema.safeParse(raw)
   if (!parsed.success) {
-    throw new AnalysisClientError('INVALID_RESPONSE', 'De runstatus kon niet worden uitgelezen (ongeldig antwoord).')
+    throw new AnalysisClientError('INVALID_RESPONSE', 'De status van de uitvoering kon niet worden uitgelezen (ongeldig antwoord).')
   }
   return parsed.data
 }
@@ -208,7 +208,7 @@ export async function fetchRecentRuns(advisorId: string, limit = 10): Promise<Re
 
   const raw: unknown = await res.json().catch(() => null)
   if (!Array.isArray(raw)) {
-    throw new AnalysisClientError('INVALID_RESPONSE', 'De lijst recente runs kon niet worden uitgelezen.')
+    throw new AnalysisClientError('INVALID_RESPONSE', 'De lijst met recente uitvoeringen kon niet worden uitgelezen.')
   }
   const runs: RecentRun[] = []
   for (const item of raw) {

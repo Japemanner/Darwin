@@ -386,5 +386,5 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/016-knowledge-source-manageability/plan.md
+specs/017-dutch-ui-language/plan.md
 <!-- SPECKIT END -->

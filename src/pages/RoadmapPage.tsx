@@ -53,11 +53,11 @@ function RoadmapPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold">Roadmap</h1>
-          <p className="text-muted-foreground">Waar we aan werken en wat eraan komt — stem op features die jij belangrijk vindt</p>
+          <h1 className="text-2xl font-bold">Ideeën en wensen</h1>
+          <p className="text-muted-foreground">Waar we aan werken en wat eraan komt — stem op ideeën en wensen die u belangrijk vindt</p>
         </div>
         <Button onClick={() => setRequestModalOpen(true)}>
-          <Lightbulb className="h-4 w-4 mr-2" /> Feature request
+          <Lightbulb className="h-4 w-4 mr-2" /> Idee of wens indienen
         </Button>
       </div>
 
@@ -96,8 +96,8 @@ function RoadmapPage() {
       ) : filteredFeatures.length === 0 ? (
         <EmptyState
           icon={<MapIcon className="h-12 w-12" />}
-          title="Nog geen features"
-          description="Er zijn nog geen roadmap-items in deze categorie"
+          title="Nog geen ideeën of wensen"
+          description="Er zijn nog geen ideeën of wensen in deze categorie"
         />
       ) : (
         <div className="space-y-2">
@@ -247,7 +247,7 @@ function FeatureRequestModal({
 
       trackEvent(PostHogEvent.FEATURE_REQUEST_SUBMITTED, { title: title.trim() })
 
-      toast({ title: 'Request verzonden', description: 'Je feature request is ingestuurd' })
+      toast({ title: 'Verzoek verzonden', description: 'Uw idee of wens is ingestuurd' })
       resetForm()
       onOpenChange(false)
     } catch (err) {
@@ -265,11 +265,11 @@ function FeatureRequestModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <form onSubmit={handleSubmit}>
         <DialogHeader>
-          <DialogTitle>Feature request indienen</DialogTitle>
+          <DialogTitle>Idee of wens indienen</DialogTitle>
         </DialogHeader>
         <DialogContent className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
           <p className="text-sm text-muted-foreground">
-            Heb je een idee voor een nieuwe feature? Laat het weten — je request wordt direct naar Jaap gestuurd.
+            Hebt u een idee of wens? Laat het weten — uw verzoek wordt direct naar Jaap gestuurd.
           </p>
           <div className="flex flex-col gap-2">
             <Label htmlFor="fr-title">Titel</Label>
@@ -277,7 +277,7 @@ function FeatureRequestModal({
               id="fr-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Korte titel van je idee"
+              placeholder="Korte titel van uw idee"
               required
             />
           </div>
@@ -287,13 +287,13 @@ function FeatureRequestModal({
               id="fr-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Beschrijf wat de feature moet doen"
+              placeholder="Beschrijf wat het idee of de wens inhoudt"
               rows={4}
               required
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="fr-motivation">Waarom heb je dit nodig?</Label>
+            <Label htmlFor="fr-motivation">Waarom heeft u dit nodig?</Label>
             <Textarea
               id="fr-motivation"
               value={motivation}
