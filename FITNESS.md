@@ -72,3 +72,35 @@ _Do not edit manually._
 ### Verdict
 
 **SHIP met verificatieachterstand**: alle lokale gates groen (FAIL:0, blocking:0). Uitrol van migratie 016 + `rag-chat` v2 + frontend-release gebeurt handmatig door Jaap via `specs/011-resumable-chat-page/quickstart.md` §3-§5 (na code-review), inclusief titel-SQL-check (T025). De openstaande verificatie-achterstand van feature 010 (rls-verify, SQL-controles, e2e met echte accounts) blijft ongewijzigd gelden.
+
+---
+
+## Feature 013 — Antwoorden leesbaar, controleerbaar en als CONCEPT gemarkeerd — 2026-10-29
+
+**Uitgevoerd**: `bash scripts/fitness-check.sh` + pre-commit gates (6 feature-commits) + volledige Playwright-suite. Frontend-only feature: géén migratie, Edge Function- of bucket-wijzigingen.
+
+### scripts/fitness-check.sh
+
+| Resultaat | FAIL:0 — PASS:13 / WARN:1 / SKIP:4 |
+|---|---|
+
+- F-14 WARN: 1 directe DOM-call in `src/main.tsx:5` — intentioneel (React root mount), pre-existing.
+- F-15 PASS: laatste 5 commits conventioneel.
+- F-01/F-10/F-16/F-17: SKIP (delegatie naar Supabase/Snyk MCP — niet actief in deze sessie; er is géén DB-wijziging in 013, dus RLS/buckets zijn ongewijzigd geldig).
+
+### Overige gates
+
+- `npx tsc --noEmit`: 0 fouten (F-07 groen), ook na alle zes feature-commits via de pre-commit hook.
+- `npm run build`: groen (4.1s; chunk-size waarschuwing pre-existing).
+- `npx eslint src/`: 0 errors / 6 pre-existing warnings (App.tsx 1x exhaustive-deps; toast.tsx/posthog.tsx 5x react-refresh — baseline sinds vóór 012); geen nieuwe warnings uit 013; nieuwe testbestanden (`answer-presentation.spec.ts`, bijgewerkt `rag-chat.spec.ts`) linten schoon.
+- Gitleaks (pre-commit): geen secrets.
+- Playwright volledige suite: **64 skipped / 0 failed** (55 bestaand + 9 nieuwe antwoord-weergave-scenario's in `answer-presentation.spec.ts`); alle specs vereisen echte Supabase-login met `E2E_EMAIL`/`E2E_PASSWORD` in `.env.local` — nog afwezig (zelfde gedocumenteerde staat als 010-012; de 9 scenario's draaien zodra het testaccount bestaat).
+- `tests/e2e/analysis-form.spec.ts` heeft een pre-existing ESLint-error (ongebruikte import, buiten `src/`-gate) — niet aangeraakt (surgical changes).
+
+### MCP-gestuurde checks (F-01/F-10/F-16/F-17)
+
+- Supabase MCP en Snyk MCP niet actief in deze sessie — F-01/F-10/F-16/F-17 blijven open. Voor 013 is er géén databasewijziging om te verifiëren; de achterstand uit 010-012 (rls-verify, SQL-controles, Snyk-scans) blijft ongewijzigd gelden.
+
+### Verdict
+
+**SHIP met verificatieachterstand**: alle lokale gates groen (FAIL:0, blocking:0); constitution II is met het CONCEPT-label in de chat gedicht. Open vóór/na release (zie Gap in FEATURES.md, feature 013): e2e-suite echt draaien zodra E2E-accounts bestaan; handmatige live-verificatie volgens `specs/013-readable-verifiable-answers/quickstart.md` §4; F-01/F-10/F-16/F-17 via MCP-sessie.

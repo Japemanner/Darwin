@@ -153,10 +153,10 @@ test.describe('rag-chat — happy path', () => {
     // The conversation got its permanent address.
     await expect(page).toHaveURL(new RegExp(`/chat/${CONV_ID}$`))
 
-    // Sources still render including the score badge (unchanged UI)
-    await page.getByRole('button', { name: /bronnen \(1\)/i }).click()
-    await expect(page.getByText('Personeelshandboek')).toBeVisible()
-    await expect(page.getByText('92%')).toBeVisible()
+    // Sources render as numbered buttons with document names; scores are
+    // gone (feature 013).
+    await expect(page.getByRole('button', { name: '[1] Personeelshandboek' })).toBeVisible()
+    await expect(page.getByText('92%')).toHaveCount(0)
 
     // Request body contains only ids + message (constitution III: no tenant
     // decisions in the browser, no client-generated conversation).

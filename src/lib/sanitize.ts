@@ -20,11 +20,6 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   }
 })
 
-export function sanitizeHtml(dirty: string): string {
-  if (!dirty) return ''
-  return DOMPurify.sanitize(dirty, { ALLOWED_TAGS, ALLOWED_ATTR })
-}
-
 export function sanitizeMarkdown(markdown: string): string {
   if (!markdown) return ''
   const html = marked.parse(markdown, { async: false }) as string
