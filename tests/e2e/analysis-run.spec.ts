@@ -96,4 +96,46 @@ test.describe('Error handling — retry with prefilled form', () => {
     await expect(page.getByLabel(/verzekeringsvraagstuk/i)).toHaveValue(/vraagstuk voor foutscenario/i)
     await expect(page.getByLabel(/klantreferentie/i)).toHaveValue(/KL-2026-006/i)
   })
+
+  test('retry shows the attachments notice when the failed attempt had files (US5)', async ({ page }) => {
+    test.skip(process.env.MOCK_SCENARIO !== 'error', 'error scenario only')
+
+    await page.goto('/assistants')
+    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk met bijlagen')
+    await page.getByRole('checkbox').first().check()
+    await page.getByLabel(/klantsituatie/i).fill('Situatie')
+    await page.getByLabel(/klantreferentie/i).fill('KL-2026-BIJL')
+    await page.locator('#bestanden').setInputFiles({
+      name: 'polis.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.alloc(512),
+    })
+    await page.getByRole('button', { name: /start analyse/i }).click()
+
+    await expect(page.getByText(/mislukt/i).first()).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: /opnieuw/i }).click()
+
+    // The notice appears and the file list is indeed empty again (US5).
+    await expect(page.getByText('Bijlagen zijn niet bewaard. Voeg de bestanden opnieuw toe.')).toBeVisible()
+    await expect(page.getByText(/polis\.pdf/i)).toHaveCount(0)
+  })
+
+  test('retry without attachments shows no notice (US5)', async ({ page }) => {
+    test.skip(process.env.MOCK_SCENARIO !== 'error', 'error scenario only')
+
+    await page.goto('/assistants')
+    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk zonder bijlagen')
+    await page.getByRole('checkbox').first().check()
+    await page.getByLabel(/klantsituatie/i).fill('Situatie')
+    await page.getByLabel(/klantreferentie/i).fill('KL-2026-GEEN')
+    await page.getByRole('button', { name: /start analyse/i }).click()
+
+    await expect(page.getByText(/mislukt/i).first()).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: /opnieuw/i }).click()
+
+    await expect(page).toHaveURL(/\/analyse\/new\//)
+    await expect(page.getByText('Bijlagen zijn niet bewaard. Voeg de bestanden opnieuw toe.')).toHaveCount(0)
+  })
 })

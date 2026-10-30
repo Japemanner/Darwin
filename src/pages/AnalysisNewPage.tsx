@@ -113,6 +113,19 @@ function AnalysisNewPage() {
         </div>
       </div>
 
+      {/* Retry after an attempt with attachments: files are deliberately not
+          kept (constitution III) — the notice makes that explicit (US5). */}
+      {retrySnapshot?.hadBestanden && (
+        <div
+          role="note"
+          className="rounded-md border border-amber-300/60 bg-amber-50 p-3 text-sm dark:border-amber-500/30 dark:bg-amber-950/30"
+        >
+          <p className="font-medium text-amber-700 dark:text-amber-400">
+            Bijlagen zijn niet bewaard. Voeg de bestanden opnieuw toe.
+          </p>
+        </div>
+      )}
+
       <AnalysisForm
         assistant={assistant}
         initial={retrySnapshot?.values ?? null}
