@@ -198,6 +198,8 @@ function publicRecent(run) {
     started_at: run.started_at,
     finished_at: run.finished_at,
     error_code: run.error_code,
+    // Feature 014: retention deadline in the recent list (contract run-status.md).
+    expires_at: run.expires_at,
   }
 }
 

@@ -1,20 +1,21 @@
-import { test, expect } from './fixtures'
+import { test, expect, type Page } from './fixtures'
 
 // Risico-analyse UI — markdown sanitizing: no raw HTML may render.
 // Requires mock server with rich scenario: node scripts/mock-analysis-server.mjs
+// Feature 014: the assistant card navigates to /analyse/new/:assistantId.
 
 const GROUP_VALIDATION_MSG = /minimaal één van klantsituatie, bestanden of url/i
 const HTTPS_MSG = /https/i
 
-async function startAnalysis(page: { goto(url: string): Promise<unknown>; getByRole(role: unknown, opts?: unknown): { name(opts: unknown): { first(): { click(): Promise<unknown> } } }; getByLabel(label: unknown): { fill(value: string): Promise<unknown>; check(): Promise<unknown> } }) {
+async function openAnalysisForm(page: Page) {
   await page.goto('/assistants')
   await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+  await expect(page).toHaveURL(/\/analyse\/new\//)
 }
 
 test.describe('Analysis form — group validation', () => {
   test('shows inline message when Klantsituatie, Bestanden and URL\u2019s are all empty', async ({ page }) => {
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await openAnalysisForm(page)
 
     await page.getByLabel(/verzekeringsvraagstuk/i).fill('Overweging inkomensverzekering')
     await page.getByLabel(/klantreferentie/i).fill('KL-2026-001')
@@ -23,12 +24,12 @@ test.describe('Analysis form — group validation', () => {
     await page.getByRole('button', { name: /start analyse/i }).click()
 
     await expect(page.getByText(GROUP_VALIDATION_MSG)).toBeVisible()
-    await expect(page).toHaveURL(/\/assistants/)
+    // The form is its own page now — validation stays on the analysis page.
+    await expect(page).toHaveURL(/\/analyse\/new\//)
   })
 
   test('rejects non-https URLs with inline error', async ({ page }) => {
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await openAnalysisForm(page)
 
     await page.getByLabel(/url/i).fill('http://onveilig.example.com')
     await page.getByRole('button', { name: /toevoegen/i }).click()
@@ -37,8 +38,7 @@ test.describe('Analysis form — group validation', () => {
   })
 
   test('rejects files with invalid type before upload', async ({ page }) => {
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await openAnalysisForm(page)
 
     const invalidFile = {
       name: 'overzicht.exe',
@@ -53,8 +53,7 @@ test.describe('Analysis form — group validation', () => {
 
 test.describe('Analysis form — happy path submit', () => {
   test('submits valid minimal input and shows run card in wachtrij/bezig', async ({ page }) => {
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await openAnalysisForm(page)
 
     await page.getByLabel(/verzekeringsvraagstuk/i).fill('Overweging inkomensverzekering voor zelfstandige')
     await page.getByRole('checkbox').first().check()
@@ -64,6 +63,8 @@ test.describe('Analysis form — happy path submit', () => {
     await page.getByRole('button', { name: /start analyse/i }).click()
 
     await expect(page.getByText(/in wachtrij/i).or(page.getByText(/bezig/i))).toBeVisible({ timeout: 15_000 })
+    // Every analysis has a permanent id-only address (US1)
+    await expect(page).toHaveURL(/\/analyse\/[0-9a-f-]{36}/)
     // No client content in URL (SC-004)
     await expect(page).not.toHaveURL(/KL-2026/)
   })

@@ -2,6 +2,8 @@ import { test, expect } from './fixtures'
 
 // Requires mock server: node scripts/mock-analysis-server.mjs
 // Scenario per run via MOCK_SCENARIO env; these specs need a seeded run.
+// Feature 014: status/result live on /analyse/:runId; the recent list on
+// /analyse/new/:assistantId.
 
 test.describe('Run status — transitions and recent runs', () => {
   test('shows status with elapsed time and survives navigation', async ({ page }) => {
@@ -9,6 +11,9 @@ test.describe('Run status — transitions and recent runs', () => {
 
     await page.goto('/assistants')
     await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await expect(page).toHaveURL(/\/analyse\/new\//)
+    const listUrl = page.url()
+
     await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk')
     await page.getByRole('checkbox').first().check()
     await page.getByLabel(/klantsituatie/i).fill('Karige situatie')
@@ -16,9 +21,15 @@ test.describe('Run status — transitions and recent runs', () => {
     await page.getByRole('button', { name: /start analyse/i }).click()
 
     await expect(page.getByText(/in wachtrij|bezig/i).first()).toBeVisible({ timeout: 15_000 })
+    const runUrl = page.url()
 
+    // Navigating away loses nothing: the run keeps its permanent address (US1).
     await page.goto('/knowledge')
-    await page.goto('/assistants')
+    await page.goto(runUrl)
+    await expect(page.getByText(/bezig/i).first()).toBeVisible({ timeout: 15_000 })
+
+    // The recent list on the analysis page shows the run with its reference.
+    await page.goto(listUrl)
     await expect(page.getByText(/KL-2026-003/i).first()).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/bezig/i).first()).toBeVisible()
   })
@@ -80,6 +91,8 @@ test.describe('Error handling — retry with prefilled form', () => {
     await expect(page.getByText(/N8N_WORKFLOW_ERROR/i)).toBeVisible()
 
     await page.getByRole('button', { name: /opnieuw/i }).click()
+    // Retry navigates to the start page with the prefill (US1).
+    await expect(page).toHaveURL(/\/analyse\/new\//)
     await expect(page.getByLabel(/verzekeringsvraagstuk/i)).toHaveValue(/vraagstuk voor foutscenario/i)
     await expect(page.getByLabel(/klantreferentie/i)).toHaveValue(/KL-2026-006/i)
   })
