@@ -60,6 +60,10 @@ export const RecentRunSchema = z.object({
   started_at: z.string().datetime(),
   finished_at: z.string().datetime().nullable().optional(),
   error_code: z.string().nullable().optional(),
+  // Feature 014: retention deadline of the result. Optional so items from a
+  // backend that does not supply the field yet still validate — fetchRecentRuns
+  // silently drops items that fail the schema (constitution V: no empty list).
+  expires_at: z.string().datetime().nullable().optional(),
 })
 
 export type BronRef = z.infer<typeof BronRefSchema>

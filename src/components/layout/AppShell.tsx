@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useAnalysisNotifications } from '@/hooks/useAnalysisNotifications'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -27,10 +28,34 @@ const navItems = [
   { href: '/settings', label: 'Instellingen', icon: Settings },
 ]
 
+// Finished-unseen analyses badge next to the "Assistenten" label (feature 014).
+// The count is text — never a color-only signal (constitution IV).
+function AnalysisBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground">
+      <span className="sr-only">analyses klaar of mislukt sinds uw laatste bezoek:</span>
+      {count}
+    </span>
+  )
+}
+
 function AppShell() {
   const location = useLocation()
   const { profile, signOut } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const analysisCount = useAnalysisNotifications(profile?.id)
+  // Base page title measured at mount; restored when the count drops to 0
+  // (constitution III: the title never contains client content).
+  const baseTitleRef = useRef(document.title)
+
+  useEffect(() => {
+    const baseTitle = baseTitleRef.current
+    document.title = analysisCount > 0 ? `(${analysisCount}) Darwin` : baseTitle
+    return () => {
+      document.title = baseTitle
+    }
+  }, [analysisCount])
 
   const isAdmin = profile?.role === 'admin'
 
@@ -60,20 +85,21 @@ function AppShell() {
                   return true
                 })
                 .map((item) => (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                      location.pathname.startsWith(item.href)
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-accent text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                  location.pathname.startsWith(item.href)
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="flex-1">{item.label}</span>
+                {item.href === '/assistants' && <AnalysisBadge count={analysisCount} />}
+              </Link>
                 ))}
             </nav>
             <div className="border-t pt-4 flex items-center gap-3">
@@ -110,7 +136,8 @@ function AppShell() {
                 )}
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.href === '/assistants' && <AnalysisBadge count={analysisCount} />}
               </Link>
             ))}
         </nav>

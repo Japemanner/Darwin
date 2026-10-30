@@ -104,3 +104,34 @@ _Do not edit manually._
 ### Verdict
 
 **SHIP met verificatieachterstand**: alle lokale gates groen (FAIL:0, blocking:0); constitution II is met het CONCEPT-label in de chat gedicht. Open vóór/na release (zie Gap in FEATURES.md, feature 013): e2e-suite echt draaien zodra E2E-accounts bestaan; handmatige live-verificatie volgens `specs/013-readable-verifiable-answers/quickstart.md` §4; F-01/F-10/F-16/F-17 via MCP-sessie.
+
+---
+
+## Feature 014 — Risico-analyse als eigen pagina, met soepelere invoer — 2026-10-30
+
+**Uitgevoerd**: `bash scripts/fitness-check.sh` + pre-commit gates (8 feature-commits) + volledige Playwright-suite. Frontend-only feature: géén migratie, Edge Function- of bucket-wijzigingen; de enige contractwijziging is het optionele `expires_at` op recente-lijst-items (notitie in het 008-contract).
+
+### scripts/fitness-check.sh
+
+| Resultaat | FAIL:0 — PASS:13 / WARN:1 / SKIP:4 |
+|---|---|
+
+- F-14 WARN: 1 directe DOM-call in `src/main.tsx:5` — intentioneel (React root mount), pre-existing.
+- F-15 PASS: laatste 5 commits conventioneel.
+- F-01/F-10/F-16/F-17: SKIP (delegatie naar Supabase/Snyk MCP — niet actief in deze sessie; er is géén DB-wijziging in 014, dus RLS/buckets zijn ongewijzigd geldig).
+
+### Overige gates
+
+- `npx tsc --noEmit`: 0 fouten (F-07 groen), ook via de pre-commit hook bij alle 8 commits.
+- `npm run build`: groen (7,0s; chunk-size waarschuwing pre-existing).
+- `npx eslint src/`: 0 errors / 6 pre-existing warnings (baseline sinds vóór 012, geen enkele uit 014); twee nieuwe warnings die tijdens de bouw opdoken zijn binnen dezelfde fase hersteld (`AppShell`-ref-cleanup, `AnalysisForm`-useMemo); de pre-existing unused-import-error in `tests/e2e/analysis-form.spec.ts` is met de route-aanpassing opgelost.
+- Gitleaks (pre-commit): geen secrets.
+- Playwright volledige suite: **72 skipped / 0 failed** (64 bestaand + 8 nieuwe analyse-gevallen: vast-adres-navigatie, badge+titel/reset, volgorde/adviseur, standaardselectie, bijlagen-melding ±, vervaldatum, DnD+placeholder); alle specs vereisen echte Supabase-login met `E2E_EMAIL`/`E2E_PASSWORD` — nog afwezig (zelfde gedocumenteerde staat als 010-013).
+
+### MCP-gestuurde checks (F-01/F-10/F-16/F-17)
+
+- Supabase MCP en Snyk MCP niet actief in deze sessie — F-01/F-10/F-16/F-17 blijven open; géén databasewijziging om te verifiëren; de achterstand uit 010-013 blijft ongewijzigd gelden.
+
+### Verdict
+
+**SHIP met verificatieachterstand**: alle lokale gates groen (FAIL:0, blocking:0). Open (zie Gap in FEATURES.md, feature 014): e2e-suite echt draaien zodra E2E-accounts bestaan; handmatige live-verificatie `specs/014-risk-analysis-page/quickstart.md` §3; backend-afstemming `expires_at` op de echte recente-lijst-API (vrijblijvend); F-01/F-10/F-16/F-17 via een MCP-sessie.

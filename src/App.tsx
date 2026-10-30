@@ -11,6 +11,8 @@ import { useAuthStore } from '@/store/authStore'
 const CommandCenterPage = lazy(() => import('@/pages/CommandCenterPage'))
 const AssistantsPage = lazy(() => import('@/pages/AssistantsPage'))
 const ChatPage = lazy(() => import('@/pages/ChatPage'))
+const AnalysisNewPage = lazy(() => import('@/pages/AnalysisNewPage'))
+const AnalysisRunPage = lazy(() => import('@/pages/AnalysisRunPage'))
 const HistoryPage = lazy(() => import('@/pages/HistoryPage'))
 const RoadmapPage = lazy(() => import('@/pages/RoadmapPage'))
 const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'))
@@ -61,6 +63,8 @@ function App() {
                   <Route path="/assistants" element={<AssistantsPage />} />
                   <Route path="/chat/new/:assistantId" element={<ChatPage />} />
                   <Route path="/chat/:conversationId" element={<ChatPage />} />
+                  <Route path="/analyse/new/:assistantId" element={<AnalysisNewPage />} />
+                  <Route path="/analyse/:runId" element={<AnalysisRunPage />} />
                   <Route path="/history" element={<HistoryPage />} />
                   <Route path="/roadmap" element={<RoadmapPage />} />
                   <Route path="/knowledge" element={<KnowledgePage />} />

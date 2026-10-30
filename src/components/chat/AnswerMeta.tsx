@@ -5,7 +5,7 @@ import type { BronRef } from '@/lib/analysis-schemas'
 import type { RagSource, RagVerification } from '@/lib/rag-client'
 
 // Constitution II: every generated output is visibly labeled as a draft for
-// advisor review — same wording as the analysis flow (AnalysisFlow.tsx).
+// advisor review — same wording as the analysis flow (AnalysisNewPage.tsx).
 const CONCEPT_LABEL = 'CONCEPT, door adviseur te accorderen'
 
 // FR-005: warning threshold as a named constant in code (0.7, strictly
