@@ -63,6 +63,27 @@ test.describe('Analysis form — order and advisor (US3)', () => {
   })
 })
 
+test.describe('Analysis form — knowledge sources default (US4)', () => {
+  test('all knowledge sources are checked by default and can be unchecked', async ({ page }) => {
+    await openAnalysisForm(page)
+
+    await expect(
+      page.getByText('Standaard zijn alle kennisbronnen van deze assistent geselecteerd.'),
+    ).toBeVisible()
+
+    const checkboxes = page.getByRole('checkbox')
+    const count = await checkboxes.count()
+    expect(count).toBeGreaterThan(0)
+    for (let index = 0; index < count; index++) {
+      await expect(checkboxes.nth(index)).toBeChecked()
+    }
+
+    // Unchecking one source is possible (US4).
+    await checkboxes.first().uncheck()
+    await expect(checkboxes.first()).not.toBeChecked()
+  })
+})
+
 test.describe('Analysis form — happy path submit', () => {
   test('submits valid minimal input and shows run card in wachtrij/bezig', async ({ page }) => {
     await openAnalysisForm(page)

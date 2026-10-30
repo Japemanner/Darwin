@@ -64,6 +64,14 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
     }
   }, [initial])
 
+  // New form (no retry prefill): all of the assistant's knowledge sources are
+  // checked by default once the list loads (US4). Retry keeps the selection
+  // from `initial` via the effect above.
+  useEffect(() => {
+    if (initial || availableKBs.length === 0) return
+    setSelectedKBIds(new Set(availableKBs.map((kb) => kb.id)))
+  }, [initial, availableKBs])
+
   const toggleKB = (id: string) => {
     setSelectedKBIds((prev) => {
       const next = new Set(prev)
@@ -199,7 +207,7 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
 
       <div className="flex flex-col gap-2">
         <Label>Kennisbronnen</Label>
-        <p className="text-xs text-muted-foreground">De selectie bepaalt het verzekerings­type.</p>
+        <p className="text-xs text-muted-foreground">Standaard zijn alle kennisbronnen van deze assistent geselecteerd.</p>
         <div className="max-h-40 overflow-y-auto rounded-lg border" role="group" aria-label="Kennisbronnen">
           {availableKBs.length === 0 ? (
             <p className="p-3 text-sm text-muted-foreground">Geen kennisbronnen gekoppeld aan deze assistent.</p>
