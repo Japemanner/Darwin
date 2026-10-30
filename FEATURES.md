@@ -70,7 +70,7 @@ _Removed: 2026-10-19 — vervangen door feature 011 "Chat als eigen pagina met h
 
 ### ✅ Kennisbronnen — Volledig CRUD (admin-only)
 
-Kennisbronnen aanmaken, bewerken, bekijken. Velden: naam, beschrijving. Per organisatie gescoped. Sinds feature 010 admin-only: members zien bronnen, documenten en statussen alleen-lezen (KBSlideOver zonder upload/bewerk/verwijderbesturing).
+Kennisbronnen aanmaken, bewerken, bekijken. Velden: naam, beschrijving. Per organisatie gescoped. Sinds feature 010 admin-only: members zien bronnen, documenten en statussen alleen-lezen (KBSlideOver zonder upload/bewerk/verwijderbesturing). Sinds feature 016 tonen kaarten het aantal documenten, het aantal fouten en de laatste wijziging; de naam is vergrendeld zodra de bron documenten bevat (de zoekfunctie filtert op naam); het veld Vector Collection ID en het tabblad Kennisitems zijn uit de UI verdwenen - de kolom, de payload en de kennisitem-data blijven bestaan.
 
 **Files**: `src/pages/KnowledgePage.tsx` (grid + KBMappingModal)
 
@@ -82,7 +82,7 @@ Documenten (PDF/TXT/DOCX) uploaden naar Supabase Storage, DB-record aanmaken met
 
 **Files**: `src/lib/storage.ts`, `src/pages/KnowledgePage.tsx` (KBSlideOver)
 
-**Gap**: Document status wordt door N8N bijgewerkt (processing→ready→error) — geen client-side polling.
+**Status**: Documentstatus wordt door N8N bijgewerkt (processing/ready/error). Sinds feature 016 ververst de documentlijst elke 5 s zolang een document in verwerking is en stopt daarna; een fout toont "Fout" met `error_message` (of een algemene tekst) en een knop "Opnieuw verwerken" die `document-webhook` met actie `index` aanroept (de server zet de status op processing en wist de reden). Uploaden ondersteunt meerdere bestanden, drag-and-drop en een toetsenbordknop, met status per bestand; verwijderen vraagt om bevestiging met de naam.
 
 ---
 

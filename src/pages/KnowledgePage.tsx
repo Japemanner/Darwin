@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { uploadDocument, deleteDocument } from '@/lib/storage'
+import { uploadDocument, deleteDocument, retryDocument, DocumentUploadError } from '@/lib/storage'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import {
   useKnowledgeBases,
   useKnowledgeBaseDocuments,
+  useKnowledgeBaseStats,
   useKnowledgeItems,
   useLinkedAssistants,
   useCreateKnowledgeBase,
@@ -24,15 +25,44 @@ import {
 } from '@/hooks/queries'
 import { useQueryClient } from '@tanstack/react-query'
 import type { KnowledgeBase, KnowledgeBaseDocument, KnowledgeItem } from '@/types/database.types'
-import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X, FilePlus } from 'lucide-react'
+import { BookOpen, Plus, FileText, Trash2, Upload, Link2, X } from 'lucide-react'
+
+const ALLOWED_EXTENSIONS = ['pdf', 'txt', 'docx']
+const GENERIC_DOCUMENT_ERROR =
+  'De verwerking is mislukt. Probeer het opnieuw of neem contact op met de beheerder.'
+
+type UploadStatus = 'waiting' | 'uploading' | 'done' | 'error'
+
+interface UploadItem {
+  id: string
+  file: File
+  status: UploadStatus
+  error?: string
+  documentId?: string
+  retryable?: boolean
+}
+
+const UPLOAD_STATUS_LABELS: Record<UploadStatus, string> = {
+  waiting: 'Wachten',
+  uploading: 'Uploaden...',
+  done: 'Klaar',
+  error: 'Fout',
+}
+
+type PendingDelete =
+  | { type: 'document'; document: KnowledgeBaseDocument }
+  | { type: 'item'; item: KnowledgeItem }
 
 function KnowledgePage() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const { data: knowledgeBases, isPending } = useKnowledgeBases(profile?.organization_id)
+  const { data: stats } = useKnowledgeBaseStats(profile?.organization_id)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingKB, setEditingKB] = useState<KnowledgeBase | null>(null)
   const [selectedKB, setSelectedKB] = useState<KnowledgeBase | null>(null)
+
+  const statsById = new Map((stats ?? []).map((row) => [row.knowledge_base_id, row]))
 
   if (isPending) {
     return (
@@ -55,7 +85,7 @@ function KnowledgePage() {
         <div>
           <h1 className="text-2xl font-bold">Kennisbronnen</h1>
           <p className="text-muted-foreground">
-            {isAdmin ? 'Beheer documenten en koppel ze aan assistenten' : 'Kennisbronnen en documenten van je organisatie'}
+            {isAdmin ? 'Beheer documenten en koppel ze aan assistenten' : 'Kennisbronnen en documenten van uw organisatie'}
           </p>
         </div>
         {isAdmin && (
@@ -69,33 +99,55 @@ function KnowledgePage() {
         <EmptyState
           icon={<BookOpen className="h-12 w-12" />}
           title="Nog geen kennisbronnen"
-          description={isAdmin ? 'Upload documenten zodat je assistenten er kennis uit kunnen putten' : 'Nog geen kennisbronnen beschikbaar'}
+          description={isAdmin ? 'Upload documenten zodat uw assistenten er kennis uit kunnen putten' : 'Nog geen kennisbronnen beschikbaar'}
           {...(isAdmin ? { action: { label: 'Maak kennisbron', onClick: () => { setEditingKB(null); setModalOpen(true) } } } : {})}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(knowledgeBases ?? []).map((kb) => (
-            <Card key={kb.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedKB(kb)}>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">{kb.name}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {kb.description ?? 'Geen beschrijving'}
-                </p>
-              </CardContent>
-              <CardFooter>
-                {isAdmin && (
-                  <Button variant="ghost" size="sm" className="ml-auto" onClick={(e) => { e.stopPropagation(); setEditingKB(kb); setModalOpen(true) }}>
-                    Bewerken
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
+          {(knowledgeBases ?? []).map((kb) => {
+            const kbStats = statsById.get(kb.id)
+            return (
+              <Card key={kb.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedKB(kb)}>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-lg">{kb.name}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {kb.description ?? 'Geen beschrijving'}
+                  </p>
+                  <div className="mt-4 space-y-1 text-sm">
+                    {kbStats ? (
+                      <>
+                        <p className="text-foreground">
+                          {kbStats.document_count === 0
+                            ? 'Nog geen documenten'
+                            : formatCount(kbStats.document_count, 'document', 'documenten')}
+                        </p>
+                        <p className={kbStats.error_count > 0 ? 'font-medium text-destructive' : 'text-muted-foreground'}>
+                          {formatCount(kbStats.error_count, 'fout', 'fouten')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Laatst bijgewerkt: {formatDateTime(kbStats.last_updated_at)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Statistieken laden...</p>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  {isAdmin && (
+                    <Button variant="ghost" size="sm" className="ml-auto" onClick={(e) => { e.stopPropagation(); setEditingKB(kb); setModalOpen(true) }}>
+                      Bewerken
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            )
+          })}
         </div>
       )}
 
@@ -134,10 +186,14 @@ function KBMappingModal({
   const { toast } = useToast()
   const createMutation = useCreateKnowledgeBase(organizationId)
   const updateMutation = useUpdateKnowledgeBase(organizationId)
+  const { data: kbDocuments, isPending: kbDocumentsLoading } = useKnowledgeBaseDocuments(open ? kb?.id : undefined)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [vectorCollectionId, setVectorCollectionId] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
+  const documentCount = (kbDocuments ?? []).length
+  const nameLocked = !!kb && (kbDocumentsLoading || documentCount > 0)
 
   useEffect(() => {
     if (kb) {
@@ -178,16 +234,24 @@ function KBMappingModal({
         <DialogContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="kb-name">Naam</Label>
-            <Input id="kb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mijn kennisbron" required />
+            <Input
+              id="kb-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Mijn kennisbron"
+              required
+              disabled={nameLocked}
+              aria-describedby={nameLocked && !kbDocumentsLoading ? 'kb-name-lock' : undefined}
+            />
+            {nameLocked && !kbDocumentsLoading && (
+              <p id="kb-name-lock" className="text-xs text-muted-foreground">
+                De naam kan niet worden gewijzigd zolang er documenten in deze kennisbron staan, omdat de zoekfunctie de naam gebruikt.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="kb-desc">Beschrijving</Label>
             <Textarea id="kb-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optionele omschrijving" rows={3} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="kb-vector">Vector Collection ID</Label>
-            <Input id="kb-vector" value={vectorCollectionId} onChange={(e) => setVectorCollectionId(e.target.value)} placeholder="my-collection-name" />
-            <p className="text-xs text-muted-foreground">Verwijzing naar de collectie in de vector database (Pinecone namespace, Qdrant collection, etc.)</p>
           </div>
         </DialogContent>
         <DialogFooter>
@@ -215,7 +279,11 @@ function KBSlideOver({
   const { toast } = useToast()
   const qc = useQueryClient()
   const [tab, setTab] = useState<'documents' | 'items' | 'assistants'>('documents')
-  const [isUploading, setIsUploading] = useState(false)
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([])
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [itemForm, setItemForm] = useState({ title: '', content: '', sourceUrl: '' })
   const [isSavingItem, setIsSavingItem] = useState(false)
 
@@ -225,39 +293,124 @@ function KBSlideOver({
   const addItemMutation = useAddKnowledgeItem(kb?.id ?? '')
   const deleteItemMutation = useDeleteKnowledgeItem(kb?.id ?? '')
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !kb) return
-
-    const ALLOWED_EXTENSIONS = ['pdf', 'txt', 'docx']
-    const fileExt = file.name.split('.').pop()?.toLowerCase()
-    if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
-      toast({ title: 'Ongeldig bestandstype', description: `Toegestane typen: ${ALLOWED_EXTENSIONS.join(', ').toUpperCase()}`, variant: 'destructive' })
-      e.target.value = ''
-      return
+  const hasProcessingDocuments = (documents ?? []).some((doc) => doc.status === 'processing')
+  const previousHasProcessing = useRef(false)
+  useEffect(() => {
+    if (previousHasProcessing.current && !hasProcessingDocuments) {
+      qc.invalidateQueries({ queryKey: ['kb-stats', organizationId] })
     }
+    previousHasProcessing.current = hasProcessingDocuments
+  }, [hasProcessingDocuments, organizationId, qc])
 
-    setIsUploading(true)
-    try {
-      await uploadDocument(file, kb.id, userId, organizationId)
-      toast({ title: 'Document geüpload', description: file.name })
-      qc.invalidateQueries({ queryKey: ['kb-documents', kb.id] })
-    } catch (err) {
-      toast({ title: 'Upload mislukt', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
-    } finally {
-      setIsUploading(false)
-      e.target.value = ''
+  const updateUploadItem = (id: string, patch: Partial<UploadItem>) => {
+    setUploadItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)))
+  }
+
+  const processUploads = async (itemsToUpload: UploadItem[]) => {
+    if (!kb) return
+    for (const item of itemsToUpload) {
+      updateUploadItem(item.id, { status: 'uploading' })
+      try {
+        await uploadDocument(item.file, kb.id, userId, organizationId)
+        updateUploadItem(item.id, { status: 'done' })
+        toast({ title: 'Document geüpload', description: item.file.name })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Onbekende fout'
+        const documentId = err instanceof DocumentUploadError ? err.documentId ?? undefined : undefined
+        updateUploadItem(item.id, { status: 'error', error: message, documentId, retryable: true })
+        toast({ title: 'Upload mislukt', description: message, variant: 'destructive' })
+      } finally {
+        qc.invalidateQueries({ queryKey: ['kb-documents', kb.id] })
+        qc.invalidateQueries({ queryKey: ['kb-stats', organizationId] })
+      }
     }
   }
 
-  const handleDeleteDoc = async (doc: KnowledgeBaseDocument) => {
+  const handleFiles = (files: FileList | File[]) => {
+    if (!kb) return
+    const list = Array.from(files)
+    if (list.length === 0) return
+
+    const allowedText = ALLOWED_EXTENSIONS.join(', ').toUpperCase()
+    const newItems: UploadItem[] = list.map((file) => {
+      const fileExt = file.name.split('.').pop()?.toLowerCase()
+      if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
+        return { id: crypto.randomUUID(), file, status: 'error', error: `Toegestane typen: ${allowedText}` }
+      }
+      return { id: crypto.randomUUID(), file, status: 'waiting' }
+    })
+
+    setUploadItems((prev) => [...prev, ...newItems])
+    if (newItems.some((item) => item.status === 'error')) {
+      toast({ title: 'Ongeldig bestandstype', description: `Toegestane typen: ${allowedText}`, variant: 'destructive' })
+    }
+    void processUploads(newItems.filter((item) => item.status === 'waiting'))
+  }
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) handleFiles(e.target.files)
+    e.target.value = ''
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    if (isAdmin) handleFiles(e.dataTransfer.files)
+  }
+
+  const handleRetryUpload = async (item: UploadItem) => {
+    if (item.documentId) {
+      updateUploadItem(item.id, { status: 'uploading', error: undefined })
+      try {
+        await retryDocument(item.documentId)
+        updateUploadItem(item.id, { status: 'done', documentId: undefined, retryable: false })
+        toast({ title: 'Opnieuw in verwerking', description: item.file.name })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Onbekende fout'
+        updateUploadItem(item.id, { status: 'error', error: message })
+        toast({ title: 'Opnieuw verwerken mislukt', description: message, variant: 'destructive' })
+      } finally {
+        qc.invalidateQueries({ queryKey: ['kb-documents', kb?.id] })
+        qc.invalidateQueries({ queryKey: ['kb-stats', organizationId] })
+      }
+      return
+    }
+
+    updateUploadItem(item.id, { status: 'waiting', error: undefined, retryable: false })
+    void processUploads([{ ...item, status: 'waiting', error: undefined, retryable: false }])
+  }
+
+  const handleRetryDocument = async (doc: KnowledgeBaseDocument) => {
+    setRetryingId(doc.id)
     try {
-      await deleteDocument(doc.id, doc.file_path)
-      toast({ title: 'Document verwijderd' })
+      await retryDocument(doc.id)
+      toast({ title: 'Opnieuw in verwerking', description: doc.name })
       qc.invalidateQueries({ queryKey: ['kb-documents', kb?.id] })
+      qc.invalidateQueries({ queryKey: ['kb-stats', organizationId] })
     } catch (err) {
-      // Show the typed Dutch error (message + code) — no silent failures (FR-009).
+      toast({ title: 'Opnieuw verwerken mislukt', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
+    } finally {
+      setRetryingId(null)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete || isDeleting) return
+    setIsDeleting(true)
+    try {
+      if (pendingDelete.type === 'document') {
+        await deleteDocument(pendingDelete.document.id, pendingDelete.document.file_path)
+        toast({ title: 'Document verwijderd' })
+        qc.invalidateQueries({ queryKey: ['kb-documents', kb?.id] })
+      } else {
+        await deleteItemMutation.mutateAsync(pendingDelete.item.id)
+        toast({ title: 'Kennisitem verwijderd' })
+      }
+      qc.invalidateQueries({ queryKey: ['kb-stats', organizationId] })
+      setPendingDelete(null)
+    } catch (err) {
       toast({ title: 'Fout bij verwijderen', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -283,16 +436,13 @@ function KBSlideOver({
     }
   }
 
-  const handleDeleteItem = async (item: KnowledgeItem) => {
-    try {
-      await deleteItemMutation.mutateAsync(item.id)
-      toast({ title: 'Kennisitem verwijderd' })
-    } catch {
-      toast({ title: 'Fout bij verwijderen', variant: 'destructive' })
-    }
-  }
-
   if (!kb) return null
+
+  const pendingDeleteName = pendingDelete?.type === 'document'
+    ? pendingDelete.document.name
+    : pendingDelete?.type === 'item'
+      ? pendingDelete.item.title
+      : ''
 
   return (
     <div className="fixed inset-0 z-40">
@@ -300,7 +450,7 @@ function KBSlideOver({
       <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-background border-l shadow-2xl flex flex-col">
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="font-semibold text-lg">{kb.name}</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Sluiten" onClick={onClose}><X className="h-5 w-5" /></Button>
         </div>
 
         <div className="flex border-b">
@@ -309,12 +459,6 @@ function KBSlideOver({
             className={cn("flex-1 py-2 text-sm font-medium border-b-2 transition-colors", tab === 'documents' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground')}
           >
             <FileText className="h-4 w-4 inline mr-1" /> Documenten
-          </button>
-          <button
-            onClick={() => setTab('items')}
-            className={cn("flex-1 py-2 text-sm font-medium border-b-2 transition-colors", tab === 'items' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground')}
-          >
-            <FilePlus className="h-4 w-4 inline mr-1" /> Kennisitems
           </button>
           <button
             onClick={() => setTab('assistants')}
@@ -328,14 +472,47 @@ function KBSlideOver({
           {tab === 'documents' && (
             <div className="space-y-3">
               {isAdmin && (
-                <label className="flex items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer hover:bg-accent/50 transition-colors">
+                <div
+                  className="rounded-lg border-2 border-dashed p-4"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                >
                   <div className="text-center">
-                    <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">{isUploading ? 'Uploaden...' : 'Klik om te uploaden'}</p>
-                    <p className="text-xs text-muted-foreground">PDF, TXT, DOCX</p>
+                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                      <Upload className="h-4 w-4 mr-2" /> Bestanden toevoegen
+                    </Button>
+                    <p className="mt-2 text-xs text-muted-foreground">of sleep bestanden hierheen · PDF, TXT, DOCX</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.txt,.docx"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileInput}
+                    />
                   </div>
-                  <input type="file" accept=".pdf,.txt,.docx" className="hidden" onChange={handleUpload} disabled={isUploading} />
-                </label>
+
+                  {uploadItems.length > 0 && (
+                    <ul className="mt-4 space-y-2" aria-live="polite">
+                      {uploadItems.map((item) => (
+                        <li key={item.id} className="flex items-start justify-between gap-2 rounded border p-2 text-sm">
+                          <span className="min-w-0 flex-1 truncate">{item.file.name}</span>
+                          <div className="text-right">
+                            <span className={cn('text-xs', item.status === 'error' && 'text-destructive', item.status === 'done' && 'text-primary')}>
+                              {UPLOAD_STATUS_LABELS[item.status]}
+                            </span>
+                            {item.error && <p className="max-w-[16rem] text-xs text-destructive">{item.error}</p>}
+                            {item.status === 'error' && item.retryable && (
+                              <Button variant="ghost" size="sm" onClick={() => handleRetryUpload(item)}>
+                                Opnieuw proberen
+                              </Button>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
 
               {docsLoading ? (
@@ -344,29 +521,42 @@ function KBSlideOver({
                 <p className="text-center text-sm text-muted-foreground py-8">Nog geen documenten geüpload</p>
               ) : (
                 (documents ?? []).map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{doc.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {doc.file_type.toUpperCase()} · {formatFileSize(doc.file_size)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {doc.status === 'ready' && (
-                        <Badge variant="default">Klaar</Badge>
-                      )}
-                      {doc.status === 'processing' && (
-                        <Badge variant="secondary">Verwerken...</Badge>
-                      )}
+                  <div key={doc.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{doc.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doc.file_type.toUpperCase()} · {formatFileSize(doc.file_size)}
+                      </p>
                       {doc.status === 'error' && (
-                        <Badge variant="destructive">Error</Badge>
+                        <p className="mt-1 text-xs text-destructive">
+                          {doc.error_message ?? GENERIC_DOCUMENT_ERROR}
+                        </p>
                       )}
-                      {isAdmin && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteDoc(doc)}>
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <div className="flex items-center gap-2">
+                        {doc.status === 'ready' && <Badge variant="default">Klaar</Badge>}
+                        {doc.status === 'processing' && <Badge variant="secondary">Verwerken...</Badge>}
+                        {doc.status === 'error' && <Badge variant="destructive">Fout</Badge>}
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Verwijder ${doc.name}`}
+                            onClick={() => setPendingDelete({ type: 'document', document: doc })}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </div>
+                      {isAdmin && doc.status === 'error' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRetryDocument(doc)}
+                          disabled={retryingId === doc.id}
+                        >
+                          {retryingId === doc.id ? 'Bezig...' : 'Opnieuw verwerken'}
                         </Button>
                       )}
                     </div>
@@ -380,40 +570,40 @@ function KBSlideOver({
             <div className="space-y-4">
               {isAdmin && (
                 <form onSubmit={handleAddItem} className="space-y-3 p-3 border rounded-lg">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="item-title">Titel</Label>
-                  <Input
-                    id="item-title"
-                    value={itemForm.title}
-                    onChange={(e) => setItemForm((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="Titel van het kennisitem"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="item-content">Inhoud</Label>
-                  <Textarea
-                    id="item-content"
-                    value={itemForm.content}
-                    onChange={(e) => setItemForm((prev) => ({ ...prev, content: e.target.value }))}
-                    placeholder="De tekst die naar de vector database gestuurd wordt..."
-                    rows={5}
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="item-source">Bron URL (optioneel)</Label>
-                  <Input
-                    id="item-source"
-                    value={itemForm.sourceUrl}
-                    onChange={(e) => setItemForm((prev) => ({ ...prev, sourceUrl: e.target.value }))}
-                    placeholder="https://..."
-                  />
-                </div>
-                <Button type="submit" size="sm" disabled={isSavingItem}>
-                  <Plus className="h-4 w-4 mr-1" /> {isSavingItem ? 'Toevoegen...' : 'Toevoegen'}
-                </Button>
-              </form>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="item-title">Titel</Label>
+                    <Input
+                      id="item-title"
+                      value={itemForm.title}
+                      onChange={(e) => setItemForm((prev) => ({ ...prev, title: e.target.value }))}
+                      placeholder="Titel van het kennisitem"
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="item-content">Inhoud</Label>
+                    <Textarea
+                      id="item-content"
+                      value={itemForm.content}
+                      onChange={(e) => setItemForm((prev) => ({ ...prev, content: e.target.value }))}
+                      placeholder="De tekst die naar de vector database gestuurd wordt..."
+                      rows={5}
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="item-source">Bron URL (optioneel)</Label>
+                    <Input
+                      id="item-source"
+                      value={itemForm.sourceUrl}
+                      onChange={(e) => setItemForm((prev) => ({ ...prev, sourceUrl: e.target.value }))}
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <Button type="submit" size="sm" disabled={isSavingItem}>
+                    <Plus className="h-4 w-4 mr-1" /> {isSavingItem ? 'Toevoegen...' : 'Toevoegen'}
+                  </Button>
+                </form>
               )}
 
               {itemsLoading ? (
@@ -437,7 +627,12 @@ function KBSlideOver({
                         {item.embedding_status === 'done' ? 'Klaar' : item.embedding_status === 'processing' ? 'Verwerken' : item.embedding_status === 'failed' ? 'Fout' : 'Wachtend'}
                       </Badge>
                       {isAdmin && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Verwijder ${item.title}`}
+                          onClick={() => setPendingDelete({ type: 'item', item })}
+                        >
                           <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
                       )}
@@ -469,8 +664,41 @@ function KBSlideOver({
           )}
         </div>
       </div>
+
+      <Dialog open={!!pendingDelete} onOpenChange={(isOpen) => { if (!isOpen) setPendingDelete(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{pendingDelete?.type === 'item' ? 'Kennisitem verwijderen' : 'Document verwijderen'}</DialogTitle>
+          </DialogHeader>
+          <p className="mt-4 text-sm">
+            Weet u zeker dat u <strong>{pendingDeleteName}</strong> wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" autoFocus onClick={() => setPendingDelete(null)} disabled={isDeleting}>
+              Annuleren
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeleting}>
+              {isDeleting ? 'Verwijderen...' : 'Verwijderen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
+}
+
+function formatCount(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('nl-NL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function formatFileSize(bytes: number): string {

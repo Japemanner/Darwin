@@ -16,6 +16,16 @@ export class DocumentWebhookError extends Error {
   }
 }
 
+// Carries the created document id when the row exists but the indexing call
+// failed, so the UI retries indexing instead of uploading a duplicate.
+export class DocumentUploadError extends Error {
+  readonly documentId: string | null
+  constructor(message: string, documentId: string | null) {
+    super(message)
+    this.documentId = documentId
+  }
+}
+
 const TEXT_UNAUTHORIZED = 'Uw sessie is verlopen. Log opnieuw in.'
 const TEXT_FORBIDDEN = 'U heeft geen toegang tot dit document.'
 const TEXT_NOT_CONFIGURED = 'Er is geen koppeling geconfigureerd. Neem contact op met de beheerder.'
@@ -88,9 +98,23 @@ export const uploadDocument = async (
 
   // Notify n8n via the server. On failure the file and row stay in place and
   // the caller shows the Dutch error message (constitution V: no silent failures).
-  await notifyDocumentWebhook(document.id, 'index')
+  try {
+    await notifyDocumentWebhook(document.id, 'index')
+  } catch (err) {
+    throw new DocumentUploadError(
+      err instanceof Error ? err.message : TEXT_UPSTREAM_ERROR,
+      document.id,
+    )
+  }
 
   return document
+}
+
+// Re-indexing is a server-side status transition: the edge function sets
+// status = 'processing' and clears error_message before calling n8n. Clients
+// have no UPDATE policy on knowledge_base_documents (migration 015).
+export const retryDocument = async (documentId: string): Promise<void> => {
+  await notifyDocumentWebhook(documentId, 'index')
 }
 
 export const deleteDocument = async (documentId: string, filePath: string | null) => {

@@ -24,8 +24,8 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 **Purpose**: Test scaffold and baseline confirmation
 
-- [ ] T001 [P] Create the E2E scaffold with reusable REST/edge mocks (`mockKnowledgeBases`, `mockDocuments`, `mockStats`, `mockDocumentWebhook`) in `tests/e2e/knowledge-source-manageability.spec.ts`
-- [ ] T002 Confirm the branch is `016-knowledge-source-manageability` and capture a clean baseline with `npx tsc --noEmit` (no file changes; see `package.json`)
+- [x] T001 [P] Create the E2E scaffold with reusable REST/edge mocks (`mockKnowledgeBases`, `mockDocuments`, `mockStats`, `mockDocumentWebhook`) in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T002 Confirm the branch is `016-knowledge-source-manageability` and capture a clean baseline with `npx tsc --noEmit` (no file changes; see `package.json`)
 
 ---
 
@@ -35,8 +35,8 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Create `supabase/migrations/018_knowledge_source_manageability.sql` with: `error_message TEXT` on `knowledge_base_documents`, the `security_invoker` view `knowledge_base_stats`, `REVOKE ALL ... FROM anon`, and `GRANT SELECT ... TO authenticated` (see `data-model.md`)
-- [ ] T004 [P] Update `src/types/database.types.ts`: add `error_message` to `knowledge_base_documents` Row/Insert/Update, add `Views.knowledge_base_stats`, and export the `KnowledgeBaseStats` alias
+- [x] T003 Create `supabase/migrations/018_knowledge_source_manageability.sql` with: `error_message TEXT` on `knowledge_base_documents`, the `security_invoker` view `knowledge_base_stats`, `REVOKE ALL ... FROM anon`, and `GRANT SELECT ... TO authenticated` (see `data-model.md`)
+- [x] T004 [P] Update `src/types/database.types.ts`: add `error_message` to `knowledge_base_documents` Row/Insert/Update, add `Views.knowledge_base_stats`, and export the `KnowledgeBaseStats` alias
 - [ ] T005 Apply the migration via Supabase MCP and verify `information_schema.columns` plus a `select * from knowledge_base_stats limit 5`; run `NOTIFY pgrst, 'reload schema'` (source: `supabase/migrations/018_knowledge_source_manageability.sql`)
 
 **Checkpoint**: Migration applied, types compile, view reachable.
@@ -51,13 +51,13 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 ### Tests for User Story 1
 
-- [ ] T006 [US1] Add E2E cases for card statistics (empty, all-ready, one-error) in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T006 [US1] Add E2E cases for card statistics (empty, all-ready, one-error) in `tests/e2e/knowledge-source-manageability.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T007 [P] [US1] Add `useKnowledgeBaseStats(orgId)` reading `knowledge_base_stats` filtered on `organization_id` with key `['kb-stats', orgId]` in `src/hooks/queries.ts`
-- [ ] T008 [US1] Merge stats into the card grid in `src/pages/KnowledgePage.tsx`: document count, error count with destructive accent, `last_updated_at` formatted `nl-NL`, and "Nog geen documenten" for empty sources (depends on T007)
-- [ ] T009 [US1] Invalidate `['kb-stats', orgId]` after upload/delete/retry so cards stay accurate in `src/pages/KnowledgePage.tsx`
+- [x] T007 [P] [US1] Add `useKnowledgeBaseStats(orgId)` reading `knowledge_base_stats` filtered on `organization_id` with key `['kb-stats', orgId]` in `src/hooks/queries.ts`
+- [x] T008 [US1] Merge stats into the card grid in `src/pages/KnowledgePage.tsx`: document count, error count with destructive accent, `last_updated_at` formatted `nl-NL`, and "Nog geen documenten" for empty sources (depends on T007)
+- [x] T009 [US1] Invalidate `['kb-stats', orgId]` after upload/delete/retry so cards stay accurate in `src/pages/KnowledgePage.tsx`
 
 **Checkpoint**: US1 works independently and is demoable as the MVP.
 
@@ -71,16 +71,16 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 ### Tests for User Story 2
 
-- [ ] T010 [US2] Add E2E case proving polling stops: `processing` responses first, then `ready`; assert the REST call count stabilises after the interval in `tests/e2e/knowledge-source-manageability.spec.ts`
-- [ ] T011 [US2] Add E2E case for a failed document: "Fout", the `error_message` (or generic text), and the retry button posting `{ document_id, action: 'index' }` in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T010 [US2] Add E2E case proving polling stops: `processing` responses first, then `ready`; assert the REST call count stabilises after the interval in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T011 [US2] Add E2E case for a failed document: "Fout", the `error_message` (or generic text), and the retry button posting `{ document_id, action: 'index' }` in `tests/e2e/knowledge-source-manageability.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Add `refetchInterval` to `useKnowledgeBaseDocuments` in `src/hooks/queries.ts`: `5000` while any document is `processing`, else `false`; set `refetchIntervalInBackground: false`
-- [ ] T013 [P] [US2] Add `retryDocument(documentId)` to `src/lib/storage.ts` that only calls `notifyDocumentWebhook(documentId, 'index')` (contract: `contracts/document-retry.md`)
-- [ ] T014 [US2] Update `supabase/functions/document-webhook/index.ts` for `action === 'index'`: read `profiles.organization_id, role`, return `403 FORBIDDEN` for non-admins, set `status='processing'`/`error_message=null` with the service role before the n8n call, and set `status='error'` plus the Dutch error text when a pre-call or upstream step fails
+- [x] T012 [US2] Add `refetchInterval` to `useKnowledgeBaseDocuments` in `src/hooks/queries.ts`: `5000` while any document is `processing`, else `false`; set `refetchIntervalInBackground: false`
+- [x] T013 [P] [US2] Add `retryDocument(documentId)` to `src/lib/storage.ts` that only calls `notifyDocumentWebhook(documentId, 'index')` (contract: `contracts/document-retry.md`)
+- [x] T014 [US2] Update `supabase/functions/document-webhook/index.ts` for `action === 'index'`: read `profiles.organization_id, role`, return `403 FORBIDDEN` for non-admins, set `status='processing'`/`error_message=null` with the service role before the n8n call, and set `status='error'` plus the Dutch error text when a pre-call or upstream step fails
 - [ ] T015 [US2] Deploy the updated `supabase/functions/document-webhook/index.ts` via Supabase MCP and verify an admin retry and a member retry (member must be refused)
-- [ ] T016 [US2] Update the document row in `src/pages/KnowledgePage.tsx`: "Fout" label, `error_message` or the generic text "De verwerking is mislukt. Probeer het opnieuw of neem contact op met de beheerder.", and an admin-only "Opnieuw verwerken" button that calls `retryDocument`, shows a Dutch toast on failure, and invalidates docs + stats on success (depends on T012, T013, T015)
+- [x] T016 [US2] Update the document row in `src/pages/KnowledgePage.tsx`: "Fout" label, `error_message` or the generic text "De verwerking is mislukt. Probeer het opnieuw of neem contact op met de beheerder.", and an admin-only "Opnieuw verwerken" button that calls `retryDocument`, shows a Dutch toast on failure, and invalidates docs + stats on success (depends on T012, T013, T015)
 
 **Checkpoint**: US2 works independently; polling starts and stops, retry round-trips through the server route.
 
@@ -94,11 +94,11 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 ### Tests for User Story 3
 
-- [ ] T017 [US3] Add E2E case: delete opens a confirmation containing the document name; cancel does not call DELETE; confirm calls DELETE in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T017 [US3] Add E2E case: delete opens a confirmation containing the document name; cancel does not call DELETE; confirm calls DELETE in `tests/e2e/knowledge-source-manageability.spec.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Add local `pendingDelete` state and a nested confirm `Dialog` (feature C pattern) in `src/pages/KnowledgePage.tsx`, wired to both document and knowledge-item deletion with "Annuleren" autofocus and Dutch u-vorm copy
+- [x] T018 [US3] Add local `pendingDelete` state and a nested confirm `Dialog` (feature C pattern) in `src/pages/KnowledgePage.tsx`, wired to both document and knowledge-item deletion with "Annuleren" autofocus and Dutch u-vorm copy
 
 **Checkpoint**: US3 works independently and is keyboard-operable.
 
@@ -112,11 +112,11 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 ### Tests for User Story 4
 
-- [ ] T019 [US4] Add E2E case: the name input is disabled and the helper text is visible when the mocked document list is non-empty in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T019 [US4] Add E2E case: the name input is disabled and the helper text is visible when the mocked document list is non-empty in `tests/e2e/knowledge-source-manageability.spec.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] In `KBMappingModal` inside `src/pages/KnowledgePage.tsx`, read documents via `useKnowledgeBaseDocuments(kb?.id)` for edit mode, disable the name input when the list is loading or non-empty, and render the exact helper text from the plan; keep the field editable for zero documents and create mode
+- [x] T020 [US4] In `KBMappingModal` inside `src/pages/KnowledgePage.tsx`, read documents via `useKnowledgeBaseDocuments(kb?.id)` for edit mode, disable the name input when the list is loading or non-empty, and render the exact helper text from the plan; keep the field editable for zero documents and create mode
 
 **Checkpoint**: US4 works independently.
 
@@ -130,11 +130,11 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 ### Tests for User Story 5
 
-- [ ] T021 [US5] Add E2E case: `setInputFiles` with multiple files shows per-file statuses, one invalid file shows an error while valid files complete, and each success posts to `document-webhook` in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T021 [US5] Add E2E case: `setInputFiles` with multiple files shows per-file statuses, one invalid file shows an error while valid files complete, and each success posts to `document-webhook` in `tests/e2e/knowledge-source-manageability.spec.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T022 [US5] Implement the upload queue in `src/pages/KnowledgePage.tsx`: `input multiple`, a focusable "Bestanden toevoegen" button that opens the picker, a drag-and-drop zone, per-file extension validation, sequential `uploadDocument` calls, and a status list with `aria-live="polite"` (depends on T009)
+- [x] T022 [US5] Implement the upload queue in `src/pages/KnowledgePage.tsx`: `input multiple`, a focusable "Bestanden toevoegen" button that opens the picker, a drag-and-drop zone, per-file extension validation, sequential `uploadDocument` calls, and a status list with `aria-live="polite"` (depends on T009)
 
 **Checkpoint**: US5 works independently and keeps the button as the keyboard alternative.
 
@@ -148,13 +148,13 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 ### Tests for User Story 6
 
-- [ ] T023 [US6] Add E2E assertions that the "Vector Collection ID" field, its Pinecone help text and the "Kennisitems" tab are absent in `tests/e2e/knowledge-source-manageability.spec.ts`
+- [x] T023 [US6] Add E2E assertions that the "Vector Collection ID" field, its Pinecone help text and the "Kennisitems" tab are absent in `tests/e2e/knowledge-source-manageability.spec.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T024 [US6] Remove the Vector Collection ID field and help text from `KBMappingModal` in `src/pages/KnowledgePage.tsx` while keeping `vectorCollectionId` state and the `vector_collection_id` payload
-- [ ] T025 [US6] Stop rendering the Kennisitems tab button and panel in `src/pages/KnowledgePage.tsx`; keep the `useKnowledgeItems` hook, the add/delete handlers and the `'items'` state branch in the file
-- [ ] T026 [P] [US6] Add a note to `FEATURES.md` that the Kennisitems tab is hidden since feature 016 and that its data and code remain
+- [x] T024 [US6] Remove the Vector Collection ID field and help text from `KBMappingModal` in `src/pages/KnowledgePage.tsx` while keeping `vectorCollectionId` state and the `vector_collection_id` payload
+- [x] T025 [US6] Stop rendering the Kennisitems tab button and panel in `src/pages/KnowledgePage.tsx`; keep the `useKnowledgeItems` hook, the add/delete handlers and the `'items'` state branch in the file
+- [x] T026 [P] [US6] Add a note to `FEATURES.md` that the Kennisitems tab is hidden since feature 016 and that its data and code remain
 
 **Checkpoint**: US6 works independently; no data is removed.
 
@@ -164,11 +164,11 @@ Single web app: `src/`, `supabase/`, `tests/` at repository root.
 
 **Purpose**: Quality gates, regression, documentation
 
-- [ ] T027 [P] Run `npx tsc --noEmit` and fix any type errors from the new column/view in `src/types/database.types.ts`
-- [ ] T028 [P] Run `npx eslint src/ --max-warnings 0` and fix any findings in `src/pages/KnowledgePage.tsx`, `src/hooks/queries.ts`, `src/lib/storage.ts`
-- [ ] T029 Run `npm run build` (per `package.json`)
+- [x] T027 [P] Run `npx tsc --noEmit` and fix any type errors from the new column/view in `src/types/database.types.ts`
+- [x] T028 [P] Run `npx eslint src/ --max-warnings 0` and fix any findings in `src/pages/KnowledgePage.tsx`, `src/hooks/queries.ts`, `src/lib/storage.ts`
+- [x] T029 Run `npm run build` (per `package.json`)
 - [ ] T030 Run `npx playwright test tests/e2e/knowledge-source-manageability.spec.ts` and the existing regression suite (`npx playwright test`)
-- [ ] T031 Review the diff for no new npm dependencies in `package.json`, no client content in URLs/logs/PostHog/storage, and admin-only actions; update the "Gap" line for document polling in `FEATURES.md`
+- [x] T031 Review the diff for no new npm dependencies in `package.json`, no client content in URLs/logs/PostHog/storage, and admin-only actions; update the "Gap" line for document polling in `FEATURES.md`
 
 ---
 
@@ -251,3 +251,11 @@ Task: "Note hidden Kennisitems tab in FEATURES.md"
 - `document-webhook` must be deployed before the retry button is exercised against the real backend
 - Tests mock Supabase REST and the edge function; only login is real
 - Commit after each story checkpoint with `feat(knowledge): ...` / `test(knowledge): ...`
+
+## Implementation Status (2026-10-30)
+
+- All code, the migration file and the Playwright cases are implemented on `016-knowledge-source-manageability`.
+- **T005** (apply migration) and **T015** (deploy `document-webhook`) remain open: they require Supabase MCP, which is not connected in this session. Run them via `quickstart.md`.
+- **T030** compiled and executed, but all 27 E2E cases in the three affected specs skip because `E2E_EMAIL`/`E2E_PASSWORD` and the member credentials are not set. Re-run with credentials before release.
+- `npx tsc --noEmit`, ESLint on the changed files and `npm run build` pass.
+- Existing repository-wide ESLint warnings (App.tsx, toast.tsx, posthog.tsx) are pre-existing and untouched.

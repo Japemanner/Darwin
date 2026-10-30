@@ -5,6 +5,7 @@ import type {
   AIAssistant,
   KnowledgeBase,
   KnowledgeBaseDocument,
+  KnowledgeBaseStats,
   KnowledgeItem,
   Conversation,
   Message,
@@ -123,6 +124,21 @@ export function useKnowledgeBases(orgId: string | undefined) {
   })
 }
 
+export function useKnowledgeBaseStats(orgId: string | undefined) {
+  return useQuery<KnowledgeBaseStats[]>({
+    queryKey: ['kb-stats', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('knowledge_base_stats')
+        .select('*')
+        .eq('organization_id', orgId!)
+      if (error) throw error
+      return data
+    },
+  })
+}
+
 export function useKnowledgeBaseDocuments(kbId: string | undefined) {
   return useQuery<KnowledgeBaseDocument[]>({
     queryKey: ['kb-documents', kbId],
@@ -136,6 +152,11 @@ export function useKnowledgeBaseDocuments(kbId: string | undefined) {
       if (error) throw error
       return data
     },
+    refetchInterval: (query) => {
+      const documents = query.state.data
+      return documents?.some((doc) => doc.status === 'processing') ? 5_000 : false
+    },
+    refetchIntervalInBackground: false,
   })
 }
 
