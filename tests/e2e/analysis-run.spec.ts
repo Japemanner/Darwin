@@ -75,6 +75,39 @@ test.describe('Result view — sections and source panel', () => {
   })
 })
 
+test.describe('Recent runs — availability deadline (US6)', () => {
+  test('shows the retention deadline for a succeeded run', async ({ page }) => {
+    if (process.env.MOCK_SCENARIO === 'error') test.skip(true, 'not for error scenario')
+
+    await page.goto('/assistants')
+    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    await expect(page).toHaveURL(/\/analyse\/new\//)
+    const listUrl = page.url()
+
+    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk voor vervaldatum')
+    await page.getByRole('checkbox').first().check()
+    await page.getByLabel(/klantsituatie/i).fill('Situatie')
+    await page.getByLabel(/klantreferentie/i).fill('KL-2026-VERVAL')
+    await page.getByRole('button', { name: /start analyse/i }).click()
+
+    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 60_000 })
+
+    // The mock sets expires_at to started_at + 7 days (retention period).
+    const expected = new Date()
+    expected.setDate(expected.getDate() + 7)
+    const expectedDate = expected.toLocaleDateString('nl-NL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+
+    await page.goto(listUrl)
+    await expect(page.getByText(`beschikbaar tot ${expectedDate}`).first()).toBeVisible({ timeout: 15_000 })
+    // The row of the just-finished run shows it next to its reference.
+    await expect(page.getByText(/KL-2026-VERVAL/i).first()).toBeVisible()
+  })
+})
+
 test.describe('Error handling — retry with prefilled form', () => {
   test('shows Dutch error with code and prefills form on retry', async ({ page }) => {
     test.skip(process.env.MOCK_SCENARIO !== 'error', 'error scenario only')
