@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-29_
-_Total features: 22_
+_Last updated: 2026-10-30_
+_Total features: 23_
 
 ---
 
@@ -170,6 +170,8 @@ Chat-stijl vaste flow voor het nieuwe assistent-type `risico_analyse` (geen vrij
 
 **Gap**: E2E-suite vereist testaccount (E2E_EMAIL/E2E_PASSWORD); draait verder tegen de mock server.
 
+_Updated 2026-10-30 — feature 014 verplaatst de flow naar eigen pagina's (`/analyse/new/:assistantId` en `/analyse/:runId`) en verwijderde het zijpaneel `AnalysisFlow`; de formuliercomponenten zijn hergebruikt en uitgebreid. Zie "Risico-analyse als eigen pagina, met soepelere invoer (014)" hieronder._
+
 ---
 
 ### 🧪 Beveiligde n8n-koppeling via de server (009)
@@ -219,6 +221,16 @@ Chatantwoorden renderen via de bestaande `sanitizeMarkdown`-pijplijn (marked + D
 **Files**: `src/components/chat/AnswerMeta.tsx` (nieuw), `src/components/chat/MessageContent.tsx`, `src/components/chat/MessageBubble.tsx`, `src/components/chat/MessageList.tsx`, `src/pages/ChatPage.tsx`, `src/pages/HistoryPage.tsx` (alleen role-doorgeef), `src/lib/rag-client.ts`, `src/lib/sanitize.ts` (sanitizeHtml verwijderd), `src/components/analysis/SourcePanel.tsx` (Locatie-conditional), `tests/e2e/answer-presentation.spec.ts` (nieuw, 9 gemockte scenario's), `tests/e2e/rag-chat.spec.ts` (bron-assertie bijgewerkt)
 
 **Gap**: de e2e-suite (9 nieuwe scenario's + de bijgewerkte rag-chat-assertie) draait pas echt zodra `E2E_EMAIL`/`E2E_PASSWORD` in `.env.local` staan (2026-10-29: nog afwezig — 18 skipped / 0 failed, zelfde gedocumenteerde staat als 011/012); handmatige live-verificatie volgens `specs/013-readable-verifiable-answers/quickstart.md` §4 open; F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie; bron-locaties (paginanummers) verschijnen pas zodra n8n die meelevert (bewust buiten scope van 013).
+
+---
+
+### 🧪 Risico-analyse als eigen pagina, met soepelere invoer (014)
+
+De risico-analyse draait op twee eigen pagina's binnen de app-layout met vaste, uitsluitend id-bevattende adressen (constitution III): `/analyse/new/:assistantId` (formulier + recente analyses) en `/analyse/:runId` (RunCard-status + bij succes het ongewijzigde ResultView met alle CONCEPT-labels, constitution II); het zijpaneel `AnalysisFlow` is verwijderd en de assistentkaart-knop navigeert. Wegnavigeren verliest niets — herladen, browserterug en bladwijzers werken; onbekende of vreemde runs tonen een nette NL-melding zonder inhoud. Klaar-meldingen: `useAnalysisNotifications` (gedeelde recente-runs-query, interval 10 s alléén zolang er wachtrij/bezig-runs zijn — FR-007) telt afgeronde-ongeziene analyses; badge (cijfertext, sr-only-toelichting, WCAG) bij het zijbalkmenu-item Assistenten in beide nav-renders en `document.title` "(n) Darwin" (basis-titel hersteld bij 0 en unmount); "gezien" is een sessionStorage-set met uitsluitend run-id's (max 50, sessiegebonden — constitution III) met initialisatieregel zodat een eerste sessie geen historische afrondingen telt; bekijken van de lijst (`AnalysisNewPage` markeert alle afgeronde rijen) of een run (`AnalysisRunPage` markeert zodra afgerond) reset de telling. Formulier: Klantreferentie bovenaan, adviseurnaam als vaste tekst in de paginakop (invoerveld Adviseur verwijderd), alle kennisbronnen standaard aangevinkt bij een nieuwe analyse (retry herstelt de eerdere keuze) met de nieuwe hulptekst "Standaard zijn alle kennisbronnen van deze assistent geselecteerd.", voorbeeldtekst in het lege vraagstukveld, en slepen-en-neerzetten op het uploadvak (dezelfde controles/meldingen; de knop blijft het toetsenbordalternatief). "Opnieuw" na een mislukte analyse navigeert naar de startpagina met de in-memory retry-snapshot (router-state `{ retryRunId }`, nooit in de URL) plus een `hadBestanden`-vlag die de amber-melding "Bijlagen zijn niet bewaard. Voeg de bestanden opnieuw toe." toont. Recente-lijst: per geslaagde run "beschikbaar tot dd-mm-jjjj" via het nieuwe optionele `expires_at`-veld in `RecentRunSchema` (rollout-veilig — de lijst blijft intact zolang de backend het veld nog niet levert; mock-server levert het; contractnotitie in specs/008-risico-analyse-ui/contracts/run-status.md). Frontend-only: geen migraties, Edge Functions of nieuwe dependencies; de Geschiedenis-pagina onaangeroerd.
+
+**Files**: `src/pages/AnalysisNewPage.tsx` (nieuw), `src/pages/AnalysisRunPage.tsx` (nieuw), `src/pages/AssistantsPage.tsx`, `src/components/layout/AppShell.tsx`, `src/components/analysis/AnalysisForm.tsx`, `src/components/analysis/RecentRunsPanel.tsx`, `src/hooks/useAnalysisNotifications.ts` (nieuw), `src/hooks/useRecentRuns.ts`, `src/store/analysisSeenStore.ts` (nieuw), `src/lib/analysis-retry.ts` (nieuw), `src/lib/analysis-schemas.ts`, `src/App.tsx`, `scripts/mock-analysis-server.mjs`, `specs/008-risico-analyse-ui/contracts/run-status.md` (notitie), `tests/e2e/analysis-notifications.spec.ts` (nieuw), `tests/e2e/analysis-form.spec.ts`, `tests/e2e/analysis-run.spec.ts`, `tests/e2e/analysis-jwt.spec.ts`; verwijderd: `src/components/analysis/AnalysisFlow.tsx`
+
+**Gap**: e2e-suite (8 nieuwe gevallen: navigatie-vast-adres, badge+titel/reset, volgorde/adviseur, standaardselectie, bijlagen-melding ±, vervaldatum, DnD+placeholder) draait pas echt zodra `E2E_EMAIL`/`E2E_PASSWORD` in `.env.local` staan (2026-10-30: 72 skipped / 0 failed); backend-afstemming: `expires_at` toevoegen aan de recente-lijst-items van de echte analyse-API (vrijblijvend — frontend werkt ook zonder); handmatige live-verificatie volgens `specs/014-risk-analysis-page/quickstart.md` §3 open; F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie.
 
 ---
 

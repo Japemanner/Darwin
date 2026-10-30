@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { AnalysisFlow } from '@/components/analysis/AnalysisFlow'
 import {
   useAssistants,
   useKnowledgeBases,
@@ -59,7 +58,6 @@ function AssistantsPage() {
     : (assistants ?? []).filter((a) => a.is_active)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAssistant, setEditingAssistant] = useState<AIAssistant | null>(null)
-  const [analysisAssistant, setAnalysisAssistant] = useState<AIAssistant | null>(null)
 
   if (isPending) {
     return (
@@ -125,7 +123,7 @@ function AssistantsPage() {
               </CardContent>
               <CardFooter className="flex gap-2">
                 {a.type === 'risico_analyse' ? (
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setAnalysisAssistant(a)}>
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate(`/analyse/new/${a.id}`)}>
                     <ClipboardList className="h-4 w-4 mr-2" /> Risico-analyse starten
                   </Button>
                 ) : (
@@ -151,13 +149,6 @@ function AssistantsPage() {
         organizationId={profile?.organization_id ?? ''}
         userId={profile?.id ?? ''}
       />
-
-      {analysisAssistant && (
-        <AnalysisFlow
-          assistant={analysisAssistant}
-          onClose={() => setAnalysisAssistant(null)}
-        />
-      )}
     </div>
   )
 }

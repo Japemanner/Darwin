@@ -46,6 +46,13 @@ started_at, finished_at, error_code) — geen analyse-inhoud, geen
 bestandsnamen, geen urls. Labels in de lijst: klantreferentie +
 starttijdstip (spec FR-017).
 
+> **Wijziging 2026-10-30 (feature 014-risk-analysis-page)**: items krijgen
+> het extra veld `expires_at` (bewaartermijn van het resultaat, zelfde vorm
+> als in de run-status hierboven) zodat de lijst "beschikbaar tot
+> dd-mm-jjjj" kan tonen. Het frontend-schema behandelt het veld als
+> optioneel — de lijst blijft volledig geldig zolang de backend het veld
+> nog niet levert. Zie `specs/014-risk-analysis-page/contracts/analysis-routes.md` §2.
+
 ## Na de bewaartermijn (7 dagen)
 
 Rijen blijven bestaan als metadata (status, klantreferentie, tijdstippen);

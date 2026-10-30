@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
-import { useAuth } from '@/hooks/useAuth'
+import { cn } from '@/lib/utils'
 import { useAssistantKnowledgeBases } from '@/hooks/queries'
 import {
   ALLOWED_FILE_EXTENSIONS,
@@ -40,9 +40,8 @@ function formatBytes(bytes: number): string {
 }
 
 export function AnalysisForm({ assistant, initial, isSubmitting, submitError, onSubmit }: AnalysisFormProps) {
-  const { profile } = useAuth()
   const { data: knowledgeBases } = useAssistantKnowledgeBases(assistant.id)
-  const availableKBs = knowledgeBases ?? []
+  const availableKBs = useMemo(() => knowledgeBases ?? [], [knowledgeBases])
 
   const [verzekeringsvraagstuk, setVerzekeringsvraagstuk] = useState(initial?.verzekeringsvraagstuk ?? '')
   const [selectedKBIds, setSelectedKBIds] = useState<Set<string>>(
@@ -53,6 +52,7 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
   const [urls, setUrls] = useState<string[]>(initial?.urls ?? [])
   const [urlInput, setUrlInput] = useState('')
   const [klantreferentie, setKlantreferentie] = useState(initial?.klantreferentie ?? '')
+  const [isDragging, setIsDragging] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -65,6 +65,14 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
       setBestanden([])
     }
   }, [initial])
+
+  // New form (no retry prefill): all of the assistant's knowledge sources are
+  // checked by default once the list loads (US4). Retry keeps the selection
+  // from `initial` via the effect above.
+  useEffect(() => {
+    if (initial || availableKBs.length === 0) return
+    setSelectedKBIds(new Set(availableKBs.map((kb) => kb.id)))
+  }, [initial, availableKBs])
 
   const toggleKB = (id: string) => {
     setSelectedKBIds((prev) => {
@@ -165,12 +173,30 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
       )}
 
       <div className="flex flex-col gap-2">
+        <Label htmlFor="klantreferentie">Klantreferentie</Label>
+        <Input
+          id="klantreferentie"
+          value={klantreferentie}
+          onChange={(e) => setKlantreferentie(e.target.value)}
+          aria-describedby={errors.klantreferentie ? 'klantreferentie-error' : undefined}
+          aria-invalid={Boolean(errors.klantreferentie)}
+          required
+        />
+        {errors.klantreferentie && (
+          <p id="klantreferentie-error" role="alert" className="text-sm text-destructive">
+            {errors.klantreferentie}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label htmlFor="verzekeringsvraagstuk">Verzekeringsvraagstuk</Label>
         <Textarea
           id="verzekeringsvraagstuk"
           value={verzekeringsvraagstuk}
           onChange={(e) => setVerzekeringsvraagstuk(e.target.value)}
           rows={4}
+          placeholder="Bijvoorbeeld: de klant twijfelt of een aansprakelijkheidsverzekering voor zijn eenmanszaak nodig is."
           aria-describedby={errors.verzekeringsvraagstuk ? 'verzekeringsvraagstuk-error' : undefined}
           aria-invalid={Boolean(errors.verzekeringsvraagstuk)}
           required
@@ -184,7 +210,7 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
 
       <div className="flex flex-col gap-2">
         <Label>Kennisbronnen</Label>
-        <p className="text-xs text-muted-foreground">De selectie bepaalt het verzekerings­type.</p>
+        <p className="text-xs text-muted-foreground">Standaard zijn alle kennisbronnen van deze assistent geselecteerd.</p>
         <div className="max-h-40 overflow-y-auto rounded-lg border" role="group" aria-label="Kennisbronnen">
           {availableKBs.length === 0 ? (
             <p className="p-3 text-sm text-muted-foreground">Geen kennisbronnen gekoppeld aan deze assistent.</p>
@@ -224,10 +250,26 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
           Optioneel. pdf, docx of txt — maximaal {formatBytes(MAX_FILE_SIZE_BYTES)} per bestand,
           totaal {formatBytes(MAX_TOTAL_FILE_SIZE_BYTES)}.
         </p>
-        <label htmlFor="bestanden" className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm hover:bg-accent">
+        <Label
+          htmlFor="bestanden"
+          onDragOver={(e) => {
+            e.preventDefault()
+            setIsDragging(true)
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setIsDragging(false)
+            addFiles(e.dataTransfer.files)
+          }}
+          className={cn(
+            'flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-accent',
+            isDragging && 'border-primary bg-accent',
+          )}
+        >
           <Paperclip className="h-4 w-4" aria-hidden="true" />
           <span>Bestanden kiezen</span>
-        </label>
+        </Label>
         <input
           id="bestanden"
           type="file"
@@ -286,34 +328,6 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
             ))}
           </ul>
         )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="klantreferentie">Klantreferentie</Label>
-        <Input
-          id="klantreferentie"
-          value={klantreferentie}
-          onChange={(e) => setKlantreferentie(e.target.value)}
-          aria-describedby={errors.klantreferentie ? 'klantreferentie-error' : undefined}
-          aria-invalid={Boolean(errors.klantreferentie)}
-          required
-        />
-        {errors.klantreferentie && (
-          <p id="klantreferentie-error" role="alert" className="text-sm text-destructive">
-            {errors.klantreferentie}
-          </p>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="adviseur">Adviseur</Label>
-        <Input
-          id="adviseur"
-          value={profile?.full_name ?? ''}
-          readOnly
-          aria-readonly="true"
-          className="bg-muted/50"
-        />
       </div>
 
       <Button type="submit" disabled={isSubmitting}>

@@ -27,7 +27,8 @@ test.describe('analysis client — session JWT on every call', () => {
     await page.goto('/assistants')
     await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
 
-    // The recent-runs list is fetched when the flow mounts
+    // The recent-runs list is fetched when the analysis page mounts (and since
+    // feature 014 also by the AppShell notifications hook on every page)
     await expect.poll(() => captured.recent ?? '').toMatch(BEARER)
 
     await page.getByLabel(/verzekeringsvraagstuk/i).fill('Inkomensverzekering zelfstandige — JWT-test')
