@@ -84,6 +84,7 @@ LEFT JOIN public.knowledge_base_documents d
 GROUP BY kb.id;
 
 REVOKE ALL ON public.knowledge_base_stats FROM anon;
+REVOKE ALL ON public.knowledge_base_stats FROM authenticated;
 GRANT SELECT ON public.knowledge_base_stats TO authenticated;
 ```
 

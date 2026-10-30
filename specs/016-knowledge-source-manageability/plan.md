@@ -98,6 +98,7 @@ FEATURES.md                                      # notitie: Kennisitems-tab verb
   - `last_updated_at` (`GREATEST(kb.updated_at, COALESCE(MAX(d.updated_at), kb.updated_at))`)
   - `FROM knowledge_bases kb LEFT JOIN knowledge_base_documents d ON d.knowledge_base_id = kb.id GROUP BY kb.id`
 - `REVOKE ALL ON public.knowledge_base_stats FROM anon;`
+- `REVOKE ALL ON public.knowledge_base_stats FROM authenticated;`
 - `GRANT SELECT ON public.knowledge_base_stats TO authenticated;`
 - Geen UPDATE-policy toevoegen; statusovergangen blijven bij de service role.
 
