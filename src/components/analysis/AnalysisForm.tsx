@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,7 +40,7 @@ function formatBytes(bytes: number): string {
 
 export function AnalysisForm({ assistant, initial, isSubmitting, submitError, onSubmit }: AnalysisFormProps) {
   const { data: knowledgeBases } = useAssistantKnowledgeBases(assistant.id)
-  const availableKBs = knowledgeBases ?? []
+  const availableKBs = useMemo(() => knowledgeBases ?? [], [knowledgeBases])
 
   const [verzekeringsvraagstuk, setVerzekeringsvraagstuk] = useState(initial?.verzekeringsvraagstuk ?? '')
   const [selectedKBIds, setSelectedKBIds] = useState<Set<string>>(
