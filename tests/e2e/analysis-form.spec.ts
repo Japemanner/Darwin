@@ -51,6 +51,18 @@ test.describe('Analysis form — group validation', () => {
   })
 })
 
+test.describe('Analysis form — order and advisor (US3)', () => {
+  test('Klantreferentie is the first field and the advisor is fixed text in the header', async ({ page }) => {
+    await openAnalysisForm(page)
+
+    // Klantreferentie stands at the top of the form (US3).
+    await expect(page.locator('form label').first()).toHaveText('Klantreferentie')
+    // The Adviseur input field is gone; the name is fixed text in the header.
+    await expect(page.getByLabel('Adviseur', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Adviseur', { exact: true })).toBeVisible()
+  })
+})
+
 test.describe('Analysis form — happy path submit', () => {
   test('submits valid minimal input and shows run card in wachtrij/bezig', async ({ page }) => {
     await openAnalysisForm(page)

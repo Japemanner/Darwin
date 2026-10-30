@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
-import { useAuth } from '@/hooks/useAuth'
 import { useAssistantKnowledgeBases } from '@/hooks/queries'
 import {
   ALLOWED_FILE_EXTENSIONS,
@@ -40,7 +39,6 @@ function formatBytes(bytes: number): string {
 }
 
 export function AnalysisForm({ assistant, initial, isSubmitting, submitError, onSubmit }: AnalysisFormProps) {
-  const { profile } = useAuth()
   const { data: knowledgeBases } = useAssistantKnowledgeBases(assistant.id)
   const availableKBs = knowledgeBases ?? []
 
@@ -165,6 +163,23 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
       )}
 
       <div className="flex flex-col gap-2">
+        <Label htmlFor="klantreferentie">Klantreferentie</Label>
+        <Input
+          id="klantreferentie"
+          value={klantreferentie}
+          onChange={(e) => setKlantreferentie(e.target.value)}
+          aria-describedby={errors.klantreferentie ? 'klantreferentie-error' : undefined}
+          aria-invalid={Boolean(errors.klantreferentie)}
+          required
+        />
+        {errors.klantreferentie && (
+          <p id="klantreferentie-error" role="alert" className="text-sm text-destructive">
+            {errors.klantreferentie}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label htmlFor="verzekeringsvraagstuk">Verzekeringsvraagstuk</Label>
         <Textarea
           id="verzekeringsvraagstuk"
@@ -286,34 +301,6 @@ export function AnalysisForm({ assistant, initial, isSubmitting, submitError, on
             ))}
           </ul>
         )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="klantreferentie">Klantreferentie</Label>
-        <Input
-          id="klantreferentie"
-          value={klantreferentie}
-          onChange={(e) => setKlantreferentie(e.target.value)}
-          aria-describedby={errors.klantreferentie ? 'klantreferentie-error' : undefined}
-          aria-invalid={Boolean(errors.klantreferentie)}
-          required
-        />
-        {errors.klantreferentie && (
-          <p id="klantreferentie-error" role="alert" className="text-sm text-destructive">
-            {errors.klantreferentie}
-          </p>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="adviseur">Adviseur</Label>
-        <Input
-          id="adviseur"
-          value={profile?.full_name ?? ''}
-          readOnly
-          aria-readonly="true"
-          className="bg-muted/50"
-        />
       </div>
 
       <Button type="submit" disabled={isSubmitting}>
