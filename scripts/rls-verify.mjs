@@ -9,7 +9,11 @@
 // Usage: node scripts/rls-verify.mjs
 // Env (from .env.local or the process environment):
 //   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
-//   E2E_MEMBER_EMAIL, E2E_MEMBER_PASSWORD
+//   E2E_MEMBER_EMAIL, E2E_MEMBER_PASSWORD,
+//   E2E_EMAIL, E2E_PASSWORD            (office admin; optional, else SKIP)
+//
+// Feature 019 adds: no client role may write ai_assistants, and no client role
+// may read platform_admins / assistant_catalog / platform_webhook_config.
 //
 // Expected results:
 //   BEFORE migration 015: the write checks FAIL (writes still allowed) —
@@ -119,34 +123,10 @@ async function main() {
   // (i.e. before migration 015) — before 015 the member can also delete it,
   // which doubles as cleanup.
 
-  // ai_assistants
-  let markerAssistantId = null
-  try {
-    const { data, error } = await supabase
-      .from('ai_assistants')
-      .insert({
-        organization_id: orgId,
-        name: MARKER,
-        system_prompt: 'rls-verify marker (safe to delete)',
-        type: 'chat',
-        n8n_webhook_url: 'https://rls-verify.invalid/hook',
-        created_by: userId,
-      })
-      .select('id')
-      .single()
-    if (error) {
-      record('ai_assistants INSERT denied', 'PASS', error.code ?? error.message)
-    } else {
-      markerAssistantId = data.id
-      cleanups.push(() => supabase.from('ai_assistants').delete().eq('id', markerAssistantId))
-      record('ai_assistants INSERT denied', 'FAIL', 'insert was allowed')
-    }
-  } catch (err) {
-    record('ai_assistants INSERT denied', 'FAIL', String(err))
-  }
-
-  await checkUpdateDenied('ai_assistants', 'name')
-  await checkDeleteDenied('ai_assistants', { name: MARKER })
+  // ai_assistants (feature 019: no client role may write, and the platform
+  // tables must stay unreadable for every client role).
+  await checkAssistantWriteDenied(supabase, profile, userId, 'member')
+  await checkPlatformTableReads(supabase, 'member')
 
   // knowledge_bases
   let markerKBId = null
@@ -240,7 +220,7 @@ async function main() {
   }
 
   // assistant_knowledge_bases (FKs: assistant_id + knowledge_base_id)
-  const linkAssistantId = markerAssistantId ?? assistant?.id ?? null
+  const linkAssistantId = assistant?.id ?? null
   const linkKbId = markerKBId ?? kb?.id ?? null
   if (linkAssistantId && linkKbId) {
     let linkCreated = false
@@ -374,6 +354,45 @@ async function main() {
     record('own conversation/message/feedback flow', 'SKIP', 'no assistant available')
   }
 
+  // ---- Feature 019: office admin (role=admin) ----------------------------
+  // A second account proves that office admins cannot write assistants either,
+  // and that no client role can read the platform tables.
+  const officeEmail = env('E2E_EMAIL')
+  const officePassword = env('E2E_PASSWORD')
+  if (!officeEmail || !officePassword) {
+    record('office admin: ai_assistants writes denied', 'SKIP', 'E2E_EMAIL / E2E_PASSWORD not set')
+    record('office admin: platform tables unreadable', 'SKIP', 'E2E_EMAIL / E2E_PASSWORD not set')
+  } else {
+    const officeClient = createClient(url, anonKey, {
+      auth: { flowType: 'pkce', autoRefreshToken: true, persistSession: false },
+    })
+    const { data: officeAuth, error: officeAuthError } =
+      await officeClient.auth.signInWithPassword({
+        email: officeEmail,
+        password: officePassword,
+      })
+
+    if (officeAuthError || !officeAuth.user) {
+      record('office admin: sign in', 'FAIL', officeAuthError?.message ?? 'no user')
+    } else {
+      const { data: officeProfile, error: officeProfileError } = await officeClient
+        .from('profiles')
+        .select('id, organization_id, role')
+        .eq('id', officeAuth.user.id)
+        .single()
+
+      if (officeProfileError || !officeProfile) {
+        record('office admin: profile', 'FAIL', officeProfileError?.message ?? 'missing')
+      } else if (officeProfile.role !== 'admin') {
+        record('office admin: ai_assistants writes denied', 'SKIP', `account role=${officeProfile.role}`)
+        record('office admin: platform tables unreadable', 'SKIP', `account role=${officeProfile.role}`)
+      } else {
+        await checkAssistantWriteDenied(officeClient, officeProfile, officeAuth.user.id, 'office admin')
+        await checkPlatformTableReads(officeClient, 'office admin')
+      }
+    }
+  }
+
   // ---- Cleanup (only relevant before migration 015) ------------------------
   for (const fn of cleanups.reverse()) {
     try {
@@ -445,6 +464,111 @@ async function checkDeleteDenied(table, match) {
   }
 }
 
+/**
+ * Feature 019: no client role may INSERT/UPDATE/DELETE ai_assistants. The
+ * INSERT must fail with 42501 (RLS); any other error (FK, NOT NULL, unique)
+ * would prove nothing, so it counts as FAIL.
+ */
+async function checkAssistantWriteDenied(client, profile, userId, actorLabel) {
+  const { data: reference, error: referenceError } = await client
+    .from('ai_assistants')
+    .select('id, catalog_id, name')
+    .limit(1)
+    .maybeSingle()
+
+  if (referenceError || !reference) {
+    for (const op of ['INSERT', 'UPDATE', 'DELETE']) {
+      record(`${actorLabel}: ai_assistants ${op} denied`, 'SKIP', 'no readable ai_assistants row')
+    }
+    return
+  }
+
+  try {
+    const { data, error } = await client
+      .from('ai_assistants')
+      .insert({
+        organization_id: profile.organization_id,
+        catalog_id: reference.catalog_id,
+        name: `${MARKER}-${actorLabel}`,
+        system_prompt: 'rls-verify marker (safe to delete)',
+        type: 'chat',
+        created_by: userId,
+      })
+      .select('id')
+      .single()
+
+    if (error?.code === '42501') {
+      record(`${actorLabel}: ai_assistants INSERT denied`, 'PASS', error.message)
+    } else if (error) {
+      record(
+        `${actorLabel}: ai_assistants INSERT denied`,
+        'FAIL',
+        `unexpected error ${error.code ?? error.message}`,
+      )
+    } else {
+      cleanups.push(() => client.from('ai_assistants').delete().eq('id', data.id))
+      record(`${actorLabel}: ai_assistants INSERT denied`, 'FAIL', 'insert was allowed')
+    }
+  } catch (err) {
+    record(`${actorLabel}: ai_assistants INSERT denied`, 'FAIL', String(err))
+  }
+
+  try {
+    const { count, error } = await client
+      .from('ai_assistants')
+      .update({ name: reference.name }, { count: 'exact' })
+      .eq('id', reference.id)
+    if (error) {
+      record(`${actorLabel}: ai_assistants UPDATE denied`, 'PASS', error.code ?? error.message)
+    } else if ((count ?? 0) === 0) {
+      record(`${actorLabel}: ai_assistants UPDATE denied`, 'PASS', '0 rows affected')
+    } else {
+      record(`${actorLabel}: ai_assistants UPDATE denied`, 'FAIL', `${count} row(s) updated`)
+    }
+  } catch (err) {
+    record(`${actorLabel}: ai_assistants UPDATE denied`, 'FAIL', String(err))
+  }
+
+  try {
+    const { count, error } = await client
+      .from('ai_assistants')
+      .delete({ count: 'exact' })
+      .eq('organization_id', profile.organization_id)
+      .like('name', `${MARKER}%`)
+    if (error) {
+      record(`${actorLabel}: ai_assistants DELETE denied`, 'PASS', error.code ?? error.message)
+    } else if ((count ?? 0) === 0) {
+      record(`${actorLabel}: ai_assistants DELETE denied`, 'PASS', 'no marker row reachable')
+    } else {
+      record(`${actorLabel}: ai_assistants DELETE denied`, 'FAIL', `${count} marker row(s) deleted`)
+    }
+  } catch (err) {
+    record(`${actorLabel}: ai_assistants DELETE denied`, 'FAIL', String(err))
+  }
+}
+
+/**
+ * Feature 019: platform_admins, assistant_catalog and platform_webhook_config
+ * have RLS enabled with no policies and no client grants. An error or an empty
+ * result means the client role cannot read them.
+ */
+async function checkPlatformTableReads(client, actorLabel) {
+  for (const table of ['platform_admins', 'assistant_catalog', 'platform_webhook_config']) {
+    try {
+      const { data, error } = await client.from(table).select('*').limit(1)
+      if (error) {
+        record(`${actorLabel}: ${table} unreadable`, 'PASS', error.code ?? error.message)
+      } else if ((data ?? []).length === 0) {
+        record(`${actorLabel}: ${table} unreadable`, 'PASS', 'no rows exposed')
+      } else {
+        record(`${actorLabel}: ${table} unreadable`, 'FAIL', `${data.length} row(s) exposed`)
+      }
+    } catch (err) {
+      record(`${actorLabel}: ${table} unreadable`, 'FAIL', String(err))
+    }
+  }
+}
+
 main()
   .then(() => {
     const fails = results.filter((r) => r.status === 'FAIL').length
@@ -452,11 +576,11 @@ main()
     const skips = results.filter((r) => r.status === 'SKIP').length
     console.log(`\nSummary: ${passes} PASS, ${fails} FAIL, ${skips} SKIP`)
     if (fails > 0) {
-      console.log('\nResult: FAIL — members can still write, or a positive check broke.')
-      console.log('Before migration 015 this is expected (proof the checks work).')
+      console.log('\nResult: FAIL — a client role can still write or read protected data.')
+      console.log('Before migration 020 this is expected (proof the checks work).')
       process.exit(1)
     }
-    console.log('\nResult: PASS — all write operations denied for the member account.')
+    console.log('\nResult: PASS — all write operations and platform tables are denied for client roles.')
     process.exit(0)
   })
   .catch((err) => {

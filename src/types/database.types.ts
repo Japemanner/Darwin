@@ -93,6 +93,7 @@ export interface Database {
         Row: {
           id: string
           organization_id: string
+          catalog_id: string
           name: string
           description: string | null
           system_prompt: string
@@ -108,6 +109,7 @@ export interface Database {
         Insert: {
           id?: string
           organization_id: string
+          catalog_id?: string
           name: string
           description?: string | null
           system_prompt: string
@@ -123,6 +125,7 @@ export interface Database {
         Update: {
           id?: string
           organization_id?: string
+          catalog_id?: string
           name?: string
           description?: string | null
           system_prompt?: string
@@ -576,6 +579,10 @@ export interface Database {
       }
     }
     Functions: {
+      is_platform_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
       get_feedback_review: {
         Args: Record<string, never>
         Returns: {

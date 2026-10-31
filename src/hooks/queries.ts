@@ -402,135 +402,41 @@ export function useUpsertMessageFeedback(conversationId: string) {
   })
 }
 
-export function useCreateAssistant(orgId: string) {
+// Knowledge-source linking only (feature 019): both the platform admin (own
+// organization) and office admins use this; assistant rows are never written
+// from the client anymore.
+export function useUpdateAssistantKnowledgeBases(orgId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: {
-      organization_id: string
-      name: string
-      description: string | null
-      system_prompt: string
-      icon: string
-      type: string
-      n8n_webhook_url: string | null
-      example_questions: string[]
-      is_active: boolean
-      created_by: string
-      kbIds: string[]
-    }) => {
-      const { data: created, error } = await supabase
-        .from('ai_assistants')
-        .insert({
-          organization_id: payload.organization_id,
-          name: payload.name,
-          description: payload.description,
-          system_prompt: payload.system_prompt,
-          icon: payload.icon,
-          type: payload.type as 'chat' | 'agent' | 'voice',
-          n8n_webhook_url: payload.n8n_webhook_url,
-          example_questions: payload.example_questions,
-          is_active: payload.is_active,
-          created_by: payload.created_by,
-        })
-        .select()
-        .single()
-      if (error) throw error
-
-      if (payload.kbIds.length > 0) {
-        const { error: linkError } = await supabase
-          .from('assistant_knowledge_bases')
-          .insert(payload.kbIds.map((kbId) => ({ assistant_id: created.id, knowledge_base_id: kbId })))
-        if (linkError) throw linkError
-      }
-
-      return created
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['assistants', orgId] })
-    },
-  })
-}
-
-export function useUpdateAssistant(orgId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (payload: {
-      id: string
-      name: string
-      description: string | null
-      type: string
-      icon: string
-      n8n_webhook_url: string | null
-      example_questions: string[]
-      is_active: boolean
-      kbIds: string[]
-    }) => {
-      const { error } = await supabase
-        .from('ai_assistants')
-        .update({
-          name: payload.name,
-          description: payload.description,
-          type: payload.type as 'chat' | 'agent' | 'voice',
-          icon: payload.icon,
-          n8n_webhook_url: payload.n8n_webhook_url,
-          example_questions: payload.example_questions,
-          is_active: payload.is_active,
-        })
-        .eq('id', payload.id)
-      if (error) throw error
-
-      const { data: existingLinks } = await supabase
+    mutationFn: async (payload: { assistantId: string; kbIds: string[] }) => {
+      const { data: existingLinks, error: linksError } = await supabase
         .from('assistant_knowledge_bases')
         .select('knowledge_base_id')
-        .eq('assistant_id', payload.id)
+        .eq('assistant_id', payload.assistantId)
+      if (linksError) throw linksError
 
       const existingIds = new Set((existingLinks ?? []).map((l) => l.knowledge_base_id))
       const toAdd = payload.kbIds.filter((id) => !existingIds.has(id))
       const toRemove = [...existingIds].filter((id) => !payload.kbIds.includes(id))
 
       if (toRemove.length > 0) {
-        await supabase
+        const { error } = await supabase
           .from('assistant_knowledge_bases')
           .delete()
-          .eq('assistant_id', payload.id)
+          .eq('assistant_id', payload.assistantId)
           .in('knowledge_base_id', toRemove)
+        if (error) throw error
       }
       if (toAdd.length > 0) {
-        await supabase
+        const { error } = await supabase
           .from('assistant_knowledge_bases')
-          .insert(toAdd.map((kbId) => ({ assistant_id: payload.id, knowledge_base_id: kbId })))
+          .insert(toAdd.map((kbId) => ({ assistant_id: payload.assistantId, knowledge_base_id: kbId })))
+        if (error) throw error
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['assistants', orgId] })
-    },
-  })
-}
-
-export function useDeleteAssistant(orgId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (assistantId: string) => {
-      const { error: convError } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('assistant_id', assistantId)
-      if (convError) throw convError
-
-      const { error: kbError } = await supabase
-        .from('assistant_knowledge_bases')
-        .delete()
-        .eq('assistant_id', assistantId)
-      if (kbError) throw kbError
-
-      const { error } = await supabase
-        .from('ai_assistants')
-        .delete()
-        .eq('id', assistantId)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['assistants', orgId] })
+      qc.invalidateQueries({ queryKey: ['assistant-kb-links', variables.assistantId] })
     },
   })
 }

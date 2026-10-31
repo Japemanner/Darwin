@@ -25,6 +25,7 @@ const ADMIN_PROFILE = { ...MEMBER_PROFILE, full_name: 'E2E Admin', role: 'admin'
 const ACTIVE_ASSISTANT = {
   id: '55555555-5555-4555-8555-555555555555',
   organization_id: ORG_ID,
+  catalog_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   name: 'Actieve Klantenservice',
   description: null,
   system_prompt: 'GEHEIM-SYSTEEMPROMPT-123',
@@ -41,6 +42,7 @@ const ACTIVE_ASSISTANT = {
 const INACTIVE_ASSISTANT = {
   id: '66666666-6666-4666-8666-666666666666',
   organization_id: ORG_ID,
+  catalog_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   name: 'Verborgen Risico Robot',
   description: 'Oude risico-analyseerbot',
   system_prompt: 'Je bent een risico-analyseur.',
@@ -129,6 +131,11 @@ async function mockRest(page: Page, opts: {
   documents?: unknown[]
   items?: unknown[]
 }) {
+  // Feature 019: the UI asks is_platform_admin; keep the mocked office admin
+  // and member out of the platform-admin views regardless of the real account.
+  await page.route('**/rest/v1/rpc/is_platform_admin', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: 'false' }),
+  )
   await page.route('**/rest/v1/profiles**', async (route) => {
     const accept = route.request().headers()['accept'] ?? ''
     const single = accept.includes('vnd.pgrst.object+json')
@@ -374,20 +381,22 @@ test.describe('admin-only-management — US2 member knowledge view', () => {
 })
 
 test.describe('admin-only-management — US3 admin parity', () => {
-  test('keeps the full assistant management view', async ({ page }) => {
+  test('shows the active assistants without catalogue management', async ({ page }) => {
     await mockAdminData(page)
     await page.goto('/assistants')
 
     await expect(page.locator('aside').getByText('Beheerder', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: /nieuwe assistent/i })).toBeVisible()
+    // Feature 019: creating/editing the catalogue is platform-admin-only.
+    await expect(page.getByRole('button', { name: /nieuwe assistent/i })).toHaveCount(0)
     await expect(page.getByText(ACTIVE_ASSISTANT.name)).toBeVisible()
-    await expect(page.getByText(INACTIVE_ASSISTANT.name)).toBeVisible()
 
-    const inactiveCard = page.locator('.grid .opacity-60')
-    await expect(inactiveCard).toHaveCount(1)
-    await expect(inactiveCard.getByText('Inactief')).toBeVisible()
-    await expect(inactiveCard.getByText('Risico-analyse', { exact: true })).toBeVisible()
-    await expect(page.locator('button:has(svg.lucide-pencil)')).toHaveCount(2)
+    // Only the platform admin sees switched-off assistants (with "Inactief").
+    await expect(page.getByText(INACTIVE_ASSISTANT.name)).toHaveCount(0)
+    await expect(page.getByText('Inactief')).toHaveCount(0)
+    await expect(page.locator('.grid .opacity-60')).toHaveCount(0)
+
+    // The pencil opens the knowledge-source-only modal.
+    await expect(page.locator('button:has(svg.lucide-pencil)')).toHaveCount(1)
     await expect(page.getByText('GEHEIM-SYSTEEMPROMPT-123')).toHaveCount(0)
   })
 
@@ -412,14 +421,17 @@ test.describe('admin-only-management — US3 admin parity', () => {
     await expect(page.getByRole('button', { name: /kennisitems/i })).toHaveCount(0)
   })
 
-  test('keeps the webhook URL field in the assistant edit modal', async ({ page }) => {
+  test('opens a knowledge-only modal without the webhook URL field', async ({ page }) => {
     await mockAdminData(page)
     await page.goto('/assistants')
 
     await expect(page.getByText(ACTIVE_ASSISTANT.name)).toBeVisible()
     await page.locator('button:has(svg.lucide-pencil)').first().click()
 
-    await expect(page.getByRole('heading', { name: 'Assistent bewerken' })).toBeVisible()
-    await expect(page.getByLabel('N8N Webhook URL')).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: `Kennisbronnen voor ${ACTIVE_ASSISTANT.name}` }),
+    ).toBeVisible()
+    await expect(page.getByLabel('N8N Webhook URL')).toHaveCount(0)
+    await expect(page.getByText('Wijzigingen gelden voor alle organisaties.')).toHaveCount(0)
   })
 })

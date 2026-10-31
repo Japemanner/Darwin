@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -65,14 +66,23 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: callerProfile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // Platform-admin-only (feature 019): the RPC runs with the caller's JWT so
+    // is_platform_admin() evaluates auth.uid() for the actual caller.
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: isPlatformAdmin, error: authzError } = await userClient.rpc("is_platform_admin");
 
-    if (!callerProfile || callerProfile.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Only admins can create new tenants" }), {
+    if (authzError) {
+      console.error("Platform admin check failed:", authzError.code);
+      return new Response(JSON.stringify({ error: "De toegang kon niet worden gecontroleerd. Probeer het opnieuw." }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    if (isPlatformAdmin !== true) {
+      return new Response(JSON.stringify({ error: "Alleen de platformbeheerder kan nieuwe organisaties aanmaken." }), {
         status: 403,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
@@ -123,6 +133,25 @@ Deno.serve(async (req: Request) => {
         status: 500,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
+    }
+
+    // Seed every catalogue assistant as ON (feature 019, FR-023). Without this
+    // step a new organization would have no assistants at all.
+    const { error: seedError } = await supabase.rpc("platform_seed_org_assistants", {
+      p_org: org.id,
+      p_actor: user.id,
+    });
+
+    if (seedError) {
+      // Never leave an organization without its assistants: undo and fail.
+      console.error("Failed to seed assistants:", seedError.code);
+      await supabase.from("profiles").delete().eq("id", newUser.user.id);
+      await supabase.auth.admin.deleteUser(newUser.user.id);
+      await supabase.from("organizations").delete().eq("id", org.id);
+      return new Response(
+        JSON.stringify({ error: "De organisatie kon niet volledig worden aangemaakt. Probeer het opnieuw." }),
+        { status: 500, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
+      );
     }
 
     return new Response(
