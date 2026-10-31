@@ -386,11 +386,15 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/018-push-notifications/plan.md
+specs/019-platform-assistant-catalog/plan.md
 
-Status 2026-10-31 (018): server-side live — migration 019 applied, VAPID secrets
-set, `push-send` v1 deployed and smoke-tested. Open: `VITE_VAPID_PUBLIC_KEY` in
-Netlify, manual push smoke test (quickstart §5) and E2E credentials.
-`analysis-run-callback` does not exist in this project (gate T003 = no), so US2
-stays pending that external backend.
+Status 2026-10-31 (019): plan and design artifacts ready (spec, research,
+data-model, contracts, quickstart). Nothing applied or deployed yet. Before
+implementation: fill `<PLATFORM_ADMIN_EMAIL>` in migration 021 and get explicit
+confirmation for the migration and each Edge Function deploy (quickstart §0-§3).
+The six `ai_assistants` write policies (three `Admins …`, three orphaned
+`Users …`) are dropped in migration 021.
+
+Still open from 018: `VITE_VAPID_PUBLIC_KEY` in Netlify, manual push smoke test
+(quickstart §5) and E2E credentials; US2 waits on `analysis-run-callback`.
 <!-- SPECKIT END -->

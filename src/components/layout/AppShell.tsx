@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, useIsPlatformAdmin } from '@/hooks/useAuth'
 import { useAnalysisNotifications } from '@/hooks/useAnalysisNotifications'
 import { PushNotificationControl } from '@/components/layout/PushNotificationControl'
 import { roleLabel } from '@/lib/labels'
@@ -59,6 +59,8 @@ function AppShell() {
   }, [analysisCount])
 
   const isAdmin = profile?.role === 'admin'
+  // Instellingen is platform-admin-only (feature 019); Team stays org-admin-only.
+  const { data: isPlatformAdmin = false } = useIsPlatformAdmin()
 
   return (
     <div className="min-h-screen bg-muted/20">
@@ -82,7 +84,8 @@ function AppShell() {
             <nav className="flex-1 flex flex-col gap-1">
               {navItems
                 .filter((item) => {
-                  if (item.href === '/team' || item.href === '/settings') return isAdmin
+                  if (item.href === '/team') return isAdmin
+                  if (item.href === '/settings') return isPlatformAdmin
                   return true
                 })
                 .map((item) => (
@@ -133,7 +136,8 @@ function AppShell() {
         <nav className="flex-1 flex flex-col gap-1">
           {navItems
             .filter((item) => {
-              if (item.href === '/team' || item.href === '/settings') return isAdmin
+              if (item.href === '/team') return isAdmin
+              if (item.href === '/settings') return isPlatformAdmin
               return true
             })
             .map((item) => (

@@ -3,6 +3,10 @@ import { useEffect } from 'react'
 import { PostHogProvider } from 'posthog-js/react'
 import { posthog } from 'posthog-js'
 
+// This module intentionally exports the provider together with the analytics
+// helpers; splitting them would only spread the same singleton over two files.
+/* eslint-disable react-refresh/only-export-components */
+
 /**
  * PostHog (EU Cloud) — product analytics module
  *

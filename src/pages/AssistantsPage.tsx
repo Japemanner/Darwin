@@ -1,33 +1,33 @@
 ﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, useIsPlatformAdmin } from '@/hooks/useAuth'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
-import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import {
   useAssistants,
   useKnowledgeBases,
   useAssistantKBLinks,
-  useCreateAssistant,
-  useUpdateAssistant,
-  useDeleteAssistant,
+  useUpdateAssistantKnowledgeBases,
 } from '@/hooks/queries'
 import type { AIAssistant } from '@/types/database.types'
-import { Bot, Plus, Pencil, MessagesSquare, Trash2, ClipboardList } from 'lucide-react'
+import { saveCatalogAssistant } from '@/lib/platform-admin-client'
+import { assistantTypeLabel } from '@/lib/labels'
+import { supabase } from '@/lib/supabase'
+import { Bot, Plus, Pencil, MessagesSquare, ClipboardList } from 'lucide-react'
 
 const ASSISTANT_TYPES = [
-  { value: 'chat', label: 'ðŸ’¬ Chat' },
-  { value: 'risico_analyse', label: 'ðŸ“‹ Risico-analyse' },
+  { value: 'chat', label: '💬 Chat' },
+  { value: 'risico_analyse', label: '📋 Risico-analyse' },
 ]
 
 // Max number of example questions per assistant (FR-013).
@@ -41,19 +41,17 @@ function parseExampleQuestions(text: string): string[] {
     .filter(Boolean)
 }
 
-// Readable type labels shown on the assistant card badge (FR-001).
-const ASSISTANT_TYPE_LABELS: Record<string, string> = {
-  chat: 'Chat',
-  risico_analyse: 'Risico-analyse',
-}
-
 function AssistantsPage() {
   const { profile } = useAuth()
+  const { data: isPlatformAdmin = false } = useIsPlatformAdmin()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin'
+  // Office admins only manage knowledge links; the platform admin edits the
+  // catalogue definition (feature 019, US3/US5).
+  const canManage = isAdmin || isPlatformAdmin
   const { data: assistants, isPending } = useAssistants(profile?.organization_id)
-  // Members only see active assistants (FR-002); admins see all.
-  const visibleAssistants = isAdmin
+  // Only the platform admin sees switched-off assistants (with "Inactief").
+  const visibleAssistants = isPlatformAdmin
     ? (assistants ?? [])
     : (assistants ?? []).filter((a) => a.is_active)
   const [modalOpen, setModalOpen] = useState(false)
@@ -83,10 +81,12 @@ function AssistantsPage() {
         <div>
           <h1 className="text-2xl font-bold">AI-assistenten</h1>
           <p className="text-muted-foreground">
-            {isAdmin ? 'Beheer uw AI-assistenten en hun configuratie' : 'Start een gesprek met een assistent'}
+            {isPlatformAdmin
+              ? 'Beheer de assistentcatalogus voor alle organisaties'
+              : 'Start een gesprek met een assistent'}
           </p>
         </div>
-        {isAdmin && (
+        {isPlatformAdmin && (
           <Button onClick={() => { setEditingAssistant(null); setModalOpen(true) }}>
             <Plus className="h-4 w-4 mr-2" /> Nieuwe assistent
           </Button>
@@ -97,8 +97,8 @@ function AssistantsPage() {
         <EmptyState
           icon={<Bot className="h-12 w-12" />}
           title="Nog geen assistenten"
-          description={isAdmin ? 'Maak uw eerste AI-assistent aan om te beginnen met chatten' : 'Er zijn nog geen actieve assistenten beschikbaar'}
-          {...(isAdmin ? { action: { label: 'Maak assistent', onClick: () => { setEditingAssistant(null); setModalOpen(true) } } } : {})}
+          description={isPlatformAdmin ? 'Maak uw eerste AI-assistent aan om te beginnen met chatten' : 'Er zijn nog geen actieve assistenten beschikbaar'}
+          {...(isPlatformAdmin ? { action: { label: 'Maak assistent', onClick: () => { setEditingAssistant(null); setModalOpen(true) } } } : {})}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -112,7 +112,7 @@ function AssistantsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     {!a.is_active && <Badge variant="secondary">Inactief</Badge>}
-                    <Badge variant="outline" className="text-xs">{ASSISTANT_TYPE_LABELS[a.type] ?? a.type}</Badge>
+                    <Badge variant="outline" className="text-xs">{assistantTypeLabel(a.type)}</Badge>
                   </div>
                 </div>
               </CardHeader>
@@ -131,9 +131,15 @@ function AssistantsPage() {
                     <MessagesSquare className="h-4 w-4 mr-2" /> Chat
                   </Button>
                 )}
-                {isAdmin && (
-                  <Button variant="ghost" size="icon" onClick={() => { setEditingAssistant(a); setModalOpen(true) }}>
-                    <Pencil className="h-4 w-4" />
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => { setEditingAssistant(a); setModalOpen(true) }}
+                    aria-label={isPlatformAdmin ? 'Assistent bewerken' : 'Kennisbronnen koppelen'}
+                    title={isPlatformAdmin ? 'Assistent bewerken' : 'Kennisbronnen koppelen'}
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 )}
               </CardFooter>
@@ -147,7 +153,7 @@ function AssistantsPage() {
         onOpenChange={setModalOpen}
         assistant={editingAssistant}
         organizationId={profile?.organization_id ?? ''}
-        userId={profile?.id ?? ''}
+        isPlatformAdmin={isPlatformAdmin}
       />
     </div>
   )
@@ -158,51 +164,41 @@ function AssistantModal({
   onOpenChange,
   assistant,
   organizationId,
-  userId,
+  isPlatformAdmin,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   assistant: AIAssistant | null
   organizationId: string
-  userId: string
+  isPlatformAdmin: boolean
 }) {
   const { toast } = useToast()
   const { data: availableKBs } = useKnowledgeBases(organizationId || undefined)
   const { data: linkedKBIds } = useAssistantKBLinks(assistant?.id)
-  const createMutation = useCreateAssistant(organizationId)
-  const updateMutation = useUpdateAssistant(organizationId)
-  const deleteMutation = useDeleteAssistant(organizationId)
+  const kbMutation = useUpdateAssistantKnowledgeBases(organizationId)
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [icon, setIcon] = useState('ðŸ¤–')
+  const [icon, setIcon] = useState('🤖')
   const [type, setType] = useState('chat')
-  const [webhookUrl, setWebhookUrl] = useState('')
-  const [isActive, setIsActive] = useState(true)
   const [exampleQuestions, setExampleQuestions] = useState('')
   const [exampleQuestionsError, setExampleQuestionsError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedKBIds, setSelectedKBIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (assistant) {
       setName(assistant.name)
       setDescription(assistant.description ?? '')
-      setIcon(assistant.icon ?? 'ðŸ¤–')
+      setIcon(assistant.icon ?? '🤖')
       setType(assistant.type ?? 'chat')
-      setWebhookUrl(assistant.n8n_webhook_url ?? '')
-      setIsActive(assistant.is_active);
       setExampleQuestions((assistant.example_questions ?? []).join('\n'))
       setSelectedKBIds(linkedKBIds ?? new Set())
     } else {
       setName('')
       setDescription('')
-      setIcon('ðŸ¤–')
+      setIcon('🤖')
       setType('chat')
-      setWebhookUrl('')
-      setIsActive(true)
       setExampleQuestions('')
       setSelectedKBIds(new Set())
     }
@@ -236,37 +232,46 @@ function AssistantModal({
     }
     setIsSaving(true)
 
-    const payload = {
-      organization_id: organizationId,
-      name,
-      description: description || null,
-      system_prompt: assistant?.system_prompt ?? '',
-      icon: icon || 'ðŸ¤–',
-      type,
-      n8n_webhook_url: webhookUrl.trim() || null,
-      example_questions: parsedExampleQuestions,
-      is_active: isActive,
-      created_by: userId,
-      kbIds: [...selectedKBIds],
-    }
-
     try {
-      if (assistant) {
-        await updateMutation.mutateAsync({
-          id: assistant.id,
-          name: payload.name,
-          description: payload.description,
-          type: payload.type,
-          icon: payload.icon,
-          n8n_webhook_url: payload.n8n_webhook_url,
-          example_questions: payload.example_questions,
-          is_active: payload.is_active,
-          kbIds: payload.kbIds,
+      if (isPlatformAdmin) {
+        const definition = {
+          name: name.trim(),
+          description: description.trim() || null,
+          icon: icon.trim() || '🤖',
+          type,
+          example_questions: parsedExampleQuestions,
+        }
+
+        const { catalog_id } = await saveCatalogAssistant({
+          id: assistant?.catalog_id ?? null,
+          ...definition,
         })
-        toast({ title: 'Assistent bijgewerkt', description: `${name} is succesvol bijgewerkt` })
+
+        // A new assistant got a row in every organization; find this
+        // organization's row before linking knowledge sources.
+        let assistantId = assistant?.id
+        if (!assistantId) {
+          const { data, error } = await supabase
+            .from('ai_assistants')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .eq('catalog_id', catalog_id)
+            .single()
+          if (error) throw error
+          assistantId = data.id
+        }
+
+        await kbMutation.mutateAsync({ assistantId, kbIds: [...selectedKBIds] })
+        toast({
+          title: assistant ? 'Assistent bijgewerkt' : 'Assistent aangemaakt',
+          description: assistant
+            ? `${definition.name} is bijgewerkt voor alle organisaties`
+            : `${definition.name} staat bij alle organisaties aan`,
+        })
       } else {
-        await createMutation.mutateAsync(payload)
-        toast({ title: 'Assistent aangemaakt', description: `${name} is klaar voor gebruik` })
+        if (!assistant) throw new Error('Alleen de platformbeheerder kan assistenten aanmaken.')
+        await kbMutation.mutateAsync({ assistantId: assistant.id, kbIds: [...selectedKBIds] })
+        toast({ title: 'Kennisbronnen bijgewerkt', description: `${assistant.name} is bijgewerkt` })
       }
 
       onOpenChange(false)
@@ -277,134 +282,95 @@ function AssistantModal({
     }
   }
 
-  const handleDelete = async () => {
-    if (!assistant) return
-    setIsDeleting(true)
-    try {
-      await deleteMutation.mutateAsync(assistant.id)
-      toast({ title: 'Assistent verwijderd', description: `${assistant.name} is permanent verwijderd` })
-      setShowDeleteConfirm(false)
-      onOpenChange(false)
-    } catch (err) {
-      toast({ title: 'Fout bij verwijderen', description: err instanceof Error ? err.message : 'Onbekende fout', variant: 'destructive' })
-    } finally {
-      setIsDeleting(false)
-    }
-  }
+  const knowledgeBlock = (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">Selecteer de kennisbronnen die deze assistent mag gebruiken</p>
+      <div className="border rounded-lg max-h-40 overflow-y-auto">
+        {(availableKBs ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground p-3">Geen kennisbronnen beschikbaar</p>
+        ) : (
+          (availableKBs ?? []).map((kb) => (
+            <label key={kb.id} className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedKBIds.has(kb.id)}
+                onChange={() => toggleKB(kb.id)}
+                className="rounded border-input"
+              />
+              <span className="text-sm">{kb.name}</span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  )
+
+  const dialogTitle = isPlatformAdmin
+    ? (assistant ? 'Assistent bewerken' : 'Nieuwe assistent')
+    : `Kennisbronnen voor ${assistant?.name ?? ''}`
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <form onSubmit={handleSave}>
         <DialogHeader>
-          <DialogTitle>{assistant ? 'Assistent bewerken' : 'Nieuwe assistent'}</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          {isPlatformAdmin && (
+            <DialogDescription>
+              Wijzigingen gelden voor alle organisaties.
+            </DialogDescription>
+          )}
         </DialogHeader>
         <DialogContent className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-          <div className="flex gap-4">
-            <div className="flex flex-col gap-2 w-20">
-              <Label htmlFor="icon">Icoon</Label>
-              <Input id="icon" value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="ðŸ¤–" maxLength={4} className="text-center text-xl" />
-            </div>
-            <div className="flex flex-col gap-2 flex-1">
-              <Label htmlFor="name">Naam</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mijn assistent" required />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="type">Type</Label>
-            <Select value={type} onValueChange={setType} options={ASSISTANT_TYPES} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="desc">Beschrijving</Label>
-            <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Korte omschrijving" rows={2} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="example-questions">Voorbeeldvragen (Ã©Ã©n per regel, maximaal 4)</Label>
-            <Textarea
-              id="example-questions"
-              value={exampleQuestions}
-              onChange={(e) => handleExampleQuestionsChange(e.target.value)}
-              placeholder={'Wat dekt mijn polis?\nHoe meld ik schade?'}
-              rows={4}
-              aria-invalid={!!exampleQuestionsError}
-            />
-            {exampleQuestionsError ? (
-              <p className="text-xs text-destructive" role="alert">{exampleQuestionsError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">Deze vragen staan als knoppen bij een nieuw gesprek.</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="webhook-url">N8N Webhook URL</Label>
-            <Input id="webhook-url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://n8n.example.com/webhook/mijn-flow" />
-            <p className="text-xs text-muted-foreground">Optioneel. Als ingevuld, gebruikt deze assistent zijn eigen webhook-URL in plaats van de gedeelde configuratie.</p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>Kennisbronnen</Label>
-            <p className="text-xs text-muted-foreground">Selecteer de kennisbronnen die deze assistent mag gebruiken</p>
-            <div className="border rounded-lg max-h-40 overflow-y-auto">
-              {(availableKBs ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground p-3">Geen kennisbronnen beschikbaar</p>
-              ) : (
-                (availableKBs ?? []).map((kb) => (
-                  <label key={kb.id} className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedKBIds.has(kb.id)}
-                      onChange={() => toggleKB(kb.id)}
-                      className="rounded border-input"
-                    />
-                    <span className="text-sm">{kb.name}</span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded border-input" />
-            <span className="text-sm">Actief</span>
-          </label>
+          {isPlatformAdmin && (
+            <>
+              <div className="flex gap-4">
+                <div className="flex flex-col gap-2 w-20">
+                  <Label htmlFor="icon">Icoon</Label>
+                  <Input id="icon" value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🤖" maxLength={4} className="text-center text-xl" />
+                </div>
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="name">Naam</Label>
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mijn assistent" required />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="type">Type</Label>
+                <Select value={type} onValueChange={setType} options={ASSISTANT_TYPES} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="desc">Beschrijving</Label>
+                <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Korte omschrijving" rows={2} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="example-questions">Voorbeeldvragen (één per regel, maximaal 4)</Label>
+                <Textarea
+                  id="example-questions"
+                  value={exampleQuestions}
+                  onChange={(e) => handleExampleQuestionsChange(e.target.value)}
+                  placeholder={'Wat dekt mijn polis?\nHoe meld ik schade?'}
+                  rows={4}
+                  aria-invalid={!!exampleQuestionsError}
+                />
+                {exampleQuestionsError ? (
+                  <p className="text-xs text-destructive" role="alert">{exampleQuestionsError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Deze vragen staan als knoppen bij een nieuw gesprek.</p>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 border-t pt-4">
+                <Label>Kennisbronnen</Label>
+                {knowledgeBlock}
+              </div>
+            </>
+          )}
+
+          {!isPlatformAdmin && knowledgeBlock}
         </DialogContent>
         <DialogFooter>
-          <div className="flex gap-2 w-full justify-between">
-            <div>
-              {assistant && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setShowDeleteConfirm(true)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" /> Verwijderen
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
-              <Button type="submit" disabled={isSaving || !!exampleQuestionsError}>{isSaving ? 'Opslaan...' : 'Opslaan'}</Button>
-            </div>
-          </div>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuleren</Button>
+          <Button type="submit" disabled={isSaving || !!exampleQuestionsError}>{isSaving ? 'Opslaan...' : 'Opslaan'}</Button>
         </DialogFooter>
       </form>
-
-      {showDeleteConfirm && (
-        <Dialog open={showDeleteConfirm} onOpenChange={(open) => { if (!open) setShowDeleteConfirm(false) }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Assistent verwijderen</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              Weet u zeker dat u <strong>{assistant?.name}</strong> wilt verwijderen? Dit verwijdert ook alle gekoppelde gesprekken en kennisbronkoppelingen.
-            </p>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>Annuleren</Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-                {isDeleting ? 'Verwijderen...' : 'Verwijderen'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </Dialog>
   )
 }

@@ -183,14 +183,13 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
       .then(({ data }) => (data?.name as string | undefined) ?? organizationId);
 
-    // --- Flow config (document_processing), service-role read.
+    // --- Central n8n connection (feature 019), service-role read.
     const { data: config } = await serviceClient
-      .from("flow_configs")
-      .select("webhook_url, webhook_auth_header, webhook_token")
-      .eq("flow_type", "document_processing")
-      .eq("organization_id", organizationId)
+      .from("platform_webhook_config")
+      .select("document_webhook_url, auth_header, token")
+      .eq("id", true)
       .maybeSingle();
-    if (!config?.webhook_url || !isAllowedWebhookUrl(config.webhook_url)) {
+    if (!config?.document_webhook_url || !isAllowedWebhookUrl(config.document_webhook_url)) {
       if (isIndex) await setDocumentStatus(documentId, "error", ERROR_MESSAGES.NOT_CONFIGURED);
       logCode("NOT_CONFIGURED", documentId, action, started);
       return errorResponse("NOT_CONFIGURED", cors);
@@ -223,7 +222,7 @@ Deno.serve(async (req: Request) => {
     };
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (config.webhook_token) headers[config.webhook_auth_header || "X-Webhook-Token"] = config.webhook_token;
+    if (config.token) headers[config.auth_header || "X-Webhook-Token"] = config.token;
 
     // Start the visible retry state before n8n is called. On any failure below
     // the row goes back to 'error' with a reason, so polling can stop and the
@@ -237,7 +236,7 @@ Deno.serve(async (req: Request) => {
     const timer = setTimeout(() => controller.abort(), 10_000);
     let upstream: Response;
     try {
-      upstream = await fetch(config.webhook_url, {
+      upstream = await fetch(config.document_webhook_url, {
         method: "POST",
         headers,
         body: JSON.stringify(payload),
