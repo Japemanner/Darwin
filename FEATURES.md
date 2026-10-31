@@ -280,19 +280,23 @@ Supabase MCP (RLS `true` + drie policies geverifieerd), `VAPID_KEYS`/
 (versie 1, ACTIVE, `verify_jwt: false`). De R1-smoke met één synthetische
 abonnement-rij gaf `200 {ok:true,sent:0,removed:0,failed:1}` en logs met alleen
 `PUSH_SENT`/`SEND_FAILED` — `jsr:@negrel/webpush` werkt dus op de Edge Runtime,
-geen fallback nodig; `node --test` is 15/15 groen en `tsc --noEmit` + fitness
-zijn schoon (0 fail). Nog open: de publieke sleutel in **Netlify** zetten
-(`VITE_VAPID_PUBLIC_KEY`; Netlify CLI is niet ingelogd), de handmatige
+geen fallback nodig. Met een nieuw, apart E2E-lidaccount (role=member,
+credentials alleen in `.env.local`) zijn de 5 Playwright-tests groen — inclusief
+de echte `push_subscriptions`-ronde en de uitlog-opruiming — en slaagt de
+RLS-rooktest (eigen insert, alleen eigen rijen, delete van andermans rij 0
+rijen, insert voor een ander `42501`, geen UPDATE-policy); de volledige suite is
+18 passed / 68 skipped / 0 failed. `node --test` is 15/15, `tsc --noEmit` en
+fitness zijn schoon (0 fail). Nog open: de publieke sleutel in **Netlify**
+zetten (`VITE_VAPID_PUBLIC_KEY`; Netlify CLI is niet ingelogd), de handmatige
 push-rooktest `quickstart.md` §5 (echte melding bij gereed/mislukt, klik opent
-`/analyse/<run-id>`, uitloggen stopt het apparaat), de RLS-rooktest met twee
-accounts en de Playwright-tests (5 tests skipped; de hele suite is 86 skipped
-zonder `E2E_MEMBER_EMAIL`/`E2E_MEMBER_PASSWORD`). `analysis-run-callback`
-bestaat **niet** in dit project (geen functie, geen `analysis`-tabel — gate
-T003 = nee); de callback-hook staat als contract in
-`contracts/analysis-callback-integration.md` en US2 is pas end-to-end actief
-zodra het analyse-backend die hook uitrolt. `eslint src/ --max-warnings 0` faalt
-op 6 bestaande waarschuwingen in `src/App.tsx`, `src/components/ui/toast.tsx`
-en `src/lib/posthog.tsx` (niet door deze feature veroorzaakt).
+`/analyse/<run-id>`), en een E2E-adminaccount (`E2E_EMAIL`/`E2E_PASSWORD`) zodat
+de 68 admin-tests niet meer skippen. `analysis-run-callback` bestaat **niet** in
+dit project (geen functie, geen `analysis`-tabel — gate T003 = nee); de
+callback-hook staat als contract in `contracts/analysis-callback-integration.md`
+en US2 is pas end-to-end actief zodra het analyse-backend die hook uitrolt.
+`eslint src/ --max-warnings 0` faalt op 6 bestaande waarschuwingen in
+`src/App.tsx`, `src/components/ui/toast.tsx` en `src/lib/posthog.tsx` (niet door
+deze feature veroorzaakt).
 
 ---
 

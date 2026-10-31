@@ -46,6 +46,10 @@ samengevat.
 - Supabase CLI (geïnstalleerd; `supabase --version` → 2.102+)
 - Toegang tot Supabase MCP (migratie + deploy) of een Management API-token
 - Een Chromium-browser voor de handmatige rooktest (Playwright test geen echte push)
+- `E2E_MEMBER_EMAIL` / `E2E_MEMBER_PASSWORD` in `.env.local` (of de shell) voor de
+  geauthenticeerde Playwright-tests; zonder die variabelen skipt de suite met een
+  duidelijke reden. Sinds 2026-10-31 bestaat er een apart lidaccount
+  (role=member) waarvan de credentials alleen in `.env.local` staan.
 
 ## Uitgevoerd op 2026-10-31 (status)
 
@@ -57,8 +61,9 @@ samengevat.
 | §3 frontend | `VITE_VAPID_PUBLIC_KEY` staat in `.env.local`; **open**: dezelfde variabele in Netlify (CLI niet ingelogd) |
 | §4 deploy | `push-send` versie 1, status ACTIVE, `verify_jwt: false` |
 | §4 R1-smoke | met één synthetische rij (geldige ECDH-sleutels, onbereikbaar endpoint): `401` bij fout token, `400 VALIDATION` bij ongeldige body, `200 {"ok":true,"sent":0,"removed":0,"failed":1}` — `jsr:@negrel/webpush` initialiseert en codeert dus op de Edge Runtime; logs tonen `PUSH_SENT` + `SEND_FAILED` zonder endpoint, sleutels of klantgegevens; geen fallback nodig |
+| §4 RLS-rooktest | met het lidaccount: eigen insert PASS, select alleen eigen rijen, delete van andermans rij 0 rijen, insert voor een ander `42501`, update 0 rijen (geen UPDATE-policy) |
 | §5 echte push | **open** — vereist een browser met toestemming en een echte analyse-run |
-| §6 tests | `node --test` 15/15 groen; Playwright 5 tests skipped (geen `E2E_MEMBER_EMAIL`/`E2E_MEMBER_PASSWORD`), volledige suite 86 skipped / 0 failed — zelfde gedocumenteerde staat als 011–016 |
+| §6 tests | `node --test` 15/15 groen; de push-spec is 5/5 groen met het lidaccount (echte `push_subscriptions`-ronde, opgeruimd na elke test); volledige suite 18 passed / 68 skipped / 0 failed — de 68 skips zijn de admin-tests zonder `E2E_EMAIL`/`E2E_PASSWORD` |
 
 ## 2. Migratie toepassen
 
@@ -205,9 +210,9 @@ bestand deleten.
 - [x] Migratie toegepast, RLS + policies geverifieerd
 - [ ] VAPID-secrets gezet, `VITE_VAPID_PUBLIC_KEY` in `.env.local` **en Netlify** (Netlify nog open)
 - [x] `push-send` gedeployed, geen crypto-fout in de logs
-- [ ] RLS-rooktest met twee accounts geslaagd (vereist een member-testaccount)
+- [x] RLS-rooktest met twee accounts geslaagd (member + admin; eigen rijen alleen, insert voor een ander `42501`, geen UPDATE-policy)
 - [ ] Handmatige push-rooktest geslaagd (aan, uit, klik, uitloggen)
 - [x] `node --test` groen (15/15)
-- [ ] Playwright nieuw + volledige regressie groen (nu 86 skipped: geen E2E-credentials)
-- [x] `tsc --noEmit` en fitness-check groen (fitness: 0 fail, 2 warn, 4 skip)
+- [x] Playwright push-spec groen (5/5); volledige regressie 18 passed / 68 skipped / 0 failed (admin-tests skippen zonder `E2E_EMAIL`/`E2E_PASSWORD`)
+- [x] `tsc --noEmit` en fitness-check groen (fitness: 0 fail, 1 warn, 4 skip)
 - [x] FEATURES.md bijgewerkt (inclusief callback-afhankelijkheid)

@@ -77,7 +77,7 @@ en ziet/ziet dat de status "aan" is; hij kan ze weer uitzetten.
 - [X] T012 [US1] Implementeer `src/hooks/usePushSubscription.ts`: statusmachine uit `data-model.md`, `enable()`/`disable()` met foutafhandeling, en hercontrole bij mount; geeft `{ status, errorCode, enable, disable }` terug
 - [X] T013 [P] [US1] Maak `src/components/layout/PushNotificationControl.tsx`: echte `<button>` met Nederlandse labels ("Meldingen aanzetten" / "Meldingen uitzetten"), statustekst, `aria-live="polite"` op de status, zichtbare focusstate; nog geen blocked/unsupported-varianten (die komen in US3)
 - [X] T014 [US1] Rendere de control in **beide** gebruikersblokken van `src/components/layout/AppShell.tsx` (mobiele overlay + desktop aside) en registreer de service worker bij mount van de geauthenticeerde shell
-- [ ] T015 [US1] Voer T009 uit tegen de implementatie tot groen; controleer handmatig dat de rij in `push_subscriptions` verschijnt en na uitzetten verdwijnt
+- [X] T015 [US1] Voer T009 uit tegen de implementatie tot groen; controleer handmatig dat de rij in `push_subscriptions` verschijnt en na uitzetten verdwijnt — **5/5 groen met een echt lidaccount (2026-10-31); de reload-assertie leest de echte rij en de tests ruimen op. RLS-rooktest met het lidaccount: eigen insert PASS, select alleen eigen rijen, delete van andermans rij 0 rijen, insert voor een ander 42501, update 0 rijen (geen UPDATE-policy)**
 
 **Checkpoint**: US1 werkt zelfstandig; de MVP is demonstreerbaar (abonneren/afmelden).
 
@@ -160,7 +160,7 @@ melding wel.
 
 - [X] T030 [P] Werk `FEATURES.md` bij met de feature, de nieuwe tabel, de send-functie en **expliciet** de callback-afhankelijkheid (T003-uitkomst)
 - [X] T031 [P] Werk `specs/018-push-notifications/quickstart.md` bij met de werkelijke T003-uitkomst, de gebruikte secrets en eventuele afwijkingen; controleer `.env.example`
-- [ ] T032 Draai `npx tsc --noEmit`, `bash scripts/fitness-check.sh` en de volledige Playwright-regressie; alle bestaande tests blijven groen (FR-020) — **`tsc` schoon, fitness 0 fail / 2 warn / 4 skip; Playwright 86 skipped (0 failed) omdat `E2E_EMAIL`/`E2E_PASSWORD`/`E2E_MEMBER_*` ontbreken**
+- [ ] T032 Draai `npx tsc --noEmit`, `bash scripts/fitness-check.sh` en de volledige Playwright-regressie; alle bestaande tests blijven groen (FR-020) — **`tsc` schoon, fitness 0 fail / 1 warn / 4 skip, Playwright 18 passed / 68 skipped / 0 failed. De skips zijn de admin-tests: zonder `E2E_EMAIL`/`E2E_PASSWORD` start het admin-`page`-fixture niet**
 - [X] T033 [P] Controleer dat de VAPID private key, `PUSH_SEND_TOKEN` en service-role key nergens in `src/`, `public/` of de repo staan (Gitleaks + handmatige grep); bevestig dat `src/` geen `crypto.subtle` bevat (F-18)
 - [X] T034 [P] Controleer de payload- en loghygiëne: precies twee payloadvelden, geen endpoint/sleutels/klantgegevens in logs, geen fetch-handler of opslag in `public/sw.js`
 - [ ] T035 Werk de agent-context (`AGENTS.md` SPECKIT-blok) bij naar het definitieve plan en commit met een conventioneel bericht
