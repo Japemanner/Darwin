@@ -149,8 +149,11 @@ zonder E2E-accounts.
 - [ ] T027 Release volgens `quickstart.md`: n8n → migratie → functies/secrets/cron →
   frontend, **pas na bevestiging** voor migratie en deploy.
   _(Migratie 023 is op 2026-10-31 via de Supabase MCP toegepast en geverifieerd
-  (remote versie `20261031192912`; F-01/F-10 groen). Functies, secrets, cron en
-  frontend nog open.)_
+  (remote versie `20261031192912`; F-01/F-10 groen). De drie functies zijn via de MCP
+  gedeployed, de twee secrets zijn gezet, Vault + pg_cron-job
+  `analysis-runs-cleanup` zijn ingericht en een handmatige pg_net-aanroep gaf 200
+  `{deleted:0,failed:0}`. Nog open: handmatige n8n-aanpassingen, frontend-release en
+  de live n8n-run/RLS-verificatie uit quickstart §5.)_
 
 ---
 

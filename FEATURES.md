@@ -376,14 +376,16 @@ naar `page.route`-interceptie; nieuw zijn de scenario's uitgezette assistent,
 
 **Gap**: **migratie 023 is toegepast en geverifieerd** (RLS aan, één SELECT-policy,
 privébucket met één SELECT-policy, `pg_cron`/`pg_net` geïnstalleerd; F-01/F-10 groen).
-De drie Edge Functions en de frontend zijn **nog niet gedeployed/gereleased**. Open: de
+De drie Edge Functions zijn **gedeployed** (`analysis-run-submit` met JWT-verificatie;
+callback en cleanup met `--no-verify-jwt`), de secrets `ANALYSIS_CALLBACK_SECRET` /
+`ANALYSIS_CLEANUP_SECRET` zijn gezet, en Vault + de dagelijkse pg_cron-job
+`analysis-runs-cleanup` (03:15 UTC) zijn ingericht. Een handmatige pg_net-aanroep gaf
+200 `{deleted:0,failed:0}`; anonieme submit/callback/cleanup geven 401. Nog open: de
 handmatige n8n-aanpassingen (Header Auth op `darwin-risicoanalyse`, twee placeholders,
-`N8N_PAYLOAD_SIZE_MAX` ≥ 64 MiB), de drie functies deployen (callback en cleanup met
-`--no-verify-jwt`), de secrets `ANALYSIS_CALLBACK_SECRET`/`ANALYSIS_CLEANUP_SECRET`
-zetten, de Vault-secrets + pg_cron-job aanmaken, de frontend releasen en daarna de
-handmatige n8n-run/RLS/callback-verificatie uit quickstart §5. De vijf analyse-specs
-zijn lokaal **23/23 groen** met het bestaande E2E-lidaccount als `E2E_EMAIL`; zonder
-credentials skippen ze met reden.
+`N8N_PAYLOAD_SIZE_MAX` ≥ 64 MiB), de frontend-release en de handmatige live n8n-run/
+RLS-verificatie uit quickstart §5. De vijf analyse-specs zijn lokaal **23/23 groen**
+met het bestaande E2E-lidaccount als `E2E_EMAIL`; zonder credentials skippen ze met
+reden.
 
 ---
 

@@ -391,12 +391,16 @@ specs/021-analysis-server-route/plan.md
 Status 2026-10-31 (021): **migration 023 is applied and verified** (remote version
 `20261031192912`): RLS on `analysis_runs` with one SELECT policy, private
 `analysis-dossiers` bucket with one SELECT policy, `pg_cron`/`pg_net` installed;
-F-01 (no public table without RLS) and F-10 (bucket private + policy) pass. The
-three Edge Functions and the frontend are **not deployed/released**. `tsc`, ESLint
-(`src/`), build and the five analysis Playwright specs (23/23 with the E2E member
-account) are green. Release order is in quickstart.md: n8n manual changes →
-(migration done) → functions/secrets/cron → frontend. Function deploys need explicit
-confirmation in chat.
+F-01 (no public table without RLS) and F-10 (bucket private + policy) pass. The three
+Edge Functions are **deployed** (`analysis-run-submit` with JWT verification;
+`analysis-run-callback` and `analysis-run-cleanup` with `--no-verify-jwt`), the
+secrets `ANALYSIS_CALLBACK_SECRET` / `ANALYSIS_CLEANUP_SECRET` are set, and Vault
+(`analysis_cleanup_url`/`analysis_cleanup_secret`) plus the daily pg_cron job
+`analysis-runs-cleanup` (03:15 UTC) are configured. A manual pg_net invocation
+returned 200 `{deleted:0,failed:0}`; anonymous submit/callback/cleanup return 401.
+`tsc`, ESLint (`src/`), build and the five analysis Playwright specs (23/23 with the
+E2E member account) are green. Still open: the manual n8n changes, the frontend
+release and the live n8n run per quickstart §5.
 
 Status 2026-10-31 (020): migration 022 (`team_management`) is applied and
 verified: `profiles.email`/`status`, 30 null-checked policies, the two
