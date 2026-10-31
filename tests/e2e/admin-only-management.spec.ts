@@ -139,13 +139,15 @@ async function mockRest(page: Page, opts: {
     })
   })
   // ai_assistants: list queries get the array, detail queries (.maybeSingle,
-  // e.g. the chat page) get a single row matched on the requested id.
+  // e.g. the chat page) get a single row matched on the requested id. PostgREST
+  // detail reads do not always carry `vnd.pgrst.object+json` (maybeSingle sends
+  // `*/*`), so an `id=eq.` filter is treated as a detail query too.
   await page.route('**/rest/v1/ai_assistants**', async (route) => {
     const accept = route.request().headers()['accept'] ?? ''
-    const single = accept.includes('vnd.pgrst.object+json')
+    const url = new URL(route.request().url())
+    const id = url.searchParams.get('id')?.replace('eq.', '')
+    const single = accept.includes('vnd.pgrst.object+json') || Boolean(id)
     if (single) {
-      const url = new URL(route.request().url())
-      const id = url.searchParams.get('id')?.replace('eq.', '')
       const row = opts.assistants.find((a) => (a as Record<string, unknown>).id === id) ?? null
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(row) })
     } else {

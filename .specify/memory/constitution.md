@@ -86,8 +86,11 @@ error-surface that this constitution has to defend.
 
 ## Security & Data Protection Constraints
 - RLS MUST be enabled on every Supabase table; no exceptions (see AGENTS.md).
-- No secrets in client code: only `VITE_SUPABASE_URL` and
-  `VITE_SUPABASE_ANON_KEY` may enter the frontend bundle.
+- No secrets in client code. Only non-secret, deployment-wide values may
+  enter the frontend bundle: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+  `VITE_ANALYSIS_API_URL` and `VITE_PUBLIC_POSTHOG_*`. Tenant-specific or
+  secret configuration lives server-side (DB + Edge Function), never in the
+  bundle (see decisions/2026-10-30-config-environment-vs-ui.md).
 - Privileged operations MUST run in Supabase Edge Functions, never in the
   client (see AGENTS.md architecture rules 1-3).
 - Storage buckets MUST have explicit policies; no public buckets without
