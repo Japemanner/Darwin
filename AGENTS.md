@@ -388,15 +388,14 @@ For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
 specs/021-analysis-server-route/plan.md
 
-Status 2026-10-31 (021): **code and migration are written; nothing is applied or
-deployed.** Implemented: migration 023 (`analysis_runs` + RLS + `analysis-dossiers`
-bucket + pg_cron/pg_net), Edge Functions `analysis-run-submit`,
-`analysis-run-callback` (deploy `--no-verify-jwt`, HMAC over `run_id`) and
-`analysis-run-cleanup` (pg_cron via pg_net, Storage API); the frontend reads
-`analysis_runs` via RLS and signs dossier downloads at click time. `tsc`, ESLint
+Status 2026-10-31 (021): **migration 023 is applied and verified** (remote version
+`20261031192912`): RLS on `analysis_runs` with one SELECT policy, private
+`analysis-dossiers` bucket with one SELECT policy, `pg_cron`/`pg_net` installed;
+F-01 (no public table without RLS) and F-10 (bucket private + policy) pass. The
+three Edge Functions and the frontend are **not deployed/released**. `tsc`, ESLint
 (`src/`), build and the five analysis Playwright specs (23/23 with the E2E member
 account) are green. Release order is in quickstart.md: n8n manual changes →
-migration → functions/secrets/cron → frontend. Migration and deploys need explicit
+(migration done) → functions/secrets/cron → frontend. Function deploys need explicit
 confirmation in chat.
 
 Status 2026-10-31 (020): migration 022 (`team_management`) is applied and

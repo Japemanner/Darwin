@@ -148,6 +148,9 @@ zonder E2E-accounts.
   pre-existent.)_
 - [ ] T027 Release volgens `quickstart.md`: n8n → migratie → functies/secrets/cron →
   frontend, **pas na bevestiging** voor migratie en deploy.
+  _(Migratie 023 is op 2026-10-31 via de Supabase MCP toegepast en geverifieerd
+  (remote versie `20261031192912`; F-01/F-10 groen). Functies, secrets, cron en
+  frontend nog open.)_
 
 ---
 
