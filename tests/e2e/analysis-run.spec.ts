@@ -1,23 +1,42 @@
 import { test, expect } from './fixtures'
+import {
+  ERROR_CODE,
+  fillMinimalAnalysisForm,
+  installAnalysisMock,
+  openAnalysisForm,
+  type AnalysisMock,
+} from './analysis-fixtures'
 
-// Requires mock server: node scripts/mock-analysis-server.mjs
-// Scenario per run via MOCK_SCENARIO env; these specs need a seeded run.
-// Feature 014: status/result live on /analyse/:runId; the recent list on
-// /analyse/new/:assistantId.
+// Feature 021: status/result live on /analyse/:runId, the recent list on
+// /analyse/new/:assistantId. The Supabase analysis endpoints are mocked; no
+// mock analysis server is used anymore.
+
+async function startAnalysis(
+  page: import('@playwright/test').Page,
+  mock: AnalysisMock,
+  clientReference: string,
+  question = 'Vraagstuk',
+): Promise<void> {
+  const assistantId = await openAnalysisForm(page)
+  mock.setAssistantId(assistantId)
+  await fillMinimalAnalysisForm(page, clientReference, question)
+  await page.getByRole('button', { name: /start analyse/i }).click()
+}
 
 test.describe('Run status — transitions and recent runs', () => {
   test('shows status with elapsed time and survives navigation', async ({ page }) => {
-    test.skip(process.env.MOCK_SCENARIO !== 'slow', 'slow scenario only')
+    const mock = await installAnalysisMock(page, {
+      initialStatus: 'running',
+      finalStatus: 'running',
+      durationMs: 0,
+      clientReference: 'KL-2026-003',
+    })
 
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
-    await expect(page).toHaveURL(/\/analyse\/new\//)
+    const assistantId = await openAnalysisForm(page)
+    mock.setAssistantId(assistantId)
     const listUrl = page.url()
 
-    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk')
-    await page.getByRole('checkbox').first().check()
-    await page.getByLabel(/klantsituatie/i).fill('Karige situatie')
-    await page.getByLabel(/klantreferentie/i).fill('KL-2026-003')
+    await fillMinimalAnalysisForm(page, 'KL-2026-003')
     await page.getByRole('button', { name: /start analyse/i }).click()
 
     await expect(page.getByText(/in wachtrij|bezig/i).first()).toBeVisible({ timeout: 15_000 })
@@ -36,20 +55,11 @@ test.describe('Run status — transitions and recent runs', () => {
 })
 
 test.describe('Result view — sections and source panel', () => {
-  test.beforeEach(async ({ page }) => {
-    if (process.env.MOCK_SCENARIO === 'error') test.skip(true, 'not for error scenario')
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
-    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk')
-    await page.getByRole('checkbox').first().check()
-    await page.getByLabel(/klantsituatie/i).fill('Situatie')
-    await page.getByLabel(/klantreferentie/i).fill('KL-2026-004')
-    await page.getByRole('button', { name: /start analyse/i }).click()
+  test('renders all sections from the rich fixture', async ({ page }) => {
+    const mock = await installAnalysisMock(page)
+    await startAnalysis(page, mock, 'KL-2026-004')
 
-    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 60_000 })
-  })
-
-  test('renders all sections from rich fixture', async ({ page }) => {
+    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(/ontbrekende informatie voor het gesprek/i)).toBeVisible()
     await expect(page.getByText(/risico/i).first()).toBeVisible()
     await expect(page.getByText(/dekking en restgat/i)).toBeVisible()
@@ -57,11 +67,17 @@ test.describe('Result view — sections and source panel', () => {
     await expect(page.getByText(/opties met voor en tegen/i)).toBeVisible()
     await expect(page.getByText(/intern, speculatief/i)).toBeVisible()
     await expect(page.getByText(/concept, door adviseur te accorderen/i).first()).toBeVisible()
-    // No raw HTML rendered (sanitizer active)
-    await expect(page.locator('script, iframe, [onclick]')).toHaveCount(0)
+    // No raw HTML rendered inside the analysis result (sanitizer active).
+    await expect(
+      page.locator('[data-testid^="result-"]').locator('script, iframe, [onclick]'),
+    ).toHaveCount(0)
   })
 
   test('resolves every source reference via side panel', async ({ page }) => {
+    const mock = await installAnalysisMock(page)
+    await startAnalysis(page, mock, 'KL-2026-004')
+
+    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 30_000 })
     await page.getByRole('link', { name: 'K1' }).first().click()
     await expect(page.getByText(/polisvoorwaarden woonhuis/i)).toBeVisible()
     await expect(page.getByText(/artikel 4.2, pagina 12/i)).toBeVisible()
@@ -70,29 +86,47 @@ test.describe('Result view — sections and source panel', () => {
 
   test('copy button places internal text on clipboard', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    const mock = await installAnalysisMock(page)
+    await startAnalysis(page, mock, 'KL-2026-004')
+
+    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: /kopieer interne tekst/i }).click()
     await expect(page.getByText(/staat op het klembord/i)).toBeVisible()
+  })
+
+  test('downloads the dossier through a short-lived signed URL (US4)', async ({ page }) => {
+    const mock = await installAnalysisMock(page)
+    await startAnalysis(page, mock, 'KL-2026-004')
+
+    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 30_000 })
+
+    const signRequest = page.waitForRequest(
+      (request) =>
+        request.url().includes('/storage/v1/object/sign/analysis-dossiers/') &&
+        request.method() === 'POST',
+      { timeout: 10_000 },
+    )
+    await page.getByRole('button', { name: /dossier opslaan/i }).click()
+    await signRequest
+    // The signed URL is created at click time and the button stays usable.
+    await expect(page.getByRole('button', { name: /dossier opslaan/i })).toBeEnabled()
+    await expect(page.getByText('Het dossier is niet meer beschikbaar.')).toHaveCount(0)
   })
 })
 
 test.describe('Recent runs — availability deadline (US6)', () => {
   test('shows the retention deadline for a succeeded run', async ({ page }) => {
-    if (process.env.MOCK_SCENARIO === 'error') test.skip(true, 'not for error scenario')
+    const mock = await installAnalysisMock(page, { clientReference: 'KL-2026-VERVAL' })
 
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
-    await expect(page).toHaveURL(/\/analyse\/new\//)
+    const assistantId = await openAnalysisForm(page)
+    mock.setAssistantId(assistantId)
     const listUrl = page.url()
 
-    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk voor vervaldatum')
-    await page.getByRole('checkbox').first().check()
-    await page.getByLabel(/klantsituatie/i).fill('Situatie')
-    await page.getByLabel(/klantreferentie/i).fill('KL-2026-VERVAL')
+    await fillMinimalAnalysisForm(page, 'KL-2026-VERVAL', 'Vraagstuk voor vervaldatum')
     await page.getByRole('button', { name: /start analyse/i }).click()
 
-    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByText(/klaar/i).first()).toBeVisible({ timeout: 30_000 })
 
-    // The mock sets expires_at to started_at + 7 days (retention period).
     const expected = new Date()
     expected.setDate(expected.getDate() + 7)
     const expectedDate = expected.toLocaleDateString('nl-NL', {
@@ -103,38 +137,37 @@ test.describe('Recent runs — availability deadline (US6)', () => {
 
     await page.goto(listUrl)
     await expect(page.getByText(`beschikbaar tot ${expectedDate}`).first()).toBeVisible({ timeout: 15_000 })
-    // The row of the just-finished run shows it next to its reference.
     await expect(page.getByText(/KL-2026-VERVAL/i).first()).toBeVisible()
   })
 })
 
 test.describe('Error handling — retry with prefilled form', () => {
   test('shows Dutch error with code and prefills form on retry', async ({ page }) => {
-    test.skip(process.env.MOCK_SCENARIO !== 'error', 'error scenario only')
-
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
-    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk voor foutscenario')
-    await page.getByRole('checkbox').first().check()
-    await page.getByLabel(/klantsituatie/i).fill('Situatie')
-    await page.getByLabel(/klantreferentie/i).fill('KL-2026-006')
-    await page.getByRole('button', { name: /start analyse/i }).click()
+    const mock = await installAnalysisMock(page, {
+      finalStatus: 'failed',
+      errorCode: ERROR_CODE,
+      clientReference: 'KL-2026-006',
+    })
+    await startAnalysis(page, mock, 'KL-2026-006', 'Vraagstuk voor foutscenario')
 
     await expect(page.getByText(/mislukt/i).first()).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(/N8N_WORKFLOW_ERROR/i)).toBeVisible()
+    await expect(page.getByText(new RegExp(ERROR_CODE))).toBeVisible()
 
     await page.getByRole('button', { name: /opnieuw/i }).click()
-    // Retry navigates to the start page with the prefill (US1).
     await expect(page).toHaveURL(/\/analyse\/new\//)
     await expect(page.getByLabel(/verzekeringsvraagstuk/i)).toHaveValue(/vraagstuk voor foutscenario/i)
     await expect(page.getByLabel(/klantreferentie/i)).toHaveValue(/KL-2026-006/i)
   })
 
   test('retry shows the attachments notice when the failed attempt had files (US5)', async ({ page }) => {
-    test.skip(process.env.MOCK_SCENARIO !== 'error', 'error scenario only')
+    const mock = await installAnalysisMock(page, {
+      finalStatus: 'failed',
+      errorCode: ERROR_CODE,
+      clientReference: 'KL-2026-BIJL',
+    })
 
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
+    const assistantId = await openAnalysisForm(page)
+    mock.setAssistantId(assistantId)
     await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk met bijlagen')
     await page.getByRole('checkbox').first().check()
     await page.getByLabel(/klantsituatie/i).fill('Situatie')
@@ -149,21 +182,17 @@ test.describe('Error handling — retry with prefilled form', () => {
     await expect(page.getByText(/mislukt/i).first()).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: /opnieuw/i }).click()
 
-    // The notice appears and the file list is indeed empty again (US5).
     await expect(page.getByText('Bijlagen zijn niet bewaard. Voeg de bestanden opnieuw toe.')).toBeVisible()
     await expect(page.getByText(/polis\.pdf/i)).toHaveCount(0)
   })
 
   test('retry without attachments shows no notice (US5)', async ({ page }) => {
-    test.skip(process.env.MOCK_SCENARIO !== 'error', 'error scenario only')
-
-    await page.goto('/assistants')
-    await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
-    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Vraagstuk zonder bijlagen')
-    await page.getByRole('checkbox').first().check()
-    await page.getByLabel(/klantsituatie/i).fill('Situatie')
-    await page.getByLabel(/klantreferentie/i).fill('KL-2026-GEEN')
-    await page.getByRole('button', { name: /start analyse/i }).click()
+    const mock = await installAnalysisMock(page, {
+      finalStatus: 'failed',
+      errorCode: ERROR_CODE,
+      clientReference: 'KL-2026-GEEN',
+    })
+    await startAnalysis(page, mock, 'KL-2026-GEEN', 'Vraagstuk zonder bijlagen')
 
     await expect(page.getByText(/mislukt/i).first()).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: /opnieuw/i }).click()

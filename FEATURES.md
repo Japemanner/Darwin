@@ -337,5 +337,53 @@ bestaande waarschuwingen als bij feature 018 (niet door deze feature veroorzaakt
 
 ---
 
+### Risico-analyse via de serverroute (021)
+
+De risico-analyse loopt niet meer via een browser-adres naar n8n, maar volledig via
+Darwin. Nieuwe migratie `023_analysis_server_route.sql`: `public.analysis_runs` met RLS
+(alleen een SELECT-policy op `advisor_id = auth.uid() AND organization_id =
+get_user_org_id()`; schrijven uitsluitend met de service role), indexen en een private
+bucket `analysis-dossiers` met pad `{organization_id}/{advisor_id}/{run_id}.docx` en
+alleen een SELECT-policy voor de eigenaar. Drie Edge Functions:
+`analysis-run-submit` (fail-closed CORS, JWT, organisatie uit `profiles`, assistent
+actief/type/eigen org, catalogus-productie-URL + centrale header/token, servervalidatie
+van velden/groepsregel/10-25 MB, server-side kennisbron-resolutie, run aanmaken met
+`expires_at = now() + 7 dagen`, JSON met base64-bestanden naar n8n, 30 s time-out,
+202 → `running`, anders `failed`), `analysis-run-callback` (deploy
+`--no-verify-jwt`; HMAC-SHA256 over `run_id` met `ANALYSIS_CALLBACK_SECRET`,
+constant-time; 401/409; error-JSON → `failed`; multipart `ok` → zod-validatie,
+dossier uploaden, conditionele update, `INVALID_RESULT` bij ongeldige analyse) en
+`analysis-run-cleanup` (pg_cron via pg_net, `x-cleanup-secret`; verwijdert eerst de
+dossierobjecten via de Storage API en daarna de rijen). Frontend: `analysis-client`
+stuurt multipart via `functions.invoke`, leest status/lijst via PostgREST (RLS), voegt
+`NOT_CONFIGURED` toe en maakt de dossierdownload pas bij de klik (60 s signed URL,
+niet in state/opslag/adresbalk). `VITE_ANALYSIS_API_URL` is verwijderd; de mock-server
+blijft als script staan maar wordt niet meer gebruikt. De analyse-specs zijn omgebouwd
+naar `page.route`-interceptie; nieuw zijn de scenario's uitgezette assistent,
+`NOT_CONFIGURED` en andermans run.
+
+**Files**: `supabase/migrations/023_analysis_server_route.sql`,
+`supabase/functions/analysis-run-submit/index.ts`,
+`supabase/functions/analysis-run-callback/index.ts`,
+`supabase/functions/analysis-run-cleanup/index.ts`, `src/lib/analysis-client.ts`,
+`src/lib/analysis-schemas.ts`, `src/components/analysis/ResultView.tsx`,
+`src/pages/AnalysisNewPage.tsx`, `src/pages/AnalysisRunPage.tsx`,
+`src/types/database.types.ts`, `.env.example`, `playwright.config.ts`,
+`tests/e2e/analysis-fixtures.ts`, `tests/e2e/analysis-form.spec.ts`,
+`tests/e2e/analysis-run.spec.ts`, `tests/e2e/analysis-jwt.spec.ts`,
+`tests/e2e/analysis-notifications.spec.ts`, `tests/e2e/analysis-server-route.spec.ts`,
+`specs/021-analysis-server-route/`
+
+**Gap**: code en migratie zijn geschreven, maar **niets is toegepast of gedeployed**.
+Open: de handmatige n8n-aanpassingen (Header Auth op `darwin-risicoanalyse`, twee
+placeholders, `N8N_PAYLOAD_SIZE_MAX` ≥ 64 MiB), migratie 023 toepassen, de drie
+functies deployen (callback en cleanup met `--no-verify-jwt`), de secrets
+`ANALYSIS_CALLBACK_SECRET`/`ANALYSIS_CLEANUP_SECRET` zetten, de Vault-secrets +
+pg_cron-job aanmaken, de frontend releasen en daarna de handmatige n8n-run/RLS/callback-
+verificatie uit quickstart §5. De vijf analyse-specs zijn lokaal **23/23 groen** met het
+bestaande E2E-lidaccount als `E2E_EMAIL`; zonder credentials skippen ze met reden.
+
+---
+
 > Dit bestand wordt onderhouden door `@feature-tracker`. Niet handmatig bewerken.
 

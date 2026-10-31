@@ -148,6 +148,64 @@ export interface Database {
           { foreignKeyName: 'ai_assistants_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
         ]
       }
+      analysis_runs: {
+        Row: {
+          advisor_id: string
+          assistant_id: string
+          client_reference: string
+          created_at: string
+          dossier_path: string | null
+          error_code: string | null
+          error_message: string | null
+          expires_at: string
+          finished_at: string | null
+          id: string
+          intern_markdown: string | null
+          organization_id: string
+          result_json: Record<string, unknown> | null
+          started_at: string
+          status: 'queued' | 'running' | 'succeeded' | 'failed'
+        }
+        Insert: {
+          advisor_id: string
+          assistant_id: string
+          client_reference: string
+          created_at?: string
+          dossier_path?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          expires_at: string
+          finished_at?: string | null
+          id: string
+          intern_markdown?: string | null
+          organization_id: string
+          result_json?: Record<string, unknown> | null
+          started_at?: string
+          status?: 'queued' | 'running' | 'succeeded' | 'failed'
+        }
+        Update: {
+          advisor_id?: string
+          assistant_id?: string
+          client_reference?: string
+          created_at?: string
+          dossier_path?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          expires_at?: string
+          finished_at?: string | null
+          id?: string
+          intern_markdown?: string | null
+          organization_id?: string
+          result_json?: Record<string, unknown> | null
+          started_at?: string
+          status?: 'queued' | 'running' | 'succeeded' | 'failed'
+        }
+        Relationships: [
+          { foreignKeyName: 'analysis_runs_advisor_id_fkey'; columns: ['advisor_id']; referencedRelation: 'profiles'; referencedColumns: ['id'] },
+          { foreignKeyName: 'analysis_runs_assistant_id_fkey'; columns: ['assistant_id']; referencedRelation: 'ai_assistants'; referencedColumns: ['id'] },
+          { foreignKeyName: 'analysis_runs_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
+      }
       knowledge_bases: {
         Row: {
           id: string

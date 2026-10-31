@@ -12,12 +12,6 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'node scripts/mock-analysis-server.mjs',
-      port: 4010,
-      reuseExistingServer: true,
-      env: { MOCK_SCENARIO: process.env.MOCK_SCENARIO ?? 'rich' },
-    },
-    {
       command: 'npm run dev',
       port: 5173,
       reuseExistingServer: true,

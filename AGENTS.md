@@ -386,7 +386,18 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/020-team-management/plan.md
+specs/021-analysis-server-route/plan.md
+
+Status 2026-10-31 (021): **code and migration are written; nothing is applied or
+deployed.** Implemented: migration 023 (`analysis_runs` + RLS + `analysis-dossiers`
+bucket + pg_cron/pg_net), Edge Functions `analysis-run-submit`,
+`analysis-run-callback` (deploy `--no-verify-jwt`, HMAC over `run_id`) and
+`analysis-run-cleanup` (pg_cron via pg_net, Storage API); the frontend reads
+`analysis_runs` via RLS and signs dossier downloads at click time. `tsc`, ESLint
+(`src/`), build and the five analysis Playwright specs (23/23 with the E2E member
+account) are green. Release order is in quickstart.md: n8n manual changes →
+migration → functions/secrets/cron → frontend. Migration and deploys need explicit
+confirmation in chat.
 
 Status 2026-10-31 (020): migration 022 (`team_management`) is applied and
 verified: `profiles.email`/`status`, 30 null-checked policies, the two
