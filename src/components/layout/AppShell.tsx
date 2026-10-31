@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useAnalysisNotifications } from '@/hooks/useAnalysisNotifications'
+import { PushNotificationControl } from '@/components/layout/PushNotificationControl'
 import { roleLabel } from '@/lib/labels'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
@@ -111,13 +112,14 @@ function AppShell() {
                 <Map className="h-4 w-4" aria-hidden="true" />
                 <span>Ideeën en wensen</span>
               </Link>
+              <PushNotificationControl userId={profile?.id} />
               <div className="mt-2 flex items-center gap-3">
                 <Avatar fallback={profile?.full_name || 'Gebruiker'} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{profile?.full_name || 'Onbekende gebruiker'}</p>
                   <p className="text-xs text-muted-foreground truncate">{roleLabel(profile?.role)}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={signOut}>
+                <Button variant="ghost" size="icon" onClick={signOut} aria-label="Uitloggen" title="Uitloggen">
                   <LogOut className="h-4 w-4" />
                 </Button>
               </div>
@@ -159,13 +161,14 @@ function AppShell() {
             <Map className="h-4 w-4" aria-hidden="true" />
             <span>Ideeën en wensen</span>
           </Link>
+          <PushNotificationControl userId={profile?.id} />
           <div className="mt-2 flex items-center gap-3">
             <Avatar fallback={profile?.full_name} size="sm" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{profile?.full_name}</p>
               <p className="text-xs text-muted-foreground truncate">{roleLabel(profile?.role)}</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={signOut}>
+            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Uitloggen" title="Uitloggen">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
