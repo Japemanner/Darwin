@@ -6,10 +6,17 @@
 // deterministic; the send function has its own Node unit tests
 // (research.md R8).
 
-export function installPushStub() {
+export function makeStubEndpoint(): string {
+  return `https://push.example.test/darwin-e2e-${crypto.randomUUID()}`
+}
+
+export function installPushStub(endpointArg?: string) {
   if (typeof navigator === 'undefined' || !navigator.serviceWorker) return
 
-  const endpoint = 'https://push.example.test/darwin-e2e-device'
+  // A unique endpoint per test keeps the suite order-independent: a row left by
+  // an earlier test can never make the next test start in the "on" state. The
+  // value is passed in by addInitScript, so it survives a reload in one test.
+  const endpoint = endpointArg ?? 'https://push.example.test/darwin-e2e-device'
 
   const makeSubscription = () => ({
     endpoint,
@@ -52,6 +59,21 @@ export function installPushStub() {
     configurable: true,
     value: function StubPushManager() {},
   })
+
+  // Headless Chromium reports `Notification.permission === 'denied'` even when
+  // Playwright granted it (navigator.permissions.query says 'granted'). Stub the
+  // permission surface so the UI state machine is exercised; `stubDeniedPermission`
+  // overrides this again for the blocked case.
+  if (typeof Notification !== 'undefined') {
+    Object.defineProperty(Notification, 'permission', {
+      configurable: true,
+      get: () => 'granted',
+    })
+    Object.defineProperty(Notification, 'requestPermission', {
+      configurable: true,
+      value: async () => 'granted',
+    })
+  }
   Object.defineProperty(navigator.serviceWorker, 'register', {
     configurable: true,
     value: async () => registration,

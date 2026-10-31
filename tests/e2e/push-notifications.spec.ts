@@ -1,6 +1,7 @@
 import { test, expect, E2E_MEMBER_EMAIL, E2E_MEMBER_PASSWORD } from './fixtures'
 import {
   installPushStub,
+  makeStubEndpoint,
   stubDeniedPermission,
   stubUnsupportedPush,
 } from './push-stubs'
@@ -18,10 +19,14 @@ test.describe('push notifications — enable and disable (US1)', () => {
   test('enables notifications for this device and remembers it after a reload', async ({
     memberPage,
   }) => {
-    await memberPage.addInitScript(installPushStub)
+    await memberPage.addInitScript(installPushStub, makeStubEndpoint())
     await memberPage.goto('/assistants')
 
-    await expect(memberPage.getByText('Meldingen staan uit op dit apparaat.')).toBeVisible()
+    // The status comes from a real push_subscriptions read; on a cold dev server
+    // the first page load can take a few seconds longer than the default timeout.
+    await expect(memberPage.getByText('Meldingen staan uit op dit apparaat.')).toBeVisible({
+      timeout: 15_000,
+    })
 
     await memberPage.getByRole('button', { name: 'Meldingen aanzetten' }).click()
     await expect(memberPage.getByText('Meldingen staan aan op dit apparaat.')).toBeVisible()
@@ -29,10 +34,14 @@ test.describe('push notifications — enable and disable (US1)', () => {
     // A reload proves the row in push_subscriptions, not just local state.
     await memberPage.reload()
     await expect(memberPage.getByText('Meldingen staan aan op dit apparaat.')).toBeVisible()
+
+    // Leave no subscription behind for the next run.
+    await memberPage.getByRole('button', { name: 'Meldingen uitzetten' }).click()
+    await expect(memberPage.getByText('Meldingen staan uit op dit apparaat.')).toBeVisible()
   })
 
   test('disables notifications for this device again', async ({ memberPage }) => {
-    await memberPage.addInitScript(installPushStub)
+    await memberPage.addInitScript(installPushStub, makeStubEndpoint())
     await memberPage.goto('/assistants')
 
     await memberPage.getByRole('button', { name: 'Meldingen aanzetten' }).click()
@@ -85,7 +94,7 @@ test.describe('push notifications — logout (US4)', () => {
       'E2E_MEMBER_EMAIL / E2E_MEMBER_PASSWORD not set',
     )
 
-    await memberPage.addInitScript(installPushStub)
+    await memberPage.addInitScript(installPushStub, makeStubEndpoint())
     await memberPage.goto('/assistants')
 
     await memberPage.getByRole('button', { name: 'Meldingen aanzetten' }).click()

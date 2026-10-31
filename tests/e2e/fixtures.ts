@@ -20,25 +20,27 @@ async function login(page: import('@playwright/test').Page, email: string, passw
   await expect(page).toHaveURL(/assistants|command-center/, { timeout: 30_000 })
 }
 
-// memberPage is defined on a separate extend chain so it resolves against the
-// pristine `page` fixture — the admin override below must not run (and require
-// E2E_EMAIL/E2E_PASSWORD) for member tests.
-const memberBase = base.extend({
-  memberPage: async ({ page }, use, testInfo) => {
-    if (!E2E_MEMBER_EMAIL || !E2E_MEMBER_PASSWORD) {
-      testInfo.skip(true, 'E2E_MEMBER_EMAIL / E2E_MEMBER_PASSWORD not set — provide a test member account (profiles.role = member)')
-    }
-    await login(page, E2E_MEMBER_EMAIL!, E2E_MEMBER_PASSWORD!)
-    await use(page)
-  },
-})
-
-export const test = memberBase.extend({
+export const test = base.extend({
   page: async ({ page }, use, testInfo) => {
     if (!E2E_EMAIL || !E2E_PASSWORD) {
       testInfo.skip(true, 'E2E_EMAIL / E2E_PASSWORD not set — provide a test admin account')
     }
     await login(page, E2E_EMAIL!, E2E_PASSWORD!)
+    await use(page)
+  },
+  // memberPage opens its own tab on the default context instead of depending on
+  // `page`: the admin override above must not run (and require E2E_EMAIL) for
+  // member tests. The default context still carries the file-level `test.use`
+  // options, such as `permissions: ['notifications']`.
+  memberPage: async ({ context }, use, testInfo) => {
+    if (!E2E_MEMBER_EMAIL || !E2E_MEMBER_PASSWORD) {
+      testInfo.skip(
+        true,
+        'E2E_MEMBER_EMAIL / E2E_MEMBER_PASSWORD not set — provide a test member account (profiles.role = member)',
+      )
+    }
+    const page = await context.newPage()
+    await login(page, E2E_MEMBER_EMAIL!, E2E_MEMBER_PASSWORD!)
     await use(page)
   },
 })
