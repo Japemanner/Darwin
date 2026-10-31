@@ -9,9 +9,9 @@
 -- Functions, release the frontend, then remove the deployed flow-config
 -- function manually.
 --
--- BEFORE APPLYING: replace <PLATFORM_ADMIN_EMAIL> with the confirmed platform
--- administrator address (quickstart.md §0-§1). The migration aborts when that
--- account or its profiles row does not exist.
+-- BEFORE APPLYING: the platform administrator address is filled in below
+-- (jaap@jaaphoeve.com). The migration aborts when that account or its profiles
+-- row does not exist.
 
 BEGIN;
 
@@ -336,14 +336,14 @@ DO $$
 DECLARE
   v_user_id uuid;
 BEGIN
-  SELECT id INTO v_user_id FROM auth.users WHERE email = '<PLATFORM_ADMIN_EMAIL>';
+  SELECT id INTO v_user_id FROM auth.users WHERE email = 'jaap@jaaphoeve.com';
 
   IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'platform admin <%> not found in auth.users', '<PLATFORM_ADMIN_EMAIL>';
+    RAISE EXCEPTION 'platform admin <%> not found in auth.users', 'jaap@jaaphoeve.com';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = v_user_id) THEN
-    RAISE EXCEPTION 'platform admin <%> has no profiles row', '<PLATFORM_ADMIN_EMAIL>';
+    RAISE EXCEPTION 'platform admin <%> has no profiles row', 'jaap@jaaphoeve.com';
   END IF;
 
   INSERT INTO public.platform_admins (user_id)
