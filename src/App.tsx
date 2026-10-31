@@ -18,6 +18,7 @@ const RoadmapPage = lazy(() => import('@/pages/RoadmapPage'))
 const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'))
 const TeamPage = lazy(() => import('@/pages/TeamPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const SettingsOrganizationPage = lazy(() => import('@/pages/SettingsOrganizationPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 
@@ -45,7 +46,7 @@ function App() {
 
   useEffect(() => {
     initialize().catch(() => {})
-  }, [])
+  }, [initialize])
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -70,6 +71,7 @@ function App() {
                   <Route path="/knowledge" element={<KnowledgePage />} />
                     <Route path="/team" element={<TeamPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/settings/organizations/:organizationId" element={<SettingsOrganizationPage />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<Navigate to="/command-center" replace />} />

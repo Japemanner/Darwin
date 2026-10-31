@@ -9,3 +9,15 @@ export function roleLabel(role: string | null | undefined): string {
   if (role === 'admin' || role === 'member') return ROLE_LABELS[role]
   return 'Geen rol'
 }
+
+// Readable assistant type labels (feature 010, FR-001; shared with the
+// platform organisation screen in feature 019). Stored values stay English.
+export const ASSISTANT_TYPE_LABELS: Record<string, string> = {
+  chat: 'Chat',
+  risico_analyse: 'Risico-analyse',
+}
+
+export function assistantTypeLabel(type: string | null | undefined): string {
+  if (!type) return ''
+  return ASSISTANT_TYPE_LABELS[type] ?? type
+}

@@ -238,7 +238,7 @@ Deno.serve(async (req: Request) => {
     // --- AuthZ: assistant (RLS scopes to the caller's org), must be active.
     const { data: assistant } = await userClient
       .from("ai_assistants")
-      .select("id, name, system_prompt, type, is_active, n8n_webhook_url, organization_id")
+      .select("id, name, system_prompt, type, is_active, catalog_id, organization_id")
       .eq("id", assistantId)
       .maybeSingle();
     if (!assistant || !assistant.is_active || assistant.organization_id !== organizationId) {
@@ -326,31 +326,34 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     const tenantId = (org?.name as string | undefined) ?? organizationId;
 
-    // --- Webhook URL selection, exactly as callRagWebhook did:
-    // type 'chat' -> org flow config, falling back to the assistant URL;
-    // other types -> assistant URL only. No URL -> NOT_CONFIGURED.
+    // --- Webhook URL and auth from the central catalogue + connection
+    // (feature 019): the assistant's production URL comes from the catalogue
+    // item, the header name and token from the single platform row. Both are
+    // read with the service role; the token never leaves the server.
     let webhookUrl = "";
     let authHeaderName = "X-Webhook-Token";
     let webhookToken: string | undefined;
 
-    if (assistant.type === "chat") {
-      const { data: config } = await serviceClient
-        .from("flow_configs")
-        .select("webhook_url, webhook_auth_header, webhook_token")
-        .eq("flow_type", "rag_chat")
-        .eq("organization_id", organizationId)
-        .maybeSingle();
-      if (config?.webhook_url) {
-        webhookUrl = config.webhook_url;
-        authHeaderName = config.webhook_auth_header || "X-Webhook-Token";
-        webhookToken = config.webhook_token || undefined;
+    if (assistant.catalog_id) {
+      const [{ data: catalog }, { data: globalConfig }] = await Promise.all([
+        serviceClient
+          .from("assistant_catalog")
+          .select("prod_webhook_url")
+          .eq("id", assistant.catalog_id)
+          .maybeSingle(),
+        serviceClient
+          .from("platform_webhook_config")
+          .select("auth_header, token")
+          .eq("id", true)
+          .maybeSingle(),
+      ]);
+      if (catalog?.prod_webhook_url) {
+        webhookUrl = catalog.prod_webhook_url as string;
       }
+      authHeaderName = (globalConfig?.auth_header as string | undefined) || "X-Webhook-Token";
+      webhookToken = (globalConfig?.token as string | undefined) || undefined;
     }
-    if (!webhookUrl && assistant.n8n_webhook_url) {
-      webhookUrl = assistant.n8n_webhook_url;
-      authHeaderName = "X-Webhook-Token";
-      webhookToken = undefined;
-    }
+
     if (!webhookUrl || !isAllowedWebhookUrl(webhookUrl)) {
       logCode("NOT_CONFIGURED", assistantId, conversationId, started);
       return errorResponse("NOT_CONFIGURED", cors);
