@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   // PostHog (EU Cloud)
   readonly VITE_PUBLIC_POSTHOG_KEY?: string
   readonly VITE_PUBLIC_POSTHOG_HOST?: string
+  // Web Push VAPID public key (feature 018) — non-secret, deployment-wide
+  readonly VITE_VAPID_PUBLIC_KEY?: string
 }
 
 interface ImportMeta {

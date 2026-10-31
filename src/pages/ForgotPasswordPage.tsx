@@ -24,13 +24,13 @@ function ForgotPasswordPage() {
       if (error) throw error
       toast({
         title: 'E-mail verstuurd',
-        description: 'Controleer je inbox voor de reset-link. Ook in je spamfolder kijken.',
+        description: 'Controleer uw inbox voor de herstelkoppeling. Kijk ook in uw spamfolder.',
       })
       navigate('/login')
-    } catch (err) {
+    } catch {
       toast({
         title: 'Fout bij versturen',
-        description: err instanceof Error ? err.message : 'Onbekende fout',
+        description: 'Versturen mislukt. Probeer het opnieuw.',
         variant: 'destructive',
       })
     } finally {
@@ -44,7 +44,7 @@ function ForgotPasswordPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Wachtwoord vergeten</CardTitle>
           <CardDescription>
-            Vul je e-mailadres in en we sturen je een link om je wachtwoord te resetten.
+            Vul uw e-mailadres in; wij sturen u een koppeling om uw wachtwoord opnieuw in te stellen.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -61,7 +61,7 @@ function ForgotPasswordPage() {
               />
             </div>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Versturen...' : 'Stuur reset-link'}
+              {isLoading ? 'Versturen...' : 'Stuur herstelkoppeling'}
             </Button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-4">

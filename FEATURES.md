@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-30_
-_Total features: 23_
+_Last updated: 2026-10-31_
+_Total features: 24_
 
 ---
 
@@ -70,7 +70,7 @@ _Removed: 2026-10-19 — vervangen door feature 011 "Chat als eigen pagina met h
 
 ### ✅ Kennisbronnen — Volledig CRUD (admin-only)
 
-Kennisbronnen aanmaken, bewerken, bekijken. Velden: naam, beschrijving. Per organisatie gescoped. Sinds feature 010 admin-only: members zien bronnen, documenten en statussen alleen-lezen (KBSlideOver zonder upload/bewerk/verwijderbesturing).
+Kennisbronnen aanmaken, bewerken, bekijken. Velden: naam, beschrijving. Per organisatie gescoped. Sinds feature 010 admin-only: members zien bronnen, documenten en statussen alleen-lezen (KBSlideOver zonder upload/bewerk/verwijderbesturing). Sinds feature 016 tonen kaarten het aantal documenten, het aantal fouten en de laatste wijziging; de naam is vergrendeld zodra de bron documenten bevat (de zoekfunctie filtert op naam); het veld Vector Collection ID en het tabblad Kennisitems zijn uit de UI verdwenen - de kolom, de payload en de kennisitem-data blijven bestaan.
 
 **Files**: `src/pages/KnowledgePage.tsx` (grid + KBMappingModal)
 
@@ -82,7 +82,7 @@ Documenten (PDF/TXT/DOCX) uploaden naar Supabase Storage, DB-record aanmaken met
 
 **Files**: `src/lib/storage.ts`, `src/pages/KnowledgePage.tsx` (KBSlideOver)
 
-**Gap**: Document status wordt door N8N bijgewerkt (processing→ready→error) — geen client-side polling.
+**Status**: Documentstatus wordt door N8N bijgewerkt (processing/ready/error). Sinds feature 016 ververst de documentlijst elke 5 s zolang een document in verwerking is en stopt daarna; een fout toont "Fout" met `error_message` (of een algemene tekst) en een knop "Opnieuw verwerken" die `document-webhook` met actie `index` aanroept (de server zet de status op processing en wist de reden). Uploaden ondersteunt meerdere bestanden, drag-and-drop en een toetsenbordknop, met status per bestand; verwijderen vraagt om bevestiging met de naam.
 
 ---
 
@@ -231,6 +231,72 @@ De risico-analyse draait op twee eigen pagina's binnen de app-layout met vaste, 
 **Files**: `src/pages/AnalysisNewPage.tsx` (nieuw), `src/pages/AnalysisRunPage.tsx` (nieuw), `src/pages/AssistantsPage.tsx`, `src/components/layout/AppShell.tsx`, `src/components/analysis/AnalysisForm.tsx`, `src/components/analysis/RecentRunsPanel.tsx`, `src/hooks/useAnalysisNotifications.ts` (nieuw), `src/hooks/useRecentRuns.ts`, `src/store/analysisSeenStore.ts` (nieuw), `src/lib/analysis-retry.ts` (nieuw), `src/lib/analysis-schemas.ts`, `src/App.tsx`, `scripts/mock-analysis-server.mjs`, `specs/008-risico-analyse-ui/contracts/run-status.md` (notitie), `tests/e2e/analysis-notifications.spec.ts` (nieuw), `tests/e2e/analysis-form.spec.ts`, `tests/e2e/analysis-run.spec.ts`, `tests/e2e/analysis-jwt.spec.ts`; verwijderd: `src/components/analysis/AnalysisFlow.tsx`
 
 **Gap**: e2e-suite (8 nieuwe gevallen: navigatie-vast-adres, badge+titel/reset, volgorde/adviseur, standaardselectie, bijlagen-melding ±, vervaldatum, DnD+placeholder) draait pas echt zodra `E2E_EMAIL`/`E2E_PASSWORD` in `.env.local` staan (2026-10-30: 72 skipped / 0 failed); backend-afstemming: `expires_at` toevoegen aan de recente-lijst-items van de echte analyse-API (vrijblijvend — frontend werkt ook zonder); handmatige live-verificatie volgens `specs/014-risk-analysis-page/quickstart.md` §3 open; F-01/F-10 (Supabase MCP) en F-16/F-17 (Snyk MCP) vereisen een MCP-sessie.
+
+---
+
+### 🟡 Pushmeldingen voor afgeronde risico-analyses (018)
+
+Web Push (RFC 8291/8292) met VAPID, zonder Firebase SDK en zonder web app
+manifest. In het gebruikersblok onderaan de zijbalk (beide nav-renders) zet de
+adviseur meldingen aan voor dit apparaat: de browser vraagt pas om toestemming
+na de klik, de status is tekst ("Meldingen staan aan/uit op dit apparaat") met
+`aria-live="polite"`, en dezelfde knop zet ze weer uit. Bij geweigerde
+toestemming of een browser zonder Push API verschijnt een Nederlandse uitleg
+zonder knop; bij een gemiste configuratie of fout een melding met "Opnieuw
+proberen". Bij uitloggen verwijdert `authStore.signOut` eerst het abonnement van
+dít apparaat (DB-rij + `subscription.unsubscribe()`), daarna de sessie. Nieuwe
+tabel `push_subscriptions` (per gebruiker per apparaat, `UNIQUE (user_id,
+endpoint)`, CHECKs op https/lengte/niet-lege sleutels) met RLS: alleen eigen
+SELECT/INSERT/DELETE, geen UPDATE-policy (aanzetten is delete+insert,
+research R5). Nieuwe Edge Function `push-send`: één serverside verzender met
+invoer `{user_id, kind, url}` (relatief `/analyse/<uuid>`), `X-Push-Token`,
+payload **uitsluitend** `{kind, run_id}`, sequentiële verzending, 404/410 →
+abonnement verwijderen, overige fouten → `failed` zonder throw, altijd
+`200 {ok,sent,removed,failed}`. Gebruikt `jsr:@negrel/webpush@0.5.0` (Web
+Crypto) omdat `npm:web-push` op de Supabase Edge Runtime faalt
+(`crypto.createECDH` ontbreekt in Deno). `public/sw.js` toont alleen de vaste
+teksten "Uw risico-analyse is gereed"/"Uw risico-analyse is mislukt", `tag` =
+run-id (geen dubbele melding), en opent bij klik `/analyse/<run-id>`; géén
+fetch-handler, cache of browseropslag. VAPID-secrets `VAPID_KEYS`,
+`VAPID_SUBJECT`, `PUSH_SEND_TOKEN`; alleen de publieke sleutel staat als
+`VITE_VAPID_PUBLIC_KEY` in de bundel. Send-logica heeft 15 Node-unit tests
+(`node --test`); Playwright dekt aanzetten/uitzetten/weigeren/niet-ondersteund
+met `permissions: ['notifications']` en een `PushManager`-stub.
+
+**Files**: `supabase/migrations/019_push_subscriptions.sql`,
+`supabase/functions/push-send/index.ts`, `supabase/functions/push-send/logic.ts`,
+`supabase/functions/push-send/logic.test.ts`, `public/sw.js`,
+`src/lib/push/client.ts`, `src/lib/push/types.ts`,
+`src/hooks/usePushSubscription.ts`,
+`src/components/layout/PushNotificationControl.tsx`,
+`src/components/layout/AppShell.tsx`, `src/store/authStore.ts`,
+`src/types/database.types.ts`, `src/vite-env.d.ts`,
+`scripts/generate-vapid-keys.mjs`, `tests/e2e/push-notifications.spec.ts`,
+`tests/e2e/push-stubs.ts`, `specs/018-push-notifications/`
+
+**Gap**: op 2026-10-31 is het serverdeel live gezet: migratie toegepast via
+Supabase MCP (RLS `true` + drie policies geverifieerd), `VAPID_KEYS`/
+`VAPID_SUBJECT`/`PUSH_SEND_TOKEN` als secrets gezet, en `push-send` gedeployed
+(versie 1, ACTIVE, `verify_jwt: false`). De R1-smoke met één synthetische
+abonnement-rij gaf `200 {ok:true,sent:0,removed:0,failed:1}` en logs met alleen
+`PUSH_SENT`/`SEND_FAILED` — `jsr:@negrel/webpush` werkt dus op de Edge Runtime,
+geen fallback nodig. Met een nieuw, apart E2E-lidaccount (role=member,
+credentials alleen in `.env.local`) zijn de 5 Playwright-tests groen — inclusief
+de echte `push_subscriptions`-ronde en de uitlog-opruiming — en slaagt de
+RLS-rooktest (eigen insert, alleen eigen rijen, delete van andermans rij 0
+rijen, insert voor een ander `42501`, geen UPDATE-policy); de volledige suite is
+18 passed / 68 skipped / 0 failed. `node --test` is 15/15, `tsc --noEmit` en
+fitness zijn schoon (0 fail). Nog open: de publieke sleutel in **Netlify**
+zetten (`VITE_VAPID_PUBLIC_KEY`; Netlify CLI is niet ingelogd), de handmatige
+push-rooktest `quickstart.md` §5 (echte melding bij gereed/mislukt, klik opent
+`/analyse/<run-id>`), en een E2E-adminaccount (`E2E_EMAIL`/`E2E_PASSWORD`) zodat
+de 68 admin-tests niet meer skippen. `analysis-run-callback` bestaat **niet** in
+dit project (geen functie, geen `analysis`-tabel — gate T003 = nee); de
+callback-hook staat als contract in `contracts/analysis-callback-integration.md`
+en US2 is pas end-to-end actief zodra het analyse-backend die hook uitrolt.
+`eslint src/ --max-warnings 0` faalt op 6 bestaande waarschuwingen in
+`src/App.tsx`, `src/components/ui/toast.tsx` en `src/lib/posthog.tsx` (niet door
+deze feature veroorzaakt).
 
 ---
 

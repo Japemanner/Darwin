@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database.types'
 import { supabase } from '@/lib/supabase'
+import { unsubscribeThisDeviceQuietly } from '@/lib/push/client'
 import { identifyUser, resetUser } from '@/lib/posthog'
 
 interface AuthState {
@@ -83,6 +84,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    const { user } = get()
+    // Stop notifications on THIS device before the session is revoked; a push
+    // failure never blocks logout (spec US4, FR-017).
+    if (user) {
+      await unsubscribeThisDeviceQuietly(user.id)
+    }
     try {
       await supabase.auth.signOut()
     } catch {

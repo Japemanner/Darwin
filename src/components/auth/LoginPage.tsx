@@ -29,10 +29,11 @@ function LoginPage() {
 
     if (error) {
       console.error('[LoginPage] signIn returned error:', error.message)
-      setLoginError(error.message)
+      const message = 'Inloggen mislukt. Controleer uw e-mailadres en wachtwoord.'
+      setLoginError(message)
       toast({
         title: 'Inloggen mislukt',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       })
       return
@@ -51,7 +52,7 @@ function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-2xl">Darwin</CardTitle>
-          <CardDescription>Log in met je e-mailadres en wachtwoord</CardDescription>
+          <CardDescription>Log in met uw e-mailadres en wachtwoord</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">

@@ -67,7 +67,7 @@ test.describe('document-webhook — upload', () => {
       buffer: Buffer.alloc(1024),
     })
 
-    await expect(page.getByText('Document geüpload')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Document toegevoegd')).toBeVisible({ timeout: 15_000 })
     expect(edgeBody).toEqual({ document_id: DOC_ROW.id, action: 'index' })
   })
 
@@ -86,7 +86,7 @@ test.describe('document-webhook — upload', () => {
       buffer: Buffer.alloc(1024),
     })
 
-    await expect(page.getByText('Upload mislukt')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Toevoegen mislukt')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/kon geen verbinding maken met de documentverwerking/i)).toBeVisible()
   })
 })
@@ -105,6 +105,7 @@ test.describe('document-webhook — delete', () => {
     await expect(page.getByText(DOC_ROW.name)).toBeVisible()
 
     await page.locator('button:has(svg.lucide-trash2)').first().click()
+    await page.getByRole('button', { name: 'Verwijderen', exact: true }).click()
 
     await expect(page.getByText('Document verwijderd')).toBeVisible({ timeout: 15_000 })
     expect(edgeBody).toEqual({ document_id: DOC_ROW.id, action: 'delete' })
@@ -123,6 +124,7 @@ test.describe('document-webhook — delete', () => {
     await expect(page.getByText(DOC_ROW.name)).toBeVisible()
 
     await page.locator('button:has(svg.lucide-trash2)').first().click()
+    await page.getByRole('button', { name: 'Verwijderen', exact: true }).click()
 
     await expect(page.getByText('Fout bij verwijderen')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/kon geen verbinding maken met de documentverwerking/i)).toBeVisible()

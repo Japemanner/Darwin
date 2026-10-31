@@ -14,12 +14,13 @@ import { Avatar } from '@/components/ui/avatar'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select } from '@/components/ui/select'
 import { useTeamMembers, useInvitations, useRevokeInvitation } from '@/hooks/queries'
+import { ROLE_LABELS, roleLabel } from '@/lib/labels'
 import type { Invitation } from '@/types/database.types'
 import { Users, UserPlus, Mail, Trash2 } from 'lucide-react'
 
 const ROLE_OPTIONS = [
-  { value: 'member', label: 'Lid' },
-  { value: 'admin', label: 'Admin' },
+  { value: 'member', label: ROLE_LABELS.member },
+  { value: 'admin', label: ROLE_LABELS.admin },
 ]
 
 function TeamPage() {
@@ -69,11 +70,11 @@ function TeamPage() {
           icon={<Users className="h-12 w-12" />}
           title="Nog geen teamleden"
           description="Nodig collega's uit om samen te werken"
-          action={{ label: 'Nodig een lid uit', onClick: () => setInviteOpen(true) }}
+          action={{ label: 'Nodig een teamlid uit', onClick: () => setInviteOpen(true) }}
         />
       ) : (
         <Card>
-          <CardHeader><CardTitle>Leden ({(members ?? []).length})</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Teamleden ({(members ?? []).length})</CardTitle></CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
@@ -94,7 +95,7 @@ function TeamPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={m.role === 'admin' ? 'default' : 'secondary'}>
-                        {m.role === 'admin' ? 'Admin' : 'Lid'}
+                        {roleLabel(m.role)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -132,7 +133,7 @@ function TeamPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={inv.role === 'admin' ? 'default' : 'secondary'}>
-                        {inv.role === 'admin' ? 'Admin' : 'Lid'}
+                        {roleLabel(inv.role)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">

@@ -78,6 +78,21 @@ function logCode(code: string, documentId: string | undefined, action: string | 
   );
 }
 
+// Status transitions are service-role only: clients have no UPDATE policy on
+// knowledge_base_documents (migration 015). Returns false when the write fails
+// so the caller can surface a typed error instead of continuing silently.
+async function setDocumentStatus(
+  documentId: string,
+  status: "processing" | "error",
+  errorMessage: string | null,
+): Promise<boolean> {
+  const { error } = await serviceClient
+    .from("knowledge_base_documents")
+    .update({ status, error_message: errorMessage })
+    .eq("id", documentId);
+  return !error;
+}
+
 // SSRF guard: https only, no literal IPs, localhost or link-local hosts.
 function isAllowedWebhookUrl(rawUrl: string): boolean {
   try {
@@ -141,10 +156,15 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile } = await userClient
       .from("profiles")
-      .select("organization_id")
+      .select("organization_id, role")
       .eq("id", user.id)
       .maybeSingle();
     if (!profile?.organization_id) return errorResponse("FORBIDDEN", cors);
+
+    // Index/re-index is a management action (feature 010/016).
+    const isIndex = action === "index";
+    if (isIndex && profile.role !== "admin") return errorResponse("FORBIDDEN", cors);
+
     const organizationId = profile.organization_id;
 
     // --- AuthZ: document row (RLS enforces organization_id = caller's org).
@@ -171,6 +191,7 @@ Deno.serve(async (req: Request) => {
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (!config?.webhook_url || !isAllowedWebhookUrl(config.webhook_url)) {
+      if (isIndex) await setDocumentStatus(documentId, "error", ERROR_MESSAGES.NOT_CONFIGURED);
       logCode("NOT_CONFIGURED", documentId, action, started);
       return errorResponse("NOT_CONFIGURED", cors);
     }
@@ -182,6 +203,7 @@ Deno.serve(async (req: Request) => {
         .from("knowledge-documents")
         .createSignedUrl(document.file_path, 900);
       if (signedError || !signed?.signedUrl) {
+        if (isIndex) await setDocumentStatus(documentId, "error", ERROR_MESSAGES.INTERNAL_ERROR);
         logCode("INTERNAL_ERROR", documentId, action, started);
         return errorResponse("INTERNAL_ERROR", cors);
       }
@@ -203,6 +225,14 @@ Deno.serve(async (req: Request) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (config.webhook_token) headers[config.webhook_auth_header || "X-Webhook-Token"] = config.webhook_token;
 
+    // Start the visible retry state before n8n is called. On any failure below
+    // the row goes back to 'error' with a reason, so polling can stop and the
+    // admin can retry again (no permanent 'processing' limbo).
+    if (isIndex && !(await setDocumentStatus(documentId, "processing", null))) {
+      logCode("INTERNAL_ERROR", documentId, action, started);
+      return errorResponse("INTERNAL_ERROR", cors);
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
     let upstream: Response;
@@ -214,21 +244,21 @@ Deno.serve(async (req: Request) => {
         signal: controller.signal,
       });
     } catch {
-      if (controller.signal.aborted) {
-        logCode("UPSTREAM_TIMEOUT", documentId, action, started);
-        return errorResponse("UPSTREAM_TIMEOUT", cors);
-      }
-      logCode("UPSTREAM_UNREACHABLE", documentId, action, started);
-      return errorResponse("UPSTREAM_UNREACHABLE", cors);
+      const code = controller.signal.aborted ? "UPSTREAM_TIMEOUT" : "UPSTREAM_UNREACHABLE";
+      if (isIndex) await setDocumentStatus(documentId, "error", ERROR_MESSAGES[code]);
+      logCode(code, documentId, action, started);
+      return errorResponse(code, cors);
     } finally {
       clearTimeout(timer);
     }
 
     if (upstream.status === 401 || upstream.status === 403) {
+      if (isIndex) await setDocumentStatus(documentId, "error", ERROR_MESSAGES.UPSTREAM_AUTH);
       logCode("UPSTREAM_AUTH", documentId, action, started);
       return errorResponse("UPSTREAM_AUTH", cors);
     }
     if (!upstream.ok) {
+      if (isIndex) await setDocumentStatus(documentId, "error", ERROR_MESSAGES.UPSTREAM_ERROR);
       logCode("UPSTREAM_ERROR", documentId, action, started);
       return errorResponse("UPSTREAM_ERROR", cors);
     }

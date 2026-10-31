@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useAnalysisNotifications } from '@/hooks/useAnalysisNotifications'
+import { PushNotificationControl } from '@/components/layout/PushNotificationControl'
+import { roleLabel } from '@/lib/labels'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -19,11 +21,10 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/command-center', label: 'Command Center', icon: Gauge },
+  { href: '/command-center', label: 'Overzicht', icon: Gauge },
   { href: '/assistants', label: 'Assistenten', icon: Bot },
   { href: '/knowledge', label: 'Kennisbronnen', icon: BookOpen },
   { href: '/history', label: 'Geschiedenis', icon: History },
-  { href: '/roadmap', label: 'Roadmap', icon: Map },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/settings', label: 'Instellingen', icon: Settings },
 ]
@@ -102,15 +103,26 @@ function AppShell() {
               </Link>
                 ))}
             </nav>
-            <div className="border-t pt-4 flex items-center gap-3">
-              <Avatar fallback={profile?.full_name || 'Gebruiker'} size="sm" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{profile?.full_name || 'Onbekende gebruiker'}</p>
-                <p className="text-xs text-muted-foreground truncate">{profile?.role || 'Geen rol'}</p>
+            <div className="border-t pt-4">
+              <Link
+                to="/roadmap"
+                onClick={() => setSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Map className="h-4 w-4" aria-hidden="true" />
+                <span>Ideeën en wensen</span>
+              </Link>
+              <PushNotificationControl userId={profile?.id} />
+              <div className="mt-2 flex items-center gap-3">
+                <Avatar fallback={profile?.full_name || 'Gebruiker'} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{profile?.full_name || 'Onbekende gebruiker'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{roleLabel(profile?.role)}</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={signOut} aria-label="Uitloggen" title="Uitloggen">
+                  <LogOut className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={signOut}>
-                <LogOut className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </div>
@@ -141,15 +153,25 @@ function AppShell() {
               </Link>
             ))}
         </nav>
-        <div className="border-t pt-4 flex items-center gap-3">
-          <Avatar fallback={profile?.full_name} size="sm" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{profile?.full_name}</p>
-            <p className="text-xs text-muted-foreground truncate">{profile?.role}</p>
+        <div className="border-t pt-4">
+          <Link
+            to="/roadmap"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Map className="h-4 w-4" aria-hidden="true" />
+            <span>Ideeën en wensen</span>
+          </Link>
+          <PushNotificationControl userId={profile?.id} />
+          <div className="mt-2 flex items-center gap-3">
+            <Avatar fallback={profile?.full_name} size="sm" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{profile?.full_name}</p>
+              <p className="text-xs text-muted-foreground truncate">{roleLabel(profile?.role)}</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Uitloggen" title="Uitloggen">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="ghost" size="icon" onClick={signOut}>
-            <LogOut className="h-4 w-4" />
-          </Button>
         </div>
       </aside>
 

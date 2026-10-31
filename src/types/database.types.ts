@@ -187,6 +187,7 @@ export interface Database {
           file_type: string
           file_size: number
           status: 'processing' | 'ready' | 'error'
+          error_message: string | null
           created_by: string
           created_at: string
           updated_at: string
@@ -200,6 +201,7 @@ export interface Database {
           file_type: string
           file_size: number
           status?: 'processing' | 'ready' | 'error'
+          error_message?: string | null
           created_by: string
           created_at?: string
           updated_at?: string
@@ -213,6 +215,7 @@ export interface Database {
           file_type?: string
           file_size?: number
           status?: 'processing' | 'ready' | 'error'
+          error_message?: string | null
           created_by?: string
           created_at?: string
           updated_at?: string
@@ -519,8 +522,45 @@ export interface Database {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
+      knowledge_base_stats: {
+        Row: {
+          knowledge_base_id: string
+          organization_id: string
+          document_count: number
+          error_count: number
+          last_updated_at: string
+        }
+        Relationships: []
+      }
       roadmap_features_with_score: {
         Row: {
           id: string
@@ -565,6 +605,7 @@ export type Organization = Database['public']['Tables']['organizations']['Row']
 export type AIAssistant = Database['public']['Tables']['ai_assistants']['Row']
 export type KnowledgeBase = Database['public']['Tables']['knowledge_bases']['Row']
 export type KnowledgeBaseDocument = Database['public']['Tables']['knowledge_base_documents']['Row']
+export type KnowledgeBaseStats = Database['public']['Views']['knowledge_base_stats']['Row']
 export type KnowledgeItem = Database['public']['Tables']['knowledge_items']['Row']
 export type FlowConfig = Database['public']['Tables']['flow_configs']['Row']
 export type Conversation = Database['public']['Tables']['conversations']['Row']

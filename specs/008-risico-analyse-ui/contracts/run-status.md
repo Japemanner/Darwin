@@ -41,6 +41,13 @@ lege weergave.
 auth.uid() af) of via tabel-select `analysis_runs` waar
 `advisor_id = auth.uid()`, geordend op `started_at desc`, limiet 10.
 
+> **Wijziging 2026-10-30 (feature 015-start-screen-history)**: de
+> Geschiedenis-pagina vraagt de recente lijst op met `limit=50` (het
+> startscherm met `limit=5`). Het endpoint MOET `limit` tot en met 50
+> accepteren en honoreren; de standaard blijft 10. De mock-server
+> (`scripts/mock-analysis-server.mjs`) leest `limit` uit de query en past
+> `slice(0, limit)` toe — gecontroleerd: 50 werkt zonder codewijziging.
+
 Elk item bevat uitsluitend metadata (id, client_reference, status,
 started_at, finished_at, error_code) — geen analyse-inhoud, geen
 bestandsnamen, geen urls. Labels in de lijst: klantreferentie +

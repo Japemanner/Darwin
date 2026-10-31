@@ -67,7 +67,7 @@ These run continuously — no manual trigger needed. Always on.
 ## Non-Negotiable Architecture Rules
 
 1. **RLS on every table.** No exceptions. If a table exists without RLS, stop and fix it before continuing.
-2. **No secrets in client code.** `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are the only Supabase values allowed in the frontend bundle. Service role keys live exclusively in Edge Functions and Netlify environment variables.
+2. **No secrets in client code.** `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are the only Supabase values allowed in the frontend bundle. Service role keys live exclusively in Edge Functions and Netlify environment variables. Broader rule: only non-secret, deployment-wide values belong in `VITE_*` env vars; tenant-specific or secret configuration lives in the DB behind an Edge Function and is edited in the UI (see `decisions/2026-10-30-config-environment-vs-ui.md`).
 3. **Edge Functions for privileged operations.** Any operation requiring the service role key (admin actions, webhooks, payment processing) must live in a Supabase Edge Function, not in the client.
 4. **PKCE auth flow.** Use `flowType: 'pkce'` in the Supabase client. No implicit flow.
 5. **Netlify redirects for SPA.** `netlify.toml` must include `[[redirects]] from = "/*" to = "/index.html" status = 200`.
@@ -386,5 +386,11 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/014-risk-analysis-page/plan.md
+specs/018-push-notifications/plan.md
+
+Status 2026-10-31 (018): server-side live — migration 019 applied, VAPID secrets
+set, `push-send` v1 deployed and smoke-tested. Open: `VITE_VAPID_PUBLIC_KEY` in
+Netlify, manual push smoke test (quickstart §5) and E2E credentials.
+`analysis-run-callback` does not exist in this project (gate T003 = no), so US2
+stays pending that external backend.
 <!-- SPECKIT END -->

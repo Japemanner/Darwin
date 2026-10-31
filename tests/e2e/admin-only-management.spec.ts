@@ -139,13 +139,15 @@ async function mockRest(page: Page, opts: {
     })
   })
   // ai_assistants: list queries get the array, detail queries (.maybeSingle,
-  // e.g. the chat page) get a single row matched on the requested id.
+  // e.g. the chat page) get a single row matched on the requested id. PostgREST
+  // detail reads do not always carry `vnd.pgrst.object+json` (maybeSingle sends
+  // `*/*`), so an `id=eq.` filter is treated as a detail query too.
   await page.route('**/rest/v1/ai_assistants**', async (route) => {
     const accept = route.request().headers()['accept'] ?? ''
-    const single = accept.includes('vnd.pgrst.object+json')
+    const url = new URL(route.request().url())
+    const id = url.searchParams.get('id')?.replace('eq.', '')
+    const single = accept.includes('vnd.pgrst.object+json') || Boolean(id)
     if (single) {
-      const url = new URL(route.request().url())
-      const id = url.searchParams.get('id')?.replace('eq.', '')
       const row = opts.assistants.find((a) => (a as Record<string, unknown>).id === id) ?? null
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(row) })
     } else {
@@ -359,10 +361,9 @@ test.describe('admin-only-management — US2 member knowledge view', () => {
     await expect(memberPage.locator('input[type="file"]')).toHaveCount(0)
     await expect(memberPage.locator('button:has(svg.lucide-trash2)')).toHaveCount(0)
 
-    await memberPage.getByRole('button', { name: /kennisitems/i }).click()
+    await expect(memberPage.getByRole('button', { name: /kennisitems/i })).toHaveCount(0)
     await expect(memberPage.getByPlaceholder('Titel van het kennisitem')).toHaveCount(0)
     await expect(memberPage.getByRole('button', { name: /^toevoegen$/i })).toHaveCount(0)
-    await expect(memberPage.getByText('Nog geen kennisitems toegevoegd')).toBeVisible()
 
     await memberPage.getByRole('button', { name: /gekoppeld/i }).click()
     await expect(memberPage.getByText('Nog geen assistenten gekoppeld')).toBeVisible()
@@ -377,6 +378,7 @@ test.describe('admin-only-management — US3 admin parity', () => {
     await mockAdminData(page)
     await page.goto('/assistants')
 
+    await expect(page.locator('aside').getByText('Beheerder', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /nieuwe assistent/i })).toBeVisible()
     await expect(page.getByText(ACTIVE_ASSISTANT.name)).toBeVisible()
     await expect(page.getByText(INACTIVE_ASSISTANT.name)).toBeVisible()
@@ -398,18 +400,16 @@ test.describe('admin-only-management — US3 admin parity', () => {
     await expect(page.getByRole('button', { name: /^bewerken$/i })).toBeVisible()
   })
 
-  test('keeps the upload zone, delete buttons and item form in the detail view', async ({ page }) => {
+  test('keeps the upload zone and delete buttons in the detail view', async ({ page }) => {
     await mockAdminData(page)
     await page.goto('/knowledge')
     await page.locator('.grid .cursor-pointer').first().click()
 
     await expect(page.getByRole('heading', { level: 2, name: KB_ROW.name })).toBeVisible()
-    await expect(page.getByText('Klik om te uploaden')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Bestanden toevoegen' })).toBeVisible()
     await expect(page.locator('button:has(svg.lucide-trash2)')).toHaveCount(2)
 
-    await page.getByRole('button', { name: /kennisitems/i }).click()
-    await expect(page.getByPlaceholder('Titel van het kennisitem')).toBeVisible()
-    await expect(page.getByRole('button', { name: /^toevoegen$/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /kennisitems/i })).toHaveCount(0)
   })
 
   test('keeps the webhook URL field in the assistant edit modal', async ({ page }) => {
