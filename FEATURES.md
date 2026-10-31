@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
 _Last updated: 2026-10-31_
-_Total features: 24_
+_Total features: 25_
 
 ---
 
@@ -297,6 +297,43 @@ en US2 is pas end-to-end actief zodra het analyse-backend die hook uitrolt.
 `eslint src/ --max-warnings 0` faalt op 6 bestaande waarschuwingen in
 `src/App.tsx`, `src/components/ui/toast.tsx` en `src/lib/posthog.tsx` (niet door
 deze feature veroorzaakt).
+
+---
+
+### Platformbeheer — assistentcatalogus, organisatieschakelaars en koppelingen
+
+Eén platformbeheerder beheert de platformbrede assistentcatalogus
+(`assistant_catalog`), zet per organisatie assistenten aan of uit en stelt de
+centrale n8n-koppeling in (headernaam, write-only secret, documentverwerkings-URL
+en per assistent een test- en productie-URL). Kantoorbeheerders koppelen alleen
+nog kennisbronnen van hun eigen organisatie; Instellingen is platformbeheerder-only.
+`rag-chat` en `document-webhook` lezen de centrale koppeling met de service role;
+`create-tenant` autoriseert via `is_platform_admin()` en zaait alle
+catalogusassistenten direct aan. De client kan `ai_assistants` niet meer schrijven:
+zes policies zijn gedropt (drie uit migratie 015 plus drie verweesde permissieve
+policies die alleen in de live database stonden).
+
+**Files**: `supabase/migrations/021_platform_admin_catalog.sql`,
+`supabase/functions/platform-admin/index.ts`,
+`supabase/functions/rag-chat/index.ts`,
+`supabase/functions/document-webhook/index.ts`,
+`supabase/functions/create-tenant/index.ts`, `src/lib/platform-admin-client.ts`,
+`src/hooks/useAuth.ts`, `src/hooks/queries.ts`,
+`src/components/layout/AppShell.tsx`, `src/components/ui/switch.tsx`,
+`src/components/settings/ConnectionsDialog.tsx`, `src/pages/SettingsPage.tsx`,
+`src/pages/SettingsOrganizationPage.tsx`, `src/pages/AssistantsPage.tsx`,
+`src/lib/labels.ts`, `src/App.tsx`, `src/types/database.types.ts`,
+`tests/e2e/platform-admin.spec.ts`, `tests/e2e/fixtures.ts`,
+`scripts/rls-verify.mjs`, `specs/019-platform-assistant-catalog/`
+
+**Gap**: code, migratie en tests zijn geschreven, maar **niets is toegepast of
+gedeployed**. Open: `<PLATFORM_ADMIN_EMAIL>` invullen en de pre-checks uit
+quickstart §0 draaien, migratie 021 toepassen, de vier Edge Functions deployen
+(`platform-admin`, `rag-chat`, `document-webhook`, `create-tenant`), de frontend
+releasen en daarna de gedeployde `flow-config` verwijderen. E2E-platform- en
+lidaccount (`E2E_PLATFORM_ADMIN_*`, `E2E_TEST_ORG_NAME`) ontbreken nog, dus de
+nieuwe tests skippen. `eslint src/ --max-warnings 0` faalt op dezelfde zes
+bestaande waarschuwingen als bij feature 018 (niet door deze feature veroorzaakt).
 
 ---
 
