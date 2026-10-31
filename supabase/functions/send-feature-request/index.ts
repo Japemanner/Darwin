@@ -69,11 +69,25 @@ Deno.serve(async (req: Request) => {
     // Haal profiel op voor naam en e-mail
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, status")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    const submitterName = profile?.full_name ?? "Onbekend";
+    if (!profile) {
+      return new Response(
+        JSON.stringify({ error: "Uw account is geblokkeerd of niet gekoppeld aan een organisatie." }),
+        { status: 403, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
+      );
+    }
+
+    if (profile.status === "blocked") {
+      return new Response(
+        JSON.stringify({ error: "Uw account is geblokkeerd." }),
+        { status: 403, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
+      );
+    }
+
+    const submitterName = profile.full_name ?? "Onbekend";
     const submitterEmail = user.email ?? "Onbekend e-mailadres";
 
     // Sla feature request op in de database
@@ -86,7 +100,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (insertError) {
-      console.error("Failed to insert feature request:", insertError);
+      console.error("Failed to insert feature request:", insertError.code);
       return new Response(
         JSON.stringify({ error: "Kon request niet opslaan" }),
         { status: 500, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
@@ -141,8 +155,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!resendResponse.ok) {
-      const resendError = await resendResponse.text();
-      console.error("Resend API error:", resendError);
+      console.error("Resend API error:", resendResponse.status);
       // Request is al opgeslagen in DB — e-mail falen is niet fataal
       return new Response(
         JSON.stringify({ success: true, warning: "Request opgeslagen, maar e-mail notificatie mislukt" }),
@@ -155,7 +168,7 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
     );
   } catch (err) {
-    console.error("Unexpected error:", err);
+    console.error("Unexpected error in send-feature-request");
     const message = err instanceof Error ? err.message : "Internal server error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,

@@ -49,7 +49,7 @@ WHERE id = '<user-uuid>';
 
 4. Deploy de Edge Function via Supabase CLI:
 ```bash
-supabase functions deploy invite-user
+supabase functions deploy team-admin
 ```
 
 5. Open `http://localhost:5173/login` en log in met je admin account
@@ -85,7 +85,7 @@ src/
 
 | Function       | Pad                              | Beschrijving               |
 |----------------|----------------------------------|----------------------------|
-| `invite-user`  | `supabase/functions/invite-user` | Nodig teamleden uit per e-mail |
+| `team-admin`   | `supabase/functions/team-admin`  | Nodigt teamleden uit, wijzigt rollen en blokkeert/deblokkeert accounts |
 
 ## Migration
 

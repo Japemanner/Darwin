@@ -96,19 +96,19 @@ Toont welke assistenten aan een kennisbron gekoppeld zijn via de `assistant_know
 
 ---
 
-### ✅ Team Beheer — Leden & Uitnodigingen
+### ✅ Team Beheer — Leden, rollen en blokkades
 
-Lijst van organisatieleden + openstaande uitnodigingen. Admins kunnen nieuwe leden uitnodigen per email met rol (admin/lid) en uitnodigingen intrekken. Verstuurd via Supabase Edge Function.
+Lijst van teamleden met naam, e-mailadres, rol, status (Uitgenodigd, Actief of Geblokkeerd) en datum. Kantoorbeheerders beheren de eigen organisatie; de platformbeheerder kiest een organisatie op Instellingen → Team. Uitnodigen, opnieuw versturen, intrekken, rol wijzigen, blokkeren en deblokkeren lopen via één Edge Function. Uitnodigingslinks activeren via `/auth/confirm` en zijn 24 uur geldig. Geblokkeerde accounts verliezen per direct toegang via RLS en Edge Functions.
 
-**Files**: `src/pages/TeamPage.tsx`, `supabase/functions/invite-user/index.ts`
+**Files**: `src/pages/TeamPage.tsx`, `src/components/team/TeamManager.tsx`, `src/lib/team-admin-client.ts`, `src/pages/AuthConfirmPage.tsx`, `supabase/functions/team-admin/index.ts`, `supabase/migrations/022_team_management.sql`
 
 ---
 
-### ✅ Edge Function — invite-user
+### ✅ Edge Function — team-admin
 
-Admin-only endpoint die een gebruiker uitnodigt via `supabase.auth.admin.inviteUserByEmail()`. Gebruikt service role key (nooit in client).
+Eén beheerroute voor `list_members`, `invite`, `resend_invite`, `revoke_invite`, `set_role`, `block` en `unblock`. Service role alleen server-side; fail-closed CORS; Nederlandse foutcodes; geen e-mailadressen, namen of tokens in de logs.
 
-**Files**: `supabase/functions/invite-user/index.ts`
+**Files**: `supabase/functions/team-admin/index.ts`
 
 ---
 

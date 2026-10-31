@@ -27,8 +27,10 @@ export interface Database {
           id: string
           organization_id: string
           full_name: string
+          email: string
           avatar_url: string | null
           role: 'admin' | 'member'
+          status: 'invited' | 'active' | 'blocked'
           created_at: string
           updated_at: string
         }
@@ -36,8 +38,10 @@ export interface Database {
           id: string
           organization_id: string
           full_name: string
+          email?: string
           avatar_url?: string | null
           role?: 'admin' | 'member'
+          status?: 'invited' | 'active' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -45,8 +49,10 @@ export interface Database {
           id?: string
           organization_id?: string
           full_name?: string
+          email?: string
           avatar_url?: string | null
           role?: 'admin' | 'member'
+          status?: 'invited' | 'active' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -582,6 +588,10 @@ export interface Database {
       is_platform_admin: {
         Args: Record<string, never>
         Returns: boolean
+      }
+      activate_own_profile: {
+        Args: Record<string, never>
+        Returns: undefined
       }
       get_feedback_review: {
         Args: Record<string, never>
