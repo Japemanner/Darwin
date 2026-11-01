@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-31
 
-**Status**: Draft
+**Status**: Implemented — resterende verificatietaken open (zie tasks.md)
 
 **Input**: User description: "Platformbeheer: assistentcatalogus, schakelaar per organisatie en koppelingen. Huidige situatie: assistenten bestaan alleen per organisatie; beheerders van een organisatie maken ze aan, bewerken en verwijderen ze op de pagina Assistenten, inclusief een eigen n8n-webhook-URL en de schakelaar Actief. Instellingen toont aan elke beheerder van een organisatie de n8n-koppelingen van de eigen organisatie en een formulier Nieuwe organisatie; de server controleert alleen role = 'admin', dus elke kantoorbeheerder kan nieuwe organisaties aanmaken. rag-chat gebruikt voor type chat de chatkoppeling van de organisatie en anders de webhook-URL van de assistent zelf (zonder token). document-webhook gebruikt de documentkoppeling van de organisatie. In n8n controleren alle webhooks dezelfde headerwaarde. Er is geen rol boven de beheerder van een organisatie. Doel: één platformbeheerder bepaalt centraal welke assistenten er zijn, welke organisatie welke assistent gebruikt en hoe Darwin met n8n verbindt."
 
@@ -242,7 +242,7 @@ assistent slaagt; leesacties blijven werken.
 **Acceptance Scenarios**:
 
 1. **Given** een kantoorbeheerder of adviseur, **When** deze buiten de UI om een actie
-   van de platformbeheerroute uitvoert, **Then** weigert de server de actie.
+   van de platformbeheerroute uitvoert, **Then** weigert de server de actie met een 403.
 2. **Given** een kantoorbeheerder of adviseur, **When** deze buiten de UI om een
    assistent aanmaakt, wijzigt of verwijdert, **Then** weigert de server de actie en
    wijzigt er niets.
@@ -252,7 +252,7 @@ assistent slaagt; leesacties blijven werken.
    een voor de organisatie aangezette assistent koppelt of ontkoppelt, **Then** slaagt de
    actie.
 5. **Given** een kantoorbeheerder, **When** deze buiten de UI om een organisatie
-   aanmaakt, **Then** weigert de server de actie.
+   aanmaakt, **Then** weigert de server de actie met een 403.
 6. **Given** een adviseur, **When** deze de eigen gesprekken en berichten leest,
    **Then** werkt dit ongewijzigd.
 
@@ -315,7 +315,8 @@ assistent slaagt; leesacties blijven werken.
 - **FR-011**: Instellingen MOET voor niet-platformbeheerders uit het menu verdwijnen en
   de route `/settings` MOET "Geen toegang" tonen.
 - **FR-012**: Elke actie van de platformbeheerroute en het aanmaken van een organisatie
-  MOET door de server worden geweigerd voor iedereen die geen platformbeheerder is.
+  MOET door de server met een 403 worden geweigerd voor iedereen die geen
+  platformbeheerder is.
 - **FR-013**: Het venster Koppelingen MOET met één tandwielknop te openen zijn en bevatten:
   de headernaam, het secret (één waarde voor alle n8n-webhooks), de productie-URL voor
   documentverwerking, en per catalogusassistent een test-URL en een productie-URL.
@@ -384,7 +385,7 @@ assistent slaagt; leesacties blijven werken.
   uitzetten in maximaal drie handelingen vanuit Instellingen, en de stand is na herladen
   van de pagina in 100% van de gevallen bewaard.
 - **SC-002**: 100% van de beheeracties van de platformbeheerroute en van het aanmaken van
-  een organisatie wordt geweigerd voor iedereen die geen platformbeheerder is —
+  een organisatie wordt met een 403 geweigerd voor iedereen die geen platformbeheerder is —
   verifieerbaar met geautomatiseerde tests die de server rechtstreeks aanroepen.
 - **SC-003**: Een uitgezette assistent is in 0 gevallen zichtbaar of bruikbaar voor
   adviseurs en kantoorbeheerders, op alle plekken waar assistenten worden aangeboden

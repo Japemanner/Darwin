@@ -41,3 +41,16 @@
 - De migratie-eis (FR-025) is bewust uitkomst-gericht geformuleerd: dezelfde actieve
   assistenten en werkende chat en documentverwerking zonder opnieuw een token in te
   voeren. Hoe de bestaande gegevens worden omgezet, is een planningsvraag.
+
+## Hercontrole 2026-11-01
+
+Dezelfde opdracht is opnieuw aangeleverd. In plaats van een dubbele specificatie is deze
+specificatie bijgewerkt en opnieuw gevalideerd:
+
+- Alle zeven user stories, de acceptatiecriteria, de buiten-scope-lijst en de aannames
+  komen ongewijzigd overeen met de opnieuw aangeleverde opdracht; er ontbrak geen
+  functionaliteit.
+- Aangescherpt: de weigering voor niet-platformbeheerders is nu expliciet een 403
+  (FR-012, SC-002, US7 scenario 1 en 5), omdat de opdracht dat letterlijk eist.
+- Status bijgewerkt naar Implemented; de resterende verificatietaken staan in `tasks.md`.
+- Alle checklistonderdelen blijven geslaagd; geen [NEEDS CLARIFICATION] nodig.

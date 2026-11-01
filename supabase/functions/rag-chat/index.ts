@@ -16,8 +16,8 @@ const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") ?? Deno.env.get("SUPABASE
 const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("VITE_SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Service-role client: for flow_configs reads, auth.getUser and (v2) message/
-// conversation persistence after ownership checks.
+// Service-role client: for platform_webhook_config and assistant_catalog reads,
+// auth.getUser and (v2) message/conversation persistence after ownership checks.
 const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Fail-closed CORS: only origins listed in ALLOWED_ORIGINS get an ACAO header.

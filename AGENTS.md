@@ -386,7 +386,7 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/021-analysis-server-route/plan.md
+specs/019-platform-assistant-catalog/plan.md
 
 Status 2026-10-31 (021): **migration 023 is applied and verified** (remote version
 `20261031192912`): RLS on `analysis_runs` with one SELECT policy, private

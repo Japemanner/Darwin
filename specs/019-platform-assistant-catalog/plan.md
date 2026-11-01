@@ -147,11 +147,24 @@ CORS, JWT-validatie, `logCode`).
 - `quickstart.md`: releasevolgorde (migratie → functies → frontend → `flow-config` weg),
   env-variabelen, verificatiequeries en de handmatige stappen die uw bevestiging vragen.
 
-## Open item before implementation
+## Implementation status (2026-11-01)
 
-Het e-mailadres van de platformbeheerder is nog niet ontvangen. `021_platform_admin_catalog.sql`
-bevat daarvoor de placeholder `<PLATFORM_ADMIN_EMAIL>`; de migratie is pas toepasbaar nadat dat
-adres is ingevuld en bevestigd. Zie quickstart stap 1.
+De technische route is opnieuw aangeleverd en regel voor regel vergeleken met dit plan; er zijn
+geen inhoudelijke afwijkingen gevonden. Stand van zaken, geverifieerd via Supabase MCP:
+
+- Migratie `021_platform_admin_catalog.sql` is toegepast als `platform_admin_catalog` (remote
+  versie `20261031174605`). Nummer 021 in plaats van 020, omdat
+  `020_profiles_update_columns.sql` dat nummer al bezette.
+- `platform-admin` (v2), `rag-chat` (v10), `document-webhook` (v9) en `create-tenant` (v11) zijn
+  actief. `flow-config` (v6) staat nog, zoals gepland, en wordt pas na de frontendrelease
+  verwijderd (quickstart §5, T047).
+- De inventarisatie en de koppeltabel uit routepunt 0 zijn bevestigd en uitgevoerd: vijf
+  catalogusitems, tien `ai_assistants`-rijen, actieve set ongewijzigd (Darwin 3,
+  Gerard_Tekelenburg 2).
+- Het e-mailadres van de platformbeheerder is aangeleverd en in de migratie verwerkt.
+
+Resterend: de verificatietaken die E2E-accounts vereisen (T034, T038, T044) en het handmatig
+verwijderen van `flow-config` (T047). T040, T042 en T046 zijn op 2026-11-01 afgerond.
 
 ## Complexity Tracking
 
