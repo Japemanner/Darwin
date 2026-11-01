@@ -96,19 +96,19 @@ Toont welke assistenten aan een kennisbron gekoppeld zijn via de `assistant_know
 
 ---
 
-### ✅ Team Beheer — Leden & Uitnodigingen
+### ✅ Team Beheer — Leden, rollen en blokkades
 
-Lijst van organisatieleden + openstaande uitnodigingen. Admins kunnen nieuwe leden uitnodigen per email met rol (admin/lid) en uitnodigingen intrekken. Verstuurd via Supabase Edge Function.
+Lijst van teamleden met naam, e-mailadres, rol, status (Uitgenodigd, Actief of Geblokkeerd) en datum. Kantoorbeheerders beheren de eigen organisatie; de platformbeheerder kiest een organisatie op Instellingen → Team. Uitnodigen, opnieuw versturen, intrekken, rol wijzigen, blokkeren en deblokkeren lopen via één Edge Function. Uitnodigingslinks activeren via `/auth/confirm` en zijn 24 uur geldig. Geblokkeerde accounts verliezen per direct toegang via RLS en Edge Functions.
 
-**Files**: `src/pages/TeamPage.tsx`, `supabase/functions/invite-user/index.ts`
+**Files**: `src/pages/TeamPage.tsx`, `src/components/team/TeamManager.tsx`, `src/lib/team-admin-client.ts`, `src/pages/AuthConfirmPage.tsx`, `supabase/functions/team-admin/index.ts`, `supabase/migrations/022_team_management.sql`
 
 ---
 
-### ✅ Edge Function — invite-user
+### ✅ Edge Function — team-admin
 
-Admin-only endpoint die een gebruiker uitnodigt via `supabase.auth.admin.inviteUserByEmail()`. Gebruikt service role key (nooit in client).
+Eén beheerroute voor `list_members`, `invite`, `resend_invite`, `revoke_invite`, `set_role`, `block` en `unblock`. Service role alleen server-side; fail-closed CORS; Nederlandse foutcodes; geen e-mailadressen, namen of tokens in de logs.
 
-**Files**: `supabase/functions/invite-user/index.ts`
+**Files**: `supabase/functions/team-admin/index.ts`
 
 ---
 
@@ -334,6 +334,58 @@ releasen en daarna de gedeployde `flow-config` verwijderen. E2E-platform- en
 lidaccount (`E2E_PLATFORM_ADMIN_*`, `E2E_TEST_ORG_NAME`) ontbreken nog, dus de
 nieuwe tests skippen. `eslint src/ --max-warnings 0` faalt op dezelfde zes
 bestaande waarschuwingen als bij feature 018 (niet door deze feature veroorzaakt).
+
+---
+
+### Risico-analyse via de serverroute (021)
+
+De risico-analyse loopt niet meer via een browser-adres naar n8n, maar volledig via
+Darwin. Nieuwe migratie `023_analysis_server_route.sql`: `public.analysis_runs` met RLS
+(alleen een SELECT-policy op `advisor_id = auth.uid() AND organization_id =
+get_user_org_id()`; schrijven uitsluitend met de service role), indexen en een private
+bucket `analysis-dossiers` met pad `{organization_id}/{advisor_id}/{run_id}.docx` en
+alleen een SELECT-policy voor de eigenaar. Drie Edge Functions:
+`analysis-run-submit` (fail-closed CORS, JWT, organisatie uit `profiles`, assistent
+actief/type/eigen org, catalogus-productie-URL + centrale header/token, servervalidatie
+van velden/groepsregel/10-25 MB, server-side kennisbron-resolutie, run aanmaken met
+`expires_at = now() + 7 dagen`, JSON met base64-bestanden naar n8n, 30 s time-out,
+202 → `running`, anders `failed`), `analysis-run-callback` (deploy
+`--no-verify-jwt`; HMAC-SHA256 over `run_id` met `ANALYSIS_CALLBACK_SECRET`,
+constant-time; 401/409; error-JSON → `failed`; multipart `ok` → zod-validatie,
+dossier uploaden, conditionele update, `INVALID_RESULT` bij ongeldige analyse) en
+`analysis-run-cleanup` (pg_cron via pg_net, `x-cleanup-secret`; verwijdert eerst de
+dossierobjecten via de Storage API en daarna de rijen). Frontend: `analysis-client`
+stuurt multipart via `functions.invoke`, leest status/lijst via PostgREST (RLS), voegt
+`NOT_CONFIGURED` toe en maakt de dossierdownload pas bij de klik (60 s signed URL,
+niet in state/opslag/adresbalk). `VITE_ANALYSIS_API_URL` is verwijderd; de mock-server
+blijft als script staan maar wordt niet meer gebruikt. De analyse-specs zijn omgebouwd
+naar `page.route`-interceptie; nieuw zijn de scenario's uitgezette assistent,
+`NOT_CONFIGURED` en andermans run.
+
+**Files**: `supabase/migrations/023_analysis_server_route.sql`,
+`supabase/functions/analysis-run-submit/index.ts`,
+`supabase/functions/analysis-run-callback/index.ts`,
+`supabase/functions/analysis-run-cleanup/index.ts`, `src/lib/analysis-client.ts`,
+`src/lib/analysis-schemas.ts`, `src/components/analysis/ResultView.tsx`,
+`src/pages/AnalysisNewPage.tsx`, `src/pages/AnalysisRunPage.tsx`,
+`src/types/database.types.ts`, `.env.example`, `playwright.config.ts`,
+`tests/e2e/analysis-fixtures.ts`, `tests/e2e/analysis-form.spec.ts`,
+`tests/e2e/analysis-run.spec.ts`, `tests/e2e/analysis-jwt.spec.ts`,
+`tests/e2e/analysis-notifications.spec.ts`, `tests/e2e/analysis-server-route.spec.ts`,
+`specs/021-analysis-server-route/`
+
+**Gap**: **migratie 023 is toegepast en geverifieerd** (RLS aan, één SELECT-policy,
+privébucket met één SELECT-policy, `pg_cron`/`pg_net` geïnstalleerd; F-01/F-10 groen).
+De drie Edge Functions zijn **gedeployed** (`analysis-run-submit` met JWT-verificatie;
+callback en cleanup met `--no-verify-jwt`), de secrets `ANALYSIS_CALLBACK_SECRET` /
+`ANALYSIS_CLEANUP_SECRET` zijn gezet, en Vault + de dagelijkse pg_cron-job
+`analysis-runs-cleanup` (03:15 UTC) zijn ingericht. Een handmatige pg_net-aanroep gaf
+200 `{deleted:0,failed:0}`; anonieme submit/callback/cleanup geven 401. Nog open: de
+handmatige n8n-aanpassingen (Header Auth op `darwin-risicoanalyse`, twee placeholders,
+`N8N_PAYLOAD_SIZE_MAX` ≥ 64 MiB), de frontend-release en de handmatige live n8n-run/
+RLS-verificatie uit quickstart §5. De vijf analyse-specs zijn lokaal **23/23 groen**
+met het bestaande E2E-lidaccount als `E2E_EMAIL`; zonder credentials skippen ze met
+reden.
 
 ---
 

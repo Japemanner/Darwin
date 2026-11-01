@@ -10,6 +10,21 @@ export function roleLabel(role: string | null | undefined): string {
   return 'Geen rol'
 }
 
+// Team statuses (feature 020). Stored values stay English; only the label is
+// Dutch.
+export const STATUS_LABELS: Record<'invited' | 'active' | 'blocked', string> = {
+  invited: 'Uitgenodigd',
+  active: 'Actief',
+  blocked: 'Geblokkeerd',
+}
+
+export function statusLabel(status: string | null | undefined): string {
+  if (status === 'invited' || status === 'active' || status === 'blocked') {
+    return STATUS_LABELS[status]
+  }
+  return 'Onbekend'
+}
+
 // Readable assistant type labels (feature 010, FR-001; shared with the
 // platform organisation screen in feature 019). Stored values stay English.
 export const ASSISTANT_TYPE_LABELS: Record<string, string> = {

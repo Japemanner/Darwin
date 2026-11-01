@@ -7,6 +7,8 @@ import { test as base, expect } from '@playwright/test'
 //   E2E_MEMBER_EMAIL, E2E_MEMBER_PASSWORD  — adviseur (role=member), memberPage fixture
 //   E2E_PLATFORM_ADMIN_EMAIL/PASSWORD     — platformbeheerder, platformAdminPage fixture
 //   E2E_TEST_ORG_NAME                     — organisatie voor schakeltests
+//   E2E_BLOCK_TARGET_EMAIL/PASSWORD       — adviseur in E2E_TEST_ORG_NAME voor blokkeertests
+//   E2E_INVITE_EMAIL_BASE                 — plus-adres basis voor uitnodigingstests
 // Without them, the matching tests are skipped with a clear reason.
 
 export const E2E_EMAIL = process.env.E2E_EMAIL
@@ -16,6 +18,9 @@ export const E2E_MEMBER_PASSWORD = process.env.E2E_MEMBER_PASSWORD
 export const E2E_PLATFORM_ADMIN_EMAIL = process.env.E2E_PLATFORM_ADMIN_EMAIL
 export const E2E_PLATFORM_ADMIN_PASSWORD = process.env.E2E_PLATFORM_ADMIN_PASSWORD
 export const E2E_TEST_ORG_NAME = process.env.E2E_TEST_ORG_NAME
+export const E2E_BLOCK_TARGET_EMAIL = process.env.E2E_BLOCK_TARGET_EMAIL
+export const E2E_BLOCK_TARGET_PASSWORD = process.env.E2E_BLOCK_TARGET_PASSWORD
+export const E2E_INVITE_EMAIL_BASE = process.env.E2E_INVITE_EMAIL_BASE
 
 async function login(page: import('@playwright/test').Page, email: string, password: string) {
   await page.goto('/login')
@@ -59,6 +64,19 @@ export const test = base.extend({
     }
     const page = await context.newPage()
     await login(page, E2E_PLATFORM_ADMIN_EMAIL!, E2E_PLATFORM_ADMIN_PASSWORD!)
+    await use(page)
+  },
+  // blockTargetPage is an advisor in E2E_TEST_ORG_NAME. The block/unblock test
+  // always restores this account in afterAll.
+  blockTargetPage: async ({ context }, use, testInfo) => {
+    if (!E2E_BLOCK_TARGET_EMAIL || !E2E_BLOCK_TARGET_PASSWORD) {
+      testInfo.skip(
+        true,
+        'E2E_BLOCK_TARGET_EMAIL / E2E_BLOCK_TARGET_PASSWORD not set — provide an advisor in E2E_TEST_ORG_NAME',
+      )
+    }
+    const page = await context.newPage()
+    await login(page, E2E_BLOCK_TARGET_EMAIL!, E2E_BLOCK_TARGET_PASSWORD!)
     await use(page)
   },
 })

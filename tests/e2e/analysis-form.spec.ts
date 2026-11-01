@@ -1,17 +1,11 @@
-import { test, expect, type Page } from './fixtures'
+import { test, expect } from './fixtures'
+import { fillMinimalAnalysisForm, installAnalysisMock, openAnalysisForm } from './analysis-fixtures'
 
-// Risico-analyse UI — markdown sanitizing: no raw HTML may render.
-// Requires mock server with rich scenario: node scripts/mock-analysis-server.mjs
-// Feature 014: the assistant card navigates to /analyse/new/:assistantId.
+// Risico-analyse UI — form and client-side validation. The analysis endpoints
+// are mocked at the Supabase boundary (feature 021); no mock server is used.
 
 const GROUP_VALIDATION_MSG = /minimaal één van klantsituatie, bestanden of url/i
 const HTTPS_MSG = /https/i
-
-async function openAnalysisForm(page: Page) {
-  await page.goto('/assistants')
-  await page.getByRole('button', { name: /risico-analyse starten/i }).first().click()
-  await expect(page).toHaveURL(/\/analyse\/new\//)
-}
 
 test.describe('Analysis form — group validation', () => {
   test('shows inline message when Klantsituatie, Bestanden and URL\u2019s are all empty', async ({ page }) => {
@@ -59,7 +53,7 @@ test.describe('Analysis form — order and advisor (US3)', () => {
     await expect(page.locator('form label').first()).toHaveText('Klantreferentie')
     // The Adviseur input field is gone; the name is fixed text in the header.
     await expect(page.getByLabel('Adviseur', { exact: true })).toHaveCount(0)
-    await expect(page.getByText('Adviseur', { exact: true })).toBeVisible()
+    await expect(page.getByRole('main').getByText('Adviseur', { exact: true })).toBeVisible()
   })
 })
 
@@ -72,6 +66,8 @@ test.describe('Analysis form — knowledge sources default (US4)', () => {
     ).toBeVisible()
 
     const checkboxes = page.getByRole('checkbox')
+    // Knowledge sources load asynchronously; wait for the first one.
+    await expect(checkboxes.first()).toBeVisible()
     const count = await checkboxes.count()
     expect(count).toBeGreaterThan(0)
     for (let index = 0; index < count; index++) {
@@ -94,7 +90,7 @@ test.describe('Analysis form — drag and drop + placeholder (US7)', () => {
       dt.items.add(new File(['polisinformatie'], 'situatie.pdf', { type: 'application/pdf' }))
       return dt
     })
-    const uploadZone = page.locator('label[for="bestanden"]')
+    const uploadZone = page.locator('label[for="bestanden"]').last()
     await uploadZone.dispatchEvent('dragover', { dataTransfer: validFile })
     await uploadZone.dispatchEvent('drop', { dataTransfer: validFile })
     await expect(page.getByText('situatie.pdf')).toBeVisible()
@@ -108,7 +104,8 @@ test.describe('Analysis form — drag and drop + placeholder (US7)', () => {
     await uploadZone.dispatchEvent('dragover', { dataTransfer: invalidFile })
     await uploadZone.dispatchEvent('drop', { dataTransfer: invalidFile })
     await expect(page.getByText(/alleen pdf, docx, txt/i)).toBeVisible()
-    await expect(page.getByText('tool.exe')).toHaveCount(0)
+    // The invalid file is not added to the list (only the error text names it).
+    await expect(page.getByRole('button', { name: /verwijder tool\.exe/i })).toHaveCount(0)
 
     // The button remains the keyboard alternative (acceptance criterion).
     await page.locator('#bestanden').setInputFiles({
@@ -131,13 +128,15 @@ test.describe('Analysis form — drag and drop + placeholder (US7)', () => {
 
 test.describe('Analysis form — happy path submit', () => {
   test('submits valid minimal input and shows run card in wachtrij/bezig', async ({ page }) => {
-    await openAnalysisForm(page)
+    const mock = await installAnalysisMock(page, {
+      initialStatus: 'queued',
+      finalStatus: 'succeeded',
+      durationMs: 60_000,
+    })
+    const assistantId = await openAnalysisForm(page)
+    mock.setAssistantId(assistantId)
 
-    await page.getByLabel(/verzekeringsvraagstuk/i).fill('Overweging inkomensverzekering voor zelfstandige')
-    await page.getByRole('checkbox').first().check()
-    await page.getByLabel(/klantsituatie/i).fill('41-jarige ondernemer, gezin met twee kinderen.')
-    await page.getByLabel(/klantreferentie/i).fill('KL-2026-002')
-
+    await fillMinimalAnalysisForm(page, 'KL-2026-002', 'Overweging inkomensverzekering voor zelfstandige')
     await page.getByRole('button', { name: /start analyse/i }).click()
 
     await expect(page.getByText(/in wachtrij/i).or(page.getByText(/bezig/i))).toBeVisible({ timeout: 15_000 })
@@ -145,5 +144,6 @@ test.describe('Analysis form — happy path submit', () => {
     await expect(page).toHaveURL(/\/analyse\/[0-9a-f-]{36}/)
     // No client content in URL (SC-004)
     await expect(page).not.toHaveURL(/KL-2026/)
+    expect(mock.submitCount).toBe(1)
   })
 })

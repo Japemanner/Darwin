@@ -1,20 +1,32 @@
 import {
+  FunctionsFetchError,
+  FunctionsHttpError,
+  FunctionsRelayError,
+} from '@supabase/supabase-js'
+import { supabase } from './supabase'
+import {
   AnalysisRunSchema,
   ALLOWED_FILE_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
   MAX_TOTAL_FILE_SIZE_BYTES,
+  RecentRunSchema,
   isAllowedFile,
   isHttpsUrl,
   type AnalysisRun,
   type RecentRun,
 } from './analysis-schemas'
-import { supabase } from './supabase'
+
+// Typed client for the risk-analysis server route (feature 021).
+// Contract: specs/021-analysis-server-route/contracts/{analysis-run-submit,analysis-runs-read}.md
+//
+// The browser never talks to n8n and never sees the webhook URL or secret:
+// starting a run goes through the analysis-run-submit Edge Function, status and
+// the recent list are read from analysis_runs under RLS, and the dossier is
+// downloaded through a 60-second signed URL created at click time.
 
 export interface SubmitAnalysisInput {
   run_id: string
   assistant_id: string
-  advisor_id: string
-  adviseur_naam: string
   verzekeringsvraagstuk: string
   kennisbronnen: Array<{ id: string; name: string }>
   klantsituatie?: string
@@ -31,6 +43,7 @@ export type AnalysisErrorCode =
   | 'URL_INVALID'
   | 'UNAUTHORIZED'
   | 'NOT_FOUND'
+  | 'NOT_CONFIGURED'
   | 'BACKEND_ERROR'
   | 'BACKEND_TIMEOUT'
   | 'CONNECTION_ERROR'
@@ -84,45 +97,63 @@ export function validateSubmitInput(input: SubmitAnalysisInput): SubmitValidatio
   return { ok: errors.length === 0, errors }
 }
 
-const API_URL = import.meta.env.VITE_ANALYSIS_API_URL
+const TEXT_NOT_CONFIGURED = 'Er is geen koppeling geconfigureerd. Neem contact op met de beheerder.'
+const TEXT_UNAUTHORIZED = 'Uw sessie is verlopen. Log opnieuw in.'
+const TEXT_NOT_FOUND = 'De uitvoering is niet gevonden.'
+const TEXT_BACKEND = 'Er trad een fout op bij de risico-analyse-service.'
+const TEXT_CONNECTION = 'Kon geen verbinding maken met de risico-analyse-service.'
+const TEXT_TIMEOUT = 'De risico-analyse-service reageert niet binnen de verwachte tijd.'
 
-function requireApiUrl(): string {
-  if (!API_URL) {
-    throw new AnalysisClientError('CONNECTION_ERROR', 'De risico-analysevoorziening is niet geconfigureerd.')
-  }
-  return API_URL
-}
-
-// Every call carries the session JWT (contracts 008: n8n-submit.md, run-status.md).
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) {
-    throw new AnalysisClientError('UNAUTHORIZED', 'Uw sessie is verlopen. Log opnieuw in.')
-  }
-  return { Authorization: `Bearer ${session.access_token}` }
-}
-
-function classifyStatusError(status: number): AnalysisClientError {
-  if (status === 401) return new AnalysisClientError('UNAUTHORIZED', 'Uw sessie is verlopen. Log opnieuw in.')
-  if (status === 404) return new AnalysisClientError('NOT_FOUND', 'De uitvoering is niet gevonden.')
-  if (status === 413) return new AnalysisClientError('FILE_TOO_LARGE', 'De bestanden overschrijden de toegestane grootte.')
-  if (status === 422) return new AnalysisClientError('GROUP_VALIDATION', 'De ingediende gegevens voldoen niet aan de validatie.')
-  return new AnalysisClientError('BACKEND_ERROR', 'Er trad een fout op bij de risico-analyse-service.')
-}
-
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(url, { ...init, signal: controller.signal })
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new AnalysisClientError('BACKEND_TIMEOUT', 'De risico-analyse-service reageert niet binnen de verwachte tijd.')
+// FunctionsHttpError carries the Edge Function's JSON error body. Map every
+// server code to the existing typed errors; never swallow an error.
+async function toAnalysisError(err: unknown): Promise<AnalysisClientError> {
+  if (err instanceof FunctionsHttpError) {
+    const body = await err.context.json().catch(() => null) as
+      | { code?: string; message?: string }
+      | null
+    const code = body?.code
+    const message = body?.message
+    if (code === 'NOT_CONFIGURED') {
+      return new AnalysisClientError('NOT_CONFIGURED', message || TEXT_NOT_CONFIGURED)
     }
-    throw new AnalysisClientError('CONNECTION_ERROR', 'Kon geen verbinding maken met de risico-analyse-service.')
-  } finally {
-    clearTimeout(timer)
+    if (code === 'UNAUTHORIZED') {
+      return new AnalysisClientError('UNAUTHORIZED', message || TEXT_UNAUTHORIZED)
+    }
+    if (code === 'FILE_TOO_LARGE') {
+      return new AnalysisClientError('FILE_TOO_LARGE', message || 'De bestanden overschrijden de toegestane grootte.')
+    }
+    if (code === 'GROUP_VALIDATION') {
+      return new AnalysisClientError('GROUP_VALIDATION', message || 'De ingediende gegevens voldoen niet aan de validatie.')
+    }
+    if (code === 'VALIDATION') {
+      return new AnalysisClientError('VALIDATION', message || 'Controleer de ingevulde gegevens.')
+    }
+    if (code === 'FORBIDDEN') {
+      return new AnalysisClientError('BACKEND_ERROR', message || 'Deze assistent is niet beschikbaar voor een analyse.')
+    }
+    if (code === 'CONFLICT') {
+      return new AnalysisClientError('BACKEND_ERROR', message || 'De analyse kon niet worden gestart. Probeer het opnieuw.')
+    }
+    if (code === 'UPSTREAM_TIMEOUT') {
+      return new AnalysisClientError('BACKEND_TIMEOUT', message || TEXT_TIMEOUT)
+    }
+    if (code === 'UPSTREAM_UNREACHABLE') {
+      return new AnalysisClientError('CONNECTION_ERROR', message || TEXT_CONNECTION)
+    }
+    // Platform-level responses (e.g. a rejected JWT before the function runs)
+    // carry no application code; keep the existing status-based mapping.
+    const status = err.context.status
+    if (status === 401) return new AnalysisClientError('UNAUTHORIZED', message || TEXT_UNAUTHORIZED)
+    if (status === 403) return new AnalysisClientError('BACKEND_ERROR', message || 'Deze assistent is niet beschikbaar voor een analyse.')
+    if (status === 413) return new AnalysisClientError('FILE_TOO_LARGE', message || 'De bestanden overschrijden de toegestane grootte.')
+    if (status === 422) return new AnalysisClientError('GROUP_VALIDATION', message || 'De ingediende gegevens voldoen niet aan de validatie.')
+    if (status === 400) return new AnalysisClientError('VALIDATION', message || 'Controleer de ingevulde gegevens.')
+    return new AnalysisClientError('BACKEND_ERROR', message || TEXT_BACKEND)
   }
+  if (err instanceof FunctionsRelayError || err instanceof FunctionsFetchError) {
+    return new AnalysisClientError('CONNECTION_ERROR', TEXT_CONNECTION)
+  }
+  return new AnalysisClientError('BACKEND_ERROR', TEXT_BACKEND)
 }
 
 export async function submitAnalysisRun(input: SubmitAnalysisInput): Promise<{ run_id: string }> {
@@ -135,37 +166,22 @@ export async function submitAnalysisRun(input: SubmitAnalysisInput): Promise<{ r
     throw new AnalysisClientError('VALIDATION', 'Controleer de ingevulde gegevens.')
   }
 
-  const body: Record<string, unknown> = {
-    run_id: input.run_id,
-    assistant_id: input.assistant_id,
-    advisor_id: input.advisor_id,
-    adviseur: { id: input.advisor_id, full_name: input.adviseur_naam },
-    verzekeringsvraagstuk: input.verzekeringsvraagstuk,
-    kennisbronnen: input.kennisbronnen,
-    klantsituatie: input.klantsituatie?.trim() || undefined,
-    bestanden: (input.bestanden ?? []).map((f) => f.name),
-    urls: input.urls ?? [],
-    klant_ref: input.klant_ref,
-    callback_url: `${requireApiUrl()}/analysis-run-callback`,
-  }
+  // FormData lets supabase-js send the real File objects without setting a
+  // Content-Type, so the browser adds the multipart boundary.
+  const form = new FormData()
+  form.set('run_id', input.run_id)
+  form.set('assistant_id', input.assistant_id)
+  form.set('verzekeringsvraagstuk', input.verzekeringsvraagstuk)
+  form.set('kennisbronnen', JSON.stringify(input.kennisbronnen))
+  if (input.klantsituatie?.trim()) form.set('klantsituatie', input.klantsituatie.trim())
+  for (const file of input.bestanden ?? []) form.append('bestanden', file, file.name)
+  form.set('urls', JSON.stringify(input.urls ?? []))
+  form.set('klant_ref', input.klant_ref)
 
-  let res: Response
-  try {
-    res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify(body),
-    }, 30_000)
-  } catch (err) {
-    if (err instanceof AnalysisClientError) throw err
-    throw new AnalysisClientError('CONNECTION_ERROR', 'Kon geen verbinding maken met de risico-analyse-service.')
-  }
+  const { data, error } = await supabase.functions.invoke('analysis-run-submit', { body: form })
+  if (error) throw await toAnalysisError(error)
 
-  if (!res.ok) {
-    throw classifyStatusError(res.status)
-  }
-
-  const parsed = await res.json().catch(() => null)
+  const parsed = data as { run_id?: unknown } | null
   if (!parsed || typeof parsed.run_id !== 'string') {
     throw new AnalysisClientError('INVALID_RESPONSE', 'De service gaf een onverwacht antwoord.')
   }
@@ -173,20 +189,26 @@ export async function submitAnalysisRun(input: SubmitAnalysisInput): Promise<{ r
 }
 
 export async function fetchAnalysisRun(runId: string): Promise<AnalysisRun> {
-  let res: Response
-  try {
-    res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs/${runId}`, { method: 'GET', headers: await authHeaders() }, 15_000)
-  } catch (err) {
-    if (err instanceof AnalysisClientError) throw err
-    throw new AnalysisClientError('CONNECTION_ERROR', 'Kon geen verbinding maken met de risico-analyse-service.')
+  const { data, error } = await supabase
+    .from('analysis_runs')
+    .select('id, assistant_id, advisor_id, client_reference, status, started_at, finished_at, error_code, error_message, result_json, intern_markdown, dossier_path, expires_at')
+    .eq('id', runId)
+    .maybeSingle()
+
+  if (error) {
+    throw new AnalysisClientError('BACKEND_ERROR', 'De status van de uitvoering kon niet worden opgehaald.')
+  }
+  if (!data) {
+    throw new AnalysisClientError('NOT_FOUND', TEXT_NOT_FOUND)
   }
 
-  if (!res.ok) {
-    throw classifyStatusError(res.status)
+  const mapped = {
+    ...data,
+    result: data.result_json,
+    // The server route stores a path, not a URL; the URL is created at click time.
+    dossier_docx_url: null,
   }
-
-  const raw: unknown = await res.json().catch(() => null)
-  const parsed = AnalysisRunSchema.safeParse(raw)
+  const parsed = AnalysisRunSchema.safeParse(mapped)
   if (!parsed.success) {
     throw new AnalysisClientError('INVALID_RESPONSE', 'De status van de uitvoering kon niet worden uitgelezen (ongeldig antwoord).')
   }
@@ -194,27 +216,42 @@ export async function fetchAnalysisRun(runId: string): Promise<AnalysisRun> {
 }
 
 export async function fetchRecentRuns(advisorId: string, limit = 10): Promise<RecentRun[]> {
-  let res: Response
-  try {
-    res = await fetchWithTimeout(`${requireApiUrl()}/analysis-runs?advisor_id=${encodeURIComponent(advisorId)}&limit=${limit}`, { method: 'GET', headers: await authHeaders() }, 15_000)
-  } catch (err) {
-    if (err instanceof AnalysisClientError) throw err
-    throw new AnalysisClientError('CONNECTION_ERROR', 'Kon geen verbinding maken met de risico-analyse-service.')
+  const { data, error } = await supabase
+    .from('analysis_runs')
+    .select('id, assistant_id, client_reference, status, started_at, finished_at, error_code, expires_at')
+    .eq('advisor_id', advisorId)
+    .order('started_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    throw new AnalysisClientError('BACKEND_ERROR', 'De lijst met recente uitvoeringen kon niet worden opgehaald.')
   }
 
-  if (!res.ok) {
-    throw classifyStatusError(res.status)
-  }
-
-  const raw: unknown = await res.json().catch(() => null)
-  if (!Array.isArray(raw)) {
-    throw new AnalysisClientError('INVALID_RESPONSE', 'De lijst met recente uitvoeringen kon niet worden uitgelezen.')
-  }
   const runs: RecentRun[] = []
-  for (const item of raw) {
-    // item is unknown per no-explicit-any policy; validate each entry
-    const parsed = (await import('./analysis-schemas')).RecentRunSchema.safeParse(item)
+  for (const item of data ?? []) {
+    const parsed = RecentRunSchema.safeParse(item)
     if (parsed.success) runs.push(parsed.data)
   }
   return runs
+}
+
+// Creates the signed URL only when the advisor clicks download (60 seconds).
+// The URL is intentionally never stored in React state, browser storage or the
+// address bar: a temporary anchor triggers the download and is removed again.
+export async function downloadAnalysisDossier(path: string): Promise<void> {
+  const { data, error } = await supabase.storage
+    .from('analysis-dossiers')
+    .createSignedUrl(path, 60, { download: 'dossier.docx' })
+
+  if (error || !data?.signedUrl) {
+    throw new AnalysisClientError('NOT_FOUND', 'Het dossier is niet meer beschikbaar.')
+  }
+
+  const link = document.createElement('a')
+  link.href = data.signedUrl
+  link.download = 'dossier.docx'
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
 }

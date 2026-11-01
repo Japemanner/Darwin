@@ -48,6 +48,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const normalizedEmail = String(user_email).trim().toLowerCase();
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -95,7 +97,7 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (orgError) {
-      console.error("Failed to create organization:", orgError);
+      console.error("Failed to create organization:", orgError.code);
       return new Response(JSON.stringify({ error: "Failed to create organization" }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -103,7 +105,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: newUser, error: userError } = await supabase.auth.admin.createUser({
-      email: user_email,
+      email: normalizedEmail,
       password: user_password,
       email_confirm: true,
       user_metadata: {
@@ -113,7 +115,7 @@ Deno.serve(async (req: Request) => {
 
     if (userError) {
       await supabase.from("organizations").delete().eq("id", org.id);
-      console.error("Failed to create user:", userError);
+      console.error("Failed to create user:", userError.code);
       return new Response(JSON.stringify({ error: `Failed to create user: ${userError.message}` }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -124,11 +126,13 @@ Deno.serve(async (req: Request) => {
       id: newUser.user.id,
       organization_id: org.id,
       full_name: user_full_name,
+      email: normalizedEmail,
       role,
+      status: "active",
     });
 
     if (profileError) {
-      console.error("Profile insert failed:", profileError);
+      console.error("Profile insert failed:", profileError.code);
       return new Response(JSON.stringify({ error: `Failed to create profile: ${profileError.message}` }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -163,7 +167,7 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
     );
   } catch (err) {
-    console.error("Unexpected error:", err);
+    console.error("Unexpected error in create-tenant");
     const message = err instanceof Error ? err.message : "Internal server error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useIsPlatformAdmin } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
@@ -11,9 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select } from '@/components/ui/select'
-import { Settings, Building2, UserPlus, CheckCircle2, Loader2, ChevronRight } from 'lucide-react'
+import { Settings, Building2, UserPlus, CheckCircle2, Loader2, ChevronRight, Users } from 'lucide-react'
 import { listOrganizations } from '@/lib/platform-admin-client'
 import { ConnectionsDialog } from '@/components/settings/ConnectionsDialog'
+import TeamManager from '@/components/team/TeamManager'
 import { ROLE_LABELS } from '@/lib/labels'
 
 const TENANT_ROLE_OPTIONS = [
@@ -163,7 +164,9 @@ function CreateTenantCard() {
 
 function SettingsPage() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('assistants')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedOrg = searchParams.get('org') ?? ''
+  const [activeTab, setActiveTab] = useState(() => (selectedOrg ? 'team' : 'assistants'))
   const [connectionsOpen, setConnectionsOpen] = useState(false)
   const { data: isPlatformAdmin, isPending: isCheckingAccess } = useIsPlatformAdmin()
 
@@ -201,12 +204,16 @@ function SettingsPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Instellingen</h1>
-        <p className="text-muted-foreground">Beheer de assistentcatalogus, de koppelingen en organisaties</p>
+        <p className="text-muted-foreground">Beheer de assistentcatalogus, de koppelingen, teams en organisaties</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="assistants">Assistenten</TabsTrigger>
+          <TabsTrigger value="team">
+            <Users className="h-4 w-4 mr-1.5" aria-hidden="true" />
+            Team
+          </TabsTrigger>
           <TabsTrigger value="tenant">
             <Building2 className="h-4 w-4 mr-1.5" />
             Nieuwe organisatie
@@ -263,6 +270,44 @@ function SettingsPage() {
                 </ul>
               )}
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="team">
+          <div className="max-w-5xl space-y-4">
+            <div className="max-w-md space-y-2">
+              <Label htmlFor="settings-team-org">Organisatie</Label>
+              {organizationsPending ? (
+                <Skeleton className="h-9 w-full" />
+              ) : (organizations ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Er zijn nog geen organisaties.</p>
+              ) : (
+                <Select
+                  id="settings-team-org"
+                  value={selectedOrg}
+                  onValueChange={(value) => {
+                    if (!value) return
+                    setSearchParams({ org: value })
+                    setActiveTab('team')
+                  }}
+                  options={(organizations ?? []).map((organization) => ({
+                    value: organization.id,
+                    label: organization.name,
+                  }))}
+                  placeholder="Kies een organisatie"
+                />
+              )}
+            </div>
+
+            {selectedOrg ? (
+              <TeamManager organizationId={selectedOrg} />
+            ) : (
+              <Card className="max-w-2xl">
+                <CardContent className="py-6 text-sm text-muted-foreground">
+                  Kies een organisatie.
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 

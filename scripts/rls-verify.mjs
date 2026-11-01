@@ -89,7 +89,7 @@ async function main() {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, organization_id, role')
+    .select('id, organization_id, role, email, status')
     .eq('id', userId)
     .single()
   if (profileError || !profile) {
@@ -377,7 +377,7 @@ async function main() {
     } else {
       const { data: officeProfile, error: officeProfileError } = await officeClient
         .from('profiles')
-        .select('id, organization_id, role')
+        .select('id, organization_id, role, email, status')
         .eq('id', officeAuth.user.id)
         .single()
 
@@ -392,6 +392,8 @@ async function main() {
       }
     }
   }
+
+  await checkTeamManagement(supabase, userId, profile)
 
   // ---- Cleanup (only relevant before migration 015) ------------------------
   for (const fn of cleanups.reverse()) {
@@ -566,6 +568,221 @@ async function checkPlatformTableReads(client, actorLabel) {
     } catch (err) {
       record(`${actorLabel}: ${table} unreadable`, 'FAIL', String(err))
     }
+  }
+}
+
+async function checkProfileUpdateDenied(client, userId, actorLabel, field, value) {
+  try {
+    const { data, error } = await client
+      .from('profiles')
+      .update({ [field]: value })
+      .eq('id', userId)
+      .select('id')
+
+    if (error) {
+      record(`${actorLabel}: profiles.${field} update denied`, 'PASS', error.code ?? error.message)
+    } else if ((data ?? []).length === 0) {
+      record(`${actorLabel}: profiles.${field} update denied`, 'PASS', '0 rows affected')
+    } else {
+      record(`${actorLabel}: profiles.${field} update denied`, 'FAIL', 'update was allowed')
+    }
+  } catch (err) {
+    record(`${actorLabel}: profiles.${field} update denied`, 'FAIL', String(err))
+  }
+}
+
+async function checkBlockedReads(client, orgId, label) {
+  const tables = ['profiles', 'conversations', 'messages', 'ai_assistants', 'knowledge_bases']
+  for (const table of tables) {
+    try {
+      const { data, error } = await client.from(table).select('id').limit(1)
+      if (error) {
+        record(`${label}: ${table} read denied`, 'PASS', error.code ?? error.message)
+      } else if ((data ?? []).length === 0) {
+        record(`${label}: ${table} read denied`, 'PASS', 'no rows exposed')
+      } else {
+        record(`${label}: ${table} read denied`, 'FAIL', `${data.length} row(s) exposed`)
+      }
+    } catch (err) {
+      record(`${label}: ${table} read denied`, 'FAIL', String(err))
+    }
+  }
+
+  try {
+    const { data, error } = await client.storage.from('knowledge-documents').list(orgId)
+    if (error) {
+      record(`${label}: storage read denied`, 'PASS', error.message)
+    } else if ((data ?? []).length === 0) {
+      record(`${label}: storage read denied`, 'PASS', 'no objects exposed')
+    } else {
+      record(`${label}: storage read denied`, 'FAIL', `${data.length} object(s) exposed`)
+    }
+  } catch (err) {
+    record(`${label}: storage read denied`, 'FAIL', String(err))
+  }
+}
+
+async function checkTeamManagement(memberClient, memberUserId, memberProfile) {
+  // A member may not change their own email, status, role or organization.
+  await checkProfileUpdateDenied(memberClient, memberUserId, 'member', 'email', memberProfile.email)
+  await checkProfileUpdateDenied(memberClient, memberUserId, 'member', 'status', memberProfile.status)
+  await checkProfileUpdateDenied(memberClient, memberUserId, 'member', 'role', memberProfile.role)
+  await checkProfileUpdateDenied(
+    memberClient,
+    memberUserId,
+    'member',
+    'organization_id',
+    memberProfile.organization_id,
+  )
+
+  // Anon cannot execute the activation/team RPCs; authenticated cannot execute
+  // team_update_member.
+  const anonClient = createClient(url, anonKey, {
+    auth: { flowType: 'pkce', autoRefreshToken: false, persistSession: false },
+  })
+  const { error: anonActivate } = await anonClient.rpc('activate_own_profile')
+  record(
+    'anon: activate_own_profile denied',
+    anonActivate ? 'PASS' : 'FAIL',
+    anonActivate?.code ?? 'no error',
+  )
+
+  const { error: anonTeam } = await anonClient.rpc('team_update_member', {
+    p_actor: memberUserId,
+    p_org: memberProfile.organization_id,
+    p_target: memberUserId,
+    p_role: 'member',
+    p_status: null,
+  })
+  record(
+    'anon: team_update_member denied',
+    anonTeam ? 'PASS' : 'FAIL',
+    anonTeam?.code ?? 'no error',
+  )
+
+  const { error: memberTeam } = await memberClient.rpc('team_update_member', {
+    p_actor: memberUserId,
+    p_org: memberProfile.organization_id,
+    p_target: memberUserId,
+    p_role: 'member',
+    p_status: null,
+  })
+  record(
+    'authenticated: team_update_member denied',
+    memberTeam ? 'PASS' : 'FAIL',
+    memberTeam?.code ?? 'no error',
+  )
+
+  // The office admin gets the same profile column checks.
+  const officeEmail = env('E2E_EMAIL')
+  const officePassword = env('E2E_PASSWORD')
+  if (!officeEmail || !officePassword) {
+    record('office admin: profiles.email update denied', 'SKIP', 'E2E_EMAIL / E2E_PASSWORD not set')
+    record('office admin: profiles.status update denied', 'SKIP', 'E2E_EMAIL / E2E_PASSWORD not set')
+    record('blocked target: reads denied', 'SKIP', 'office admin account not set')
+    return
+  }
+
+  const officeClient = createClient(url, anonKey, {
+    auth: { flowType: 'pkce', autoRefreshToken: true, persistSession: false },
+  })
+  const { data: officeAuth, error: officeAuthError } =
+    await officeClient.auth.signInWithPassword({
+      email: officeEmail,
+      password: officePassword,
+    })
+  if (officeAuthError || !officeAuth.user) {
+    record('office admin: team checks', 'FAIL', officeAuthError?.message ?? 'no user')
+    return
+  }
+
+  const { data: officeProfile } = await officeClient
+    .from('profiles')
+    .select('id, organization_id, role, email, status')
+    .eq('id', officeAuth.user.id)
+    .maybeSingle()
+  if (!officeProfile) {
+    record('office admin: profile', 'FAIL', 'missing')
+    return
+  }
+
+  await checkProfileUpdateDenied(officeClient, officeAuth.user.id, 'office admin', 'email', officeProfile.email)
+  await checkProfileUpdateDenied(officeClient, officeAuth.user.id, 'office admin', 'status', officeProfile.status)
+
+  // Block the dedicated block target, verify it reads nothing, then always
+  // unblock it.
+  const targetEmail = env('E2E_BLOCK_TARGET_EMAIL')
+  const targetPassword = env('E2E_BLOCK_TARGET_PASSWORD')
+  if (!targetEmail || !targetPassword) {
+    record('blocked target: reads denied', 'SKIP', 'E2E_BLOCK_TARGET_EMAIL / E2E_BLOCK_TARGET_PASSWORD not set')
+    return
+  }
+  if (targetEmail === officeEmail) {
+    record('blocked target: reads denied', 'SKIP', 'block target equals the office admin')
+    return
+  }
+
+  const targetClient = createClient(url, anonKey, {
+    auth: { flowType: 'pkce', autoRefreshToken: true, persistSession: false },
+  })
+  const { data: targetAuth, error: targetAuthError } =
+    await targetClient.auth.signInWithPassword({
+      email: targetEmail,
+      password: targetPassword,
+    })
+  if (targetAuthError || !targetAuth.user) {
+    record('blocked target: sign in', 'SKIP', targetAuthError?.message ?? 'no user')
+    return
+  }
+
+  const { data: targetProfile } = await targetClient
+    .from('profiles')
+    .select('id, organization_id, status')
+    .eq('id', targetAuth.user.id)
+    .maybeSingle()
+  if (!targetProfile || targetProfile.organization_id !== officeProfile.organization_id) {
+    record('blocked target: reads denied', 'SKIP', 'target is not in the office-admin organization')
+    return
+  }
+
+  // Recover from a previous interrupted run before blocking again.
+  if (targetProfile.status === 'blocked') {
+    const { error: preUnblock } = await officeClient.functions.invoke('team-admin', {
+      body: {
+        action: 'unblock',
+        organization_id: targetProfile.organization_id,
+        user_id: targetAuth.user.id,
+      },
+    })
+    if (preUnblock) {
+      record('blocked target: clean up previous block', 'FAIL', preUnblock.message)
+      return
+    }
+  }
+
+  const { error: blockError } = await officeClient.functions.invoke('team-admin', {
+    body: {
+      action: 'block',
+      organization_id: targetProfile.organization_id,
+      user_id: targetAuth.user.id,
+    },
+  })
+  if (blockError) {
+    record('blocked target: block', 'FAIL', blockError.message)
+    return
+  }
+
+  try {
+    await checkBlockedReads(targetClient, targetProfile.organization_id, 'blocked target')
+  } finally {
+    const { error: unblockError } = await officeClient.functions.invoke('team-admin', {
+      body: {
+        action: 'unblock',
+        organization_id: targetProfile.organization_id,
+        user_id: targetAuth.user.id,
+      },
+    })
+    record('blocked target: unblock', unblockError ? 'FAIL' : 'PASS', unblockError?.message ?? '')
   }
 }
 

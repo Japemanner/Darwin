@@ -27,8 +27,10 @@ export interface Database {
           id: string
           organization_id: string
           full_name: string
+          email: string
           avatar_url: string | null
           role: 'admin' | 'member'
+          status: 'invited' | 'active' | 'blocked'
           created_at: string
           updated_at: string
         }
@@ -36,8 +38,10 @@ export interface Database {
           id: string
           organization_id: string
           full_name: string
+          email?: string
           avatar_url?: string | null
           role?: 'admin' | 'member'
+          status?: 'invited' | 'active' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -45,8 +49,10 @@ export interface Database {
           id?: string
           organization_id?: string
           full_name?: string
+          email?: string
           avatar_url?: string | null
           role?: 'admin' | 'member'
+          status?: 'invited' | 'active' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -140,6 +146,64 @@ export interface Database {
         }
         Relationships: [
           { foreignKeyName: 'ai_assistants_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
+        ]
+      }
+      analysis_runs: {
+        Row: {
+          advisor_id: string
+          assistant_id: string
+          client_reference: string
+          created_at: string
+          dossier_path: string | null
+          error_code: string | null
+          error_message: string | null
+          expires_at: string
+          finished_at: string | null
+          id: string
+          intern_markdown: string | null
+          organization_id: string
+          result_json: Record<string, unknown> | null
+          started_at: string
+          status: 'queued' | 'running' | 'succeeded' | 'failed'
+        }
+        Insert: {
+          advisor_id: string
+          assistant_id: string
+          client_reference: string
+          created_at?: string
+          dossier_path?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          expires_at: string
+          finished_at?: string | null
+          id: string
+          intern_markdown?: string | null
+          organization_id: string
+          result_json?: Record<string, unknown> | null
+          started_at?: string
+          status?: 'queued' | 'running' | 'succeeded' | 'failed'
+        }
+        Update: {
+          advisor_id?: string
+          assistant_id?: string
+          client_reference?: string
+          created_at?: string
+          dossier_path?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          expires_at?: string
+          finished_at?: string | null
+          id?: string
+          intern_markdown?: string | null
+          organization_id?: string
+          result_json?: Record<string, unknown> | null
+          started_at?: string
+          status?: 'queued' | 'running' | 'succeeded' | 'failed'
+        }
+        Relationships: [
+          { foreignKeyName: 'analysis_runs_advisor_id_fkey'; columns: ['advisor_id']; referencedRelation: 'profiles'; referencedColumns: ['id'] },
+          { foreignKeyName: 'analysis_runs_assistant_id_fkey'; columns: ['assistant_id']; referencedRelation: 'ai_assistants'; referencedColumns: ['id'] },
+          { foreignKeyName: 'analysis_runs_organization_id_fkey'; columns: ['organization_id']; referencedRelation: 'organizations'; referencedColumns: ['id'] },
         ]
       }
       knowledge_bases: {
@@ -582,6 +646,10 @@ export interface Database {
       is_platform_admin: {
         Args: Record<string, never>
         Returns: boolean
+      }
+      activate_own_profile: {
+        Args: Record<string, never>
+        Returns: undefined
       }
       get_feedback_review: {
         Args: Record<string, never>

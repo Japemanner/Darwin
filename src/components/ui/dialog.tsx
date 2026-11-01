@@ -1,13 +1,45 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-const Dialog = ({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: React.ReactNode }) => {
+const Dialog = ({ open, onOpenChange, children, ariaLabel }: { open: boolean; onOpenChange: (open: boolean) => void; children: React.ReactNode; ariaLabel?: string }) => {
+  const dialogRef = React.useRef<HTMLDivElement>(null)
+
   React.useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onOpenChange(false)
+    if (!open) return
+    const node = dialogRef.current
+    const focusables = node?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focusables?.[0]?.focus()
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onOpenChange(false)
+        return
+      }
+      if (e.key !== "Tab" || !node) return
+
+      const items = Array.from(
+        node.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => el.getClientRects().length > 0)
+
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (!first || !last) return
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
-    if (open) document.addEventListener("keydown", handleEsc)
-    return () => document.removeEventListener("keydown", handleEsc)
+
+    document.addEventListener("keydown", handleKey)
+    return () => document.removeEventListener("keydown", handleKey)
   }, [open, onOpenChange])
 
   if (!open) return null
@@ -16,7 +48,14 @@ const Dialog = ({ open, onOpenChange, children }: { open: boolean; onOpenChange:
     <div className="fixed inset-0 z-50">
       <div className="fixed inset-0 bg-black/50" onClick={() => onOpenChange(false)} />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-lg max-h-[85vh] overflow-auto rounded-lg border bg-background shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabel}
+          className="relative w-full max-w-lg max-h-[85vh] overflow-auto rounded-lg border bg-background shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
           {children}
         </div>
       </div>
