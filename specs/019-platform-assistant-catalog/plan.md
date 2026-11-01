@@ -163,8 +163,8 @@ geen inhoudelijke afwijkingen gevonden. Stand van zaken, geverifieerd via Supaba
   Gerard_Tekelenburg 2).
 - Het e-mailadres van de platformbeheerder is aangeleverd en in de migratie verwerkt.
 
-Resterend: de verificatietaken uit `tasks.md` (T034, T038, T040, T042, T044, T046) en het
-handmatig verwijderen van `flow-config` (T047).
+Resterend: de verificatietaken die E2E-accounts vereisen (T034, T038, T044) en het handmatig
+verwijderen van `flow-config` (T047). T040, T042 en T046 zijn op 2026-11-01 afgerond.
 
 ## Complexity Tracking
 

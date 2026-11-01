@@ -174,13 +174,13 @@ terwijl kenniskoppelingen binnen de eigen organisatie blijven werken.
 ## Phase 10: Polish & Cross-Cutting Concerns
 
 - [x] T039 [P] Werk `FEATURES.md` bij via `@feature-tracker` (catalogus, schakelaar, koppelingen, platformbeheerder)
-- [ ] T040 [P] Voer de verificatiequeries uit quickstart §2 uit en noteer de uitkomsten (10 rijen, 0 zonder catalogus, Darwin 3 actief, Gerard_Tekelenburg 2 actief, 0 schrijfpolicies, `has_token = true`, 1 platformbeheerder)
+- [x] T040 [P] Voer de verificatiequeries uit quickstart §2 uit en noteer de uitkomsten (10 rijen, 0 zonder catalogus, Darwin 3 actief, Gerard_Tekelenburg 2 actief, 0 schrijfpolicies, `has_token = true`, 1 platformbeheerder)
 - [x] T041 Draai `npx tsc --noEmit`
-- [ ] T042 Draai `npx eslint src/ --max-warnings 0`
+- [x] T042 Draai `npx eslint src/ --max-warnings 0`
 - [x] T043 Draai `npm run build`
 - [ ] T044 Draai `npx playwright test tests/e2e/platform-admin.spec.ts`
 - [x] T045 Draai de volledige Playwright-regressie
-- [ ] T046 Commit in conventionele stappen (migratie, functies, frontend, tests) met Engelse commit messages
+- [x] T046 Commit in conventionele stappen (migratie, functies, frontend, tests) met Engelse commit messages
 - [ ] T047 **(handmatig, na de frontend-release)** Verwijder de gedeployde `flow-config`-functie in het Supabase-dashboard volgens quickstart §5
 
 ---
@@ -288,15 +288,16 @@ T026 rag-chat  →  T033 create-tenant  →  T035 document-webhook  →  T036 rl
 | `npm run build` | groen (bestaande chunk-size-waarschuwing) |
 | volledige Playwright-suite | 18 passed, 65 skipped, 0 failed |
 | `tests/e2e/platform-admin.spec.ts` | 5 tests, allemaal geskipt (E2E-platform-/lidaccount ontbreekt) |
-| `eslint src/ --max-warnings 0` | **niet groen**: 6 bestaande waarschuwingen in `src/App.tsx`, `src/components/ui/toast.tsx`, `src/lib/posthog.tsx` (zelfde als bij feature 018, niet door deze feature veroorzaakt) |
+| `eslint src/ --max-warnings 0` | **groen** op 2026-11-01 (de 6 waarschuwingen uit 018 zijn inmiddels opgelost) |
+| T040-verificatiequeries (2026-11-01) | 10 rijen, 0 zonder `catalog_id`; actief Darwin 3 / Gerard_Tekelenburg 2; 0 niet-SELECT-policies op `ai_assistants`; `X-Webhook-Token` + `has_token = true` + document-URL; 1 platformbeheerder; 0 dubbele combinaties |
+| RLS- en grantcontrole (2026-11-01) | RLS aan op `platform_admins`, `assistant_catalog`, `platform_webhook_config`, `ai_assistants` en `assistant_knowledge_bases`; 0 grants aan `anon`/`authenticated` op de drie platformtabellen; `ai_assistants` heeft alleen de SELECT-policy; `assistant_knowledge_bases` heeft 6 policies |
 
 **Geblokkeerd:**
 
 - **T001** — afgerond: e-mailadres aangeleverd, placeholder vervangen, migratie 021 toegepast als `platform_admin_catalog` (`20261031174605`).
-- **T034, T038, T040** — de blokkade is weg (migratie toegepast, functies gedeployed); alleen de uitvoering en vastlegging resteren.
+- **T034** — vereist een kantoorbeheerderssessie; zonder `E2E_EMAIL`/`E2E_PASSWORD` kan alleen de anonieme 401 worden gecontroleerd (die is eerder bevestigd).
+- **T038** — `scripts/rls-verify.mjs` stopt met exit 2 zonder `E2E_MEMBER_EMAIL`/`E2E_MEMBER_PASSWORD`. Dezelfde asserties zijn op 2026-11-01 rechtstreeks in de database geverifieerd (zie de tabel hierboven); het script zelf blijft open tot de E2E-accounts er zijn.
 - **T044** — vereist `E2E_PLATFORM_ADMIN_EMAIL/PASSWORD`, `E2E_EMAIL/PASSWORD` en `E2E_TEST_ORG_NAME`.
-- **T042** — zie de eslint-uitkomst hierboven; de gate faalt op bestaande waarschuwingen.
-- **T046** — nog geen commits gemaakt.
 - **T047** — handmatig, na de frontend-release.
 
 **Status 2026-11-01:** migratie en Edge Functions zijn inmiddels toegepast en gedeployed
