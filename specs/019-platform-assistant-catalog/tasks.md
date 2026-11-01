@@ -27,7 +27,7 @@ Edge Function en de client zijn gedeelde fundamenten en staan in fase 2.
 
 **Purpose**: vastleggen van de laatste invoer en de gedeelde bouwstenen
 
-- [ ] T001 **(blokkerend)** Vul `<PLATFORM_ADMIN_EMAIL>` in `supabase/migrations/021_platform_admin_catalog.sql` en voer de pre-checks uit quickstart §0 uit (profiel bestaat, `role = 'admin'` in eigen organisatie, elke organisatie heeft een admin)
+- [x] T001 **(blokkerend)** Vul `<PLATFORM_ADMIN_EMAIL>` in `supabase/migrations/021_platform_admin_catalog.sql` en voer de pre-checks uit quickstart §0 uit (profiel bestaat, `role = 'admin'` in eigen organisatie, elke organisatie heeft een admin)
 - [x] T002 [P] Voeg `E2E_PLATFORM_ADMIN_EMAIL`, `E2E_PLATFORM_ADMIN_PASSWORD` en `E2E_TEST_ORG_NAME` zonder echte waarden toe aan `.env.example`
 - [x] T003 [P] Voeg `catalog_id: string` toe aan `ai_assistants` Row/Insert/Update in `src/types/database.types.ts`
 - [x] T004 [P] Maak `src/components/ui/switch.tsx`: native `<button role="switch">` met `aria-checked`, verplichte `aria-label`/`aria-labelledby`, zichtbare focusring, `disabled`-staat; Enter en Spatie werken via de native button
@@ -292,13 +292,15 @@ T026 rag-chat  →  T033 create-tenant  →  T035 document-webhook  →  T036 rl
 
 **Geblokkeerd:**
 
-- **T001** — e-mailadres platformbeheerder ontbreekt; migratie 021 bevat nog `<PLATFORM_ADMIN_EMAIL>`.
-- **T034, T038, T040** — vereisen een toegepaste migratie en gedeployde functies.
+- **T001** — afgerond: e-mailadres aangeleverd, placeholder vervangen, migratie 021 toegepast als `platform_admin_catalog` (`20261031174605`).
+- **T034, T038, T040** — de blokkade is weg (migratie toegepast, functies gedeployed); alleen de uitvoering en vastlegging resteren.
 - **T044** — vereist `E2E_PLATFORM_ADMIN_EMAIL/PASSWORD`, `E2E_EMAIL/PASSWORD` en `E2E_TEST_ORG_NAME`.
 - **T042** — zie de eslint-uitkomst hierboven; de gate faalt op bestaande waarschuwingen.
 - **T046** — nog geen commits gemaakt.
 - **T047** — handmatig, na de frontend-release.
 
-**Niet gedaan, conform de route:** geen `apply_migration`, geen `deploy_edge_function`, geen
-frontend-release.
+**Status 2026-11-01:** migratie en Edge Functions zijn inmiddels toegepast en gedeployed
+(`platform_admin_catalog` `20261031174605`; `platform-admin` v2, `rag-chat` v10,
+`document-webhook` v9, `create-tenant` v11). `flow-config` v6 staat nog en wordt na de
+frontendrelease verwijderd (T047).
 
