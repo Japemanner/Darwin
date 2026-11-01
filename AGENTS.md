@@ -386,14 +386,34 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/019-platform-assistant-catalog/plan.md
+specs/021-analysis-server-route/plan.md
 
-Status 2026-10-31 (019): plan and design artifacts ready (spec, research,
-data-model, contracts, quickstart). Nothing applied or deployed yet. Before
-implementation: fill `<PLATFORM_ADMIN_EMAIL>` in migration 021 and get explicit
-confirmation for the migration and each Edge Function deploy (quickstart §0-§3).
-The six `ai_assistants` write policies (three `Admins …`, three orphaned
-`Users …`) are dropped in migration 021.
+Status 2026-10-31 (021): **migration 023 is applied and verified** (remote version
+`20261031192912`): RLS on `analysis_runs` with one SELECT policy, private
+`analysis-dossiers` bucket with one SELECT policy, `pg_cron`/`pg_net` installed;
+F-01 (no public table without RLS) and F-10 (bucket private + policy) pass. The three
+Edge Functions are **deployed** (`analysis-run-submit` with JWT verification;
+`analysis-run-callback` and `analysis-run-cleanup` with `--no-verify-jwt`), the
+secrets `ANALYSIS_CALLBACK_SECRET` / `ANALYSIS_CLEANUP_SECRET` are set, and Vault
+(`analysis_cleanup_url`/`analysis_cleanup_secret`) plus the daily pg_cron job
+`analysis-runs-cleanup` (03:15 UTC) are configured. A manual pg_net invocation
+returned 200 `{deleted:0,failed:0}`; anonymous submit/callback/cleanup return 401.
+`tsc`, ESLint (`src/`), build and the five analysis Playwright specs (23/23 with the
+E2E member account) are green. Still open: the manual n8n changes, the frontend
+release and the live n8n run per quickstart §5.
+
+Status 2026-10-31 (020): migration 022 (`team_management`) is applied and
+verified: `profiles.email`/`status`, 30 null-checked policies, the two
+security-definer functions, 0 profiles without e-mail, all existing profiles
+`active`, and the assistant set unchanged. `team-admin`, `rag-chat`,
+`send-feature-request` and `create-tenant` are deployed; all four reject
+anonymous calls with 401. The 020 frontend is **not** released yet, so the
+deployed `invite-user` function is still present; remove it only after the 020
+frontend is live. 019 is live on the backend and its frontend is merged to
+`main` (PR #35 -> #36); verify the Netlify production deploy. Full Playwright
+and `rls-verify` runs need the E2E accounts and the Scaleway TEM/Site
+URL/invite-template/24h settings. The login of a blocked user deliberately keeps
+the generic message (GoTrue checks the ban before the password).
 
 Still open from 018: `VITE_VAPID_PUBLIC_KEY` in Netlify, manual push smoke test
 (quickstart §5) and E2E credentials; US2 waits on `analysis-run-callback`.

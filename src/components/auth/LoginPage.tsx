@@ -12,24 +12,23 @@ function LoginPage() {
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState<string | null>(null)
   const signIn = useAuthStore((s) => s.signIn)
+  const authError = useAuthStore((s) => s.authError)
   const isSigningIn = useAuthStore((s) => s.isSigningIn)
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const navigate = useNavigate()
   const { toast } = useToast()
-
-  console.log('[LoginPage] render, isSigningIn:', isSigningIn)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError(null)
 
-    console.log('[LoginPage] handleLogin called for:', email)
-
     const { error } = await signIn(email, password)
 
     if (error) {
-      console.error('[LoginPage] signIn returned error:', error.message)
-      const message = 'Inloggen mislukt. Controleer uw e-mailadres en wachtwoord.'
+      // A blocked/orphaned session sets the specific store message; a normal
+      // invalid login keeps the generic message. user_banned is deliberately
+      // not surfaced here (GoTrue checks the ban before the password).
+      const message = useAuthStore.getState().authError
+        ?? 'Inloggen mislukt. Controleer uw e-mailadres en wachtwoord.'
       setLoginError(message)
       toast({
         title: 'Inloggen mislukt',
@@ -39,13 +38,13 @@ function LoginPage() {
       return
     }
 
-    console.log('[LoginPage] signIn success, isAuthenticated:', isAuthenticated)
-
     const redirectUrl = localStorage.getItem('redirectAfterLogin') || '/command-center'
     localStorage.removeItem('redirectAfterLogin')
 
     navigate(redirectUrl, { replace: true })
   }
+
+  const visibleError = authError ?? loginError
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30">
@@ -77,8 +76,8 @@ function LoginPage() {
                 required
               />
             </div>
-            {loginError && (
-              <p className="text-sm text-destructive">{loginError}</p>
+            {visibleError && (
+              <p className="text-sm text-destructive" role="alert">{visibleError}</p>
             )}
             <Button type="submit" disabled={isSigningIn}>
               {isSigningIn ? 'Inloggen...' : 'Inloggen'}

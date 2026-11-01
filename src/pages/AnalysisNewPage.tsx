@@ -54,8 +54,6 @@ function AnalysisNewPage() {
       await submitAnalysisRun({
         run_id: newRunId,
         assistant_id: assistant.id,
-        advisor_id: profile.id,
-        adviseur_naam: profile.full_name,
         verzekeringsvraagstuk: values.verzekeringsvraagstuk,
         kennisbronnen: values.kennisbronnen,
         klantsituatie: values.klantsituatie,

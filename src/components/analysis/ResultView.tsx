@@ -5,19 +5,21 @@ import { SourcePanel } from '@/components/analysis/SourcePanel'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import { AnalysisResultSchema } from '@/lib/analysis-schemas'
+import { AnalysisClientError, downloadAnalysisDossier } from '@/lib/analysis-client'
 import { Download, Copy, AlertTriangle, FileText } from 'lucide-react'
 
 export interface ResultViewProps {
   runId: string
   result: unknown
   internMarkdown: string
-  dossierDocxUrl: string | null
+  dossierPath: string | null
   expiresAt: string
 }
 
-export function ResultView({ runId, result, internMarkdown, dossierDocxUrl, expiresAt }: ResultViewProps) {
+export function ResultView({ runId, result, internMarkdown, dossierPath, expiresAt }: ResultViewProps) {
   const { toast } = useToast()
   const [activeBronId, setActiveBronId] = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
   const parsed = AnalysisResultSchema.safeParse(result)
 
   if (!parsed.success) {
@@ -53,6 +55,22 @@ export function ResultView({ runId, result, internMarkdown, dossierDocxUrl, expi
       toast({ title: 'Gekopieerd', description: 'De interne tekst staat op het klembord.' })
     } catch {
       toast({ title: 'Fout', description: 'Kopiëren is niet gelukt. Probeer het opnieuw.', variant: 'destructive' })
+    }
+  }
+
+  const handleDownload = async () => {
+    if (!dossierPath) return
+    setIsDownloading(true)
+    try {
+      await downloadAnalysisDossier(dossierPath)
+    } catch (err) {
+      toast({
+        title: 'Fout',
+        description: err instanceof AnalysisClientError ? err.message : 'Het dossier kon niet worden gedownload.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsDownloading(false)
     }
   }
 
@@ -93,15 +111,17 @@ export function ResultView({ runId, result, internMarkdown, dossierDocxUrl, expi
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {dossierDocxUrl ? (
-            <a
-              href={dossierDocxUrl}
-              download
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          {dossierPath ? (
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              aria-busy={isDownloading}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               Dossier opslaan (.docx) — CONCEPT, door adviseur te accorderen
-            </a>
+            </button>
           ) : (
             <button type="button" disabled className="inline-flex h-10 items-center gap-2 rounded-md border px-4 py-2 text-sm text-muted-foreground">
               <Download className="h-4 w-4" aria-hidden="true" />

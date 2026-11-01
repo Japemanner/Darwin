@@ -9,13 +9,21 @@ import type {
   KnowledgeItem,
   Conversation,
   Message,
-  Profile,
-  Invitation,
   RoadmapFeature,
   RoadmapVote,
   FeedbackInteraction,
   FeedbackReason,
 } from '@/types/database.types'
+import {
+  blockMember,
+  inviteMember,
+  listMembers,
+  resendInvite,
+  revokeInvite,
+  setMemberRole,
+  unblockMember,
+} from '@/lib/team-admin-client'
+import type { InviteMemberInput, TeamMember, TeamRole } from '@/lib/team-admin-client'
 
 export interface ConversationWithAssistant extends Conversation {
   ai_assistants: { name: string; icon: string } | null
@@ -293,34 +301,74 @@ export function useRoadmapFeatures(userId: string | undefined) {
 }
 
 export function useTeamMembers(orgId: string | undefined) {
-  return useQuery<Profile[]>({
+  return useQuery<TeamMember[]>({
     queryKey: ['team-members', orgId],
     enabled: !!orgId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('organization_id', orgId!)
-        .order('created_at')
-      if (error) throw error
-      return data
+    queryFn: () => listMembers(orgId!),
+  })
+}
+
+export function useInviteMember(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: InviteMemberInput) => inviteMember(orgId, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-members', orgId] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts', orgId] })
     },
   })
 }
 
-export function useInvitations(orgId: string | undefined) {
-  return useQuery<Invitation[]>({
-    queryKey: ['invitations', orgId],
-    enabled: !!orgId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('organization_id', orgId!)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data
+export function useResendInvite(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => resendInvite(orgId, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-members', orgId] })
+    },
+  })
+}
+
+export function useRevokeInvite(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => revokeInvite(orgId, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-members', orgId] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts', orgId] })
+    },
+  })
+}
+
+export function useSetMemberRole(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: TeamRole }) =>
+      setMemberRole(orgId, userId, role),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-members', orgId] })
+    },
+  })
+}
+
+export function useBlockMember(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => blockMember(orgId, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-members', orgId] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts', orgId] })
+    },
+  })
+}
+
+export function useUnblockMember(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => unblockMember(orgId, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-members', orgId] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts', orgId] })
     },
   })
 }
@@ -333,7 +381,11 @@ export function useDashboardCounts(orgId: string | undefined) {
       const [assistantsRes, kbRes, membersRes] = await Promise.all([
         supabase.from('ai_assistants').select('id', { count: 'exact', head: true }).eq('organization_id', orgId!),
         supabase.from('knowledge_bases').select('id', { count: 'exact', head: true }).eq('organization_id', orgId!),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('organization_id', orgId!),
+        supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', orgId!)
+          .eq('status', 'active'),
       ])
 
       return {
@@ -529,22 +581,6 @@ export function useDeleteKnowledgeItem(kbId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kb-items', kbId] })
-    },
-  })
-}
-
-export function useRevokeInvitation(orgId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (invitationId: string) => {
-      const { error } = await supabase
-        .from('invitations')
-        .update({ status: 'revoked' })
-        .eq('id', invitationId)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['invitations', orgId] })
     },
   })
 }

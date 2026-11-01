@@ -21,6 +21,7 @@ const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const SettingsOrganizationPage = lazy(() => import('@/pages/SettingsOrganizationPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
+const AuthConfirmPage = lazy(() => import('@/pages/AuthConfirmPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,7 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/auth/confirm" element={<AuthConfirmPage />} />
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppShell />}>
                   <Route path="/command-center" element={<CommandCenterPage />} />

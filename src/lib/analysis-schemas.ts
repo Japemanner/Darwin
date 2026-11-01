@@ -50,6 +50,9 @@ export const AnalysisRunSchema = z.object({
   result: AnalysisResultSchema.nullable().optional(),
   intern_markdown: z.string().nullable().optional(),
   dossier_docx_url: z.string().nullable().optional(),
+  // Feature 021: storage path used to create a short-lived signed URL at click
+  // time. Optional so rows from before the server-route migration still parse.
+  dossier_path: z.string().min(1).nullable().optional(),
 })
 
 export const RecentRunSchema = z.object({

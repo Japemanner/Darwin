@@ -99,6 +99,28 @@ export function PostHogAppProvider({ children }: PostHogAppProviderProps) {
       person_profiles: 'identified_only',
       autocapture: false,
       disable_session_recording: true,
+      // Never send URL query strings or fragments to PostHog. This covers the
+      // invitation token_hash on /auth/confirm and the existing ?code= on
+      // /reset-password, for every event (pageview, pageleave and custom).
+      before_send: (event) => {
+        if (!event) return event
+        const properties = event.properties
+        if (properties) {
+          for (const key of Object.keys(properties)) {
+            if (
+              key === '$current_url' ||
+              key === '$referrer' ||
+              key.startsWith('$initial_')
+            ) {
+              const value = properties[key]
+              if (typeof value === 'string') {
+                properties[key] = value.split(/[?#]/)[0]
+              }
+            }
+          }
+        }
+        return event
+      },
     })
   }, [])
 

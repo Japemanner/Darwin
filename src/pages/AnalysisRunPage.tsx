@@ -72,7 +72,7 @@ function AnalysisRunPage() {
           runId={run.id}
           result={run.result}
           internMarkdown={run.intern_markdown}
-          dossierDocxUrl={run.dossier_docx_url ?? null}
+          dossierPath={run.dossier_path ?? null}
           expiresAt={run.expires_at}
         />
       )}
