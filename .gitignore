@@ -11,3 +11,6 @@ supabase/.temp/
 test-results/
 playwright-report/
 
+# Backups
+*.bak
+
