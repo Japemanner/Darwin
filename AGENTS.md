@@ -418,3 +418,9 @@ the generic message (GoTrue checks the ban before the password).
 Still open from 018: `VITE_VAPID_PUBLIC_KEY` in Netlify, manual push smoke test
 (quickstart §5) and E2E credentials; US2 waits on `analysis-run-callback`.
 <!-- SPECKIT END -->
+
+## Pre-commit review
+- Blokkeert de pre-commit review een commit, los dan de bevindingen op in de code en commit opnieuw.
+- Blijkt een taak niet af, zet hem in tasks.md terug op [ ].
+- Pas spec.md, plan.md of .specify/memory/constitution.md nooit aan om een bevinding weg te werken. Denk je dat de spec fout is, vraag het dan de gebruiker.
+- Blokkeert de review twee keer op dezelfde bevinding, stop dan en vraag de gebruiker.
