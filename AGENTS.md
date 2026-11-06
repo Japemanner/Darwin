@@ -400,9 +400,10 @@ Acceptance 2026-11-06: with a one-time platform-admin session, "Schade" was arch
 and restored through the real UI; the direct link returned "Assistent niet gevonden",
 history stayed readable, a new message returned the existing 403 message, the switch
 states were unchanged, and live idempotency returned already_archived/not_archived/
-not_found as expected. Still open: the full Playwright suite/E2E accounts, Snyk and
-the production release. The remote migration history lacks 005-017; that drift
-predates this feature.
+not_found as expected. Production release: merged to main via PR #46
+(`0b5b6bb`); the Netlify production deploy is triggered. Still open: the full
+Playwright suite/E2E accounts, Snyk and the live production URL check. The remote
+migration history lacks 005-017; that drift predates this feature.
 
 Status 2026-10-31 (021): **migration 023 is applied and verified** (remote version
 `20261031192912`): RLS on `analysis_runs` with one SELECT policy, private

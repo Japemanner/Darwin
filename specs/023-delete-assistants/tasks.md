@@ -269,7 +269,9 @@ bevestiging in de chat.**
   `<!-- SPECKIT END -->` in `AGENTS.md` bij met de toegepaste migratie, gedeployde
   functies en verificatieresultaten.
 - [ ] T043 Release via PR `develop` → `main` volgens `AGENTS.md` en controleer de
-  Netlify-productiedeploy met dezelfde acceptatie als T036.
+  Netlify-productiedeploy met dezelfde acceptatie als T036. **Release uitgevoerd**:
+  PR #46, main `0b5b6bb`; de Netlify-productiedeploy is getriggerd. De live
+  site-acceptatie wacht op de Netlify-URL.
 
 ---
 
