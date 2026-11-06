@@ -9,3 +9,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Public client configuration: these values are intentionally shipped to the
+  # browser (see AGENTS.md) and are not secrets. Keep Netlify's Secrets
+  # Controller from failing the build on them.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY"
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "https://ddfjigrjwlfpaljhhogv.supabase.co"
