@@ -16,9 +16,9 @@ deze volgorde uit: eerst de migratie, dan de Edge Function, dan de frontend.
 - Een kantoorbeheerdersaccount en een anonieme anon-key client voor de
   negatieve controles.
 
-## 1. Migratie 024 toepassen
+## 1. Migratie 025 toepassen
 
-Maak `supabase/migrations/024_assistant_archive.sql` aan volgens
+Maak `supabase/migrations/025_assistant_archive.sql` aan volgens
 `data-model.md` §7 en pas hem toe via de Supabase MCP
 (`apply_migration`, naam `assistant_archive`). Gebruik geen handmatige SQL in
 productie buiten de MCP om.

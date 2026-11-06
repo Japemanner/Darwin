@@ -175,3 +175,29 @@ export async function saveCatalogAssistant(
     example_questions: input.example_questions,
   })
 }
+
+export interface ArchivedAssistant {
+  catalog_id: string
+  name: string
+  icon: string
+  type: string
+  archived_at: string
+}
+
+export async function listArchivedAssistants(): Promise<ArchivedAssistant[]> {
+  return invokePlatformAdmin<ArchivedAssistant[]>({ action: 'list_archived_assistants' })
+}
+
+export async function archiveCatalogAssistant(catalogId: string): Promise<void> {
+  await invokePlatformAdmin<{ ok: true }>({
+    action: 'archive_catalog_assistant',
+    catalog_id: catalogId,
+  })
+}
+
+export async function restoreCatalogAssistant(catalogId: string): Promise<void> {
+  await invokePlatformAdmin<{ ok: true }>({
+    action: 'restore_catalog_assistant',
+    catalog_id: catalogId,
+  })
+}

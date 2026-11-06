@@ -271,11 +271,12 @@ Deno.serve(async (req: Request) => {
     // the caller's organization.
     const { data: assistant } = await serviceClient
       .from("ai_assistants")
-      .select("id, type, is_active, organization_id, catalog_id")
+      .select("id, type, is_active, archived_at, organization_id, catalog_id")
       .eq("id", assistantId)
       .maybeSingle();
     if (
-      !assistant || !assistant.is_active || assistant.type !== "risico_analyse" ||
+      !assistant || !assistant.is_active || assistant.archived_at ||
+      assistant.type !== "risico_analyse" ||
       assistant.organization_id !== organizationId
     ) {
       return errorResponse("FORBIDDEN", cors);

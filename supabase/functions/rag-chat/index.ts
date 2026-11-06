@@ -238,10 +238,13 @@ Deno.serve(async (req: Request) => {
     // --- AuthZ: assistant (RLS scopes to the caller's org), must be active.
     const { data: assistant } = await userClient
       .from("ai_assistants")
-      .select("id, name, system_prompt, type, is_active, catalog_id, organization_id")
+      .select("id, name, system_prompt, type, is_active, archived_at, catalog_id, organization_id")
       .eq("id", assistantId)
       .maybeSingle();
-    if (!assistant || !assistant.is_active || assistant.organization_id !== organizationId) {
+    if (
+      !assistant || !assistant.is_active || assistant.archived_at ||
+      assistant.organization_id !== organizationId
+    ) {
       return errorResponse("FORBIDDEN", cors);
     }
 

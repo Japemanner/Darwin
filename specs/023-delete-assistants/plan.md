@@ -78,9 +78,9 @@ analyse. Geen nieuwe polling of achtergrondtaak.
   cliëntinhoud (constitution III).
 - Geen migratie toepassen of functie deployen zonder expliciete bevestiging in de
   chat; daarna via de Supabase MCP.
-- Releasevolgorde: migratie 024 → `platform-admin` deployen → frontend.
+- Releasevolgorde: migratie 025 → `platform-admin` deployen → frontend.
 
-**Scale/Scope**: 1 migratie (`024_assistant_archive.sql`), 3 gewijzigde Edge
+**Scale/Scope**: 1 migratie (`025_assistant_archive.sql`), 3 gewijzigde Edge
 Functions (`platform-admin`, `rag-chat`, `analysis-run-submit`), 2 nieuwe
 frontend-componenten, 5 gewijzigde frontend-bestanden (inclusief de gedeelde
 dialoog en de types), 1 nieuwe Playwright-spec. Geen nieuwe dependencies, geen
@@ -133,7 +133,7 @@ specs/023-delete-assistants/
 ```text
 supabase/
 ├── migrations/
-│   └── 024_assistant_archive.sql    # NIEUW: archived_at op catalogus en
+│   └── 025_assistant_archive.sql    # NIEUW: archived_at op catalogus en
 │                                    #   organisatierijen, index, archive/restore-RPC's,
 │                                    #   seedfunctie slaat gearchiveerde catalogusrijen over
 └── functions/
@@ -165,7 +165,7 @@ de gedeelde dialoog. Er komt geen nieuwe route, pagina, tabel of dependency.
 
 ## Ontwerp in het kort
 
-### Migratie 024
+### Migratie 025
 
 Volgt [data-model.md](data-model.md) §7:
 

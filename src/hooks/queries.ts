@@ -24,6 +24,12 @@ import {
   unblockMember,
 } from '@/lib/team-admin-client'
 import type { InviteMemberInput, TeamMember, TeamRole } from '@/lib/team-admin-client'
+import {
+  archiveCatalogAssistant,
+  listArchivedAssistants,
+  restoreCatalogAssistant,
+} from '@/lib/platform-admin-client'
+import type { ArchivedAssistant } from '@/lib/platform-admin-client'
 
 export interface ConversationWithAssistant extends Conversation {
   ai_assistants: { name: string; icon: string } | null
@@ -49,6 +55,7 @@ export function useAssistants(orgId: string | undefined) {
         .from('ai_assistants')
         .select('*')
         .eq('organization_id', orgId!)
+        .is('archived_at', null)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data
@@ -65,6 +72,7 @@ export function useAssistantOptions(orgId: string | undefined) {
         .from('ai_assistants')
         .select('id, name, icon')
         .eq('organization_id', orgId!)
+        .is('archived_at', null)
         .order('name', { ascending: true })
       if (error) throw error
       return data
@@ -81,9 +89,50 @@ export function useAssistant(assistantId: string | undefined) {
         .from('ai_assistants')
         .select('*')
         .eq('id', assistantId!)
+        .is('archived_at', null)
         .maybeSingle()
       if (error) throw error
       return data
+    },
+  })
+}
+
+export function useArchivedAssistants(enabled: boolean) {
+  return useQuery<ArchivedAssistant[]>({
+    queryKey: ['archived-assistants'],
+    enabled,
+    queryFn: () => listArchivedAssistants(),
+  })
+}
+
+export function useArchiveAssistant(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (catalogId: string) => archiveCatalogAssistant(catalogId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assistants'] })
+      qc.invalidateQueries({ queryKey: ['archived-assistants'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts', orgId] })
+    },
+    // A concurrent delete may already have archived the assistant on the
+    // server. Refresh on every failure so the list reflects that state; the
+    // dialog decides whether the message means "already archived".
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ['assistants'] })
+      qc.invalidateQueries({ queryKey: ['archived-assistants'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts', orgId] })
+    },
+  })
+}
+
+export function useRestoreAssistant(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (catalogId: string) => restoreCatalogAssistant(catalogId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assistants'] })
+      qc.invalidateQueries({ queryKey: ['archived-assistants'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts', orgId] })
     },
   })
 }
@@ -194,7 +243,9 @@ export function useLinkedAssistants(kbId: string | undefined) {
         .select('ai_assistants(*)')
         .eq('knowledge_base_id', kbId!)
       if (error) throw error
-      return (data ?? []).map((row) => row.ai_assistants).filter(Boolean) as AIAssistant[]
+      return ((data ?? []) as Array<{ ai_assistants: AIAssistant | null }>)
+        .map((row) => row.ai_assistants)
+        .filter((assistant): assistant is AIAssistant => !!assistant && !assistant.archived_at)
     },
   })
 }
@@ -379,7 +430,7 @@ export function useDashboardCounts(orgId: string | undefined) {
     enabled: !!orgId,
     queryFn: async () => {
       const [assistantsRes, kbRes, membersRes] = await Promise.all([
-        supabase.from('ai_assistants').select('id', { count: 'exact', head: true }).eq('organization_id', orgId!),
+        supabase.from('ai_assistants').select('id', { count: 'exact', head: true }).eq('organization_id', orgId!).is('archived_at', null),
         supabase.from('knowledge_bases').select('id', { count: 'exact', head: true }).eq('organization_id', orgId!),
         supabase
           .from('profiles')

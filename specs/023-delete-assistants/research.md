@@ -195,7 +195,7 @@ quickstart.
 
 ## 9. Migration and type strategy
 
-**Decision**: One additive migration `supabase/migrations/024_assistant_archive.sql`
+**Decision**: One additive migration `supabase/migrations/025_assistant_archive.sql`
 (columns, index, two RPCs, replaced seed function). Add `archived_at` to the
 `ai_assistants` `Row`, `Insert` and `Update` types in
 `src/types/database.types.ts` by hand, because that file predates migration 021 and
