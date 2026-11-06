@@ -135,3 +135,57 @@ _Do not edit manually._
 ### Verdict
 
 **SHIP met verificatieachterstand**: alle lokale gates groen (FAIL:0, blocking:0). Open (zie Gap in FEATURES.md, feature 014): e2e-suite echt draaien zodra E2E-accounts bestaan; handmatige live-verificatie `specs/014-risk-analysis-page/quickstart.md` §3; backend-afstemming `expires_at` op de echte recente-lijst-API (vrijblijvend); F-01/F-10/F-16/F-17 via een MCP-sessie.
+
+---
+
+## Feature 023 — Assistenten verwijderen (archief) — 2026-11-06
+
+**Trigger:** After feature "023-delete-assistants"
+**Script output:** `bash scripts/fitness-check.sh` — FAIL:0 WARN:2 PASS:12 SKIP:4
+**Snyk scan:** niet uitgevoerd — Snyk CLI/MCP geeft 401 (SNYK-0005); de key is niet provisioned.
+**Overall result:** ⚠️ WARNINGS (Snyk- en acceptatieverificatie open)
+
+| ID    | Check                           | Result | Detail |
+|-------|---------------------------------|--------|--------|
+| F-01  | RLS on all tables               | ✅     | Supabase MCP: 0 public tables without RLS |
+| F-02  | No service role in frontend     | ✅     | 0 hits in `src/` |
+| F-03  | Single Supabase client          | ✅     | Geen extra `createClient()` in `src/` |
+| F-04  | PKCE flow configured            | ✅     | `flowType: 'pkce'` aanwezig |
+| F-05  | Netlify SPA redirect            | ✅     | Redirectregel aanwezig |
+| F-06  | TypeScript strict mode          | ✅     | `strict: true` |
+| F-07  | tsc --noEmit clean              | ✅     | 0 fouten |
+| F-08  | No unjustified `any`            | ✅     | Geen nieuwe `any` |
+| F-09  | No admin client in frontend     | ✅     | 0 hits in `src/` |
+| F-10  | Storage bucket policies         | ✅     | 2 privébuckets (`analysis-dossiers`, `knowledge-documents`), beide met policies |
+| F-11  | No waitForTimeout in tests      | ✅     | 0 hits in `tests/` |
+| F-12  | .env.local in .gitignore        | ✅     | Aanwezig |
+| F-13  | .env.example exists             | ✅     | Aanwezig |
+| F-14  | No direct DOM manipulation      | ⚠️     | 2 calls in `src/components/ui/dialog.tsx` (focus-trap) + `src/main.tsx` (root mount) — intentioneel |
+| F-15  | Conventional commits            | ⚠️     | 3 van de laatste 5 commits niet-conventioneel (merge-commits en docs) — geen featurecode |
+| F-16  | Snyk SAST                       | ⚠️     | Niet uitgevoerd: Snyk 401 (SNYK-0005) |
+| F-17  | Snyk SCA (dependencies)         | ⚠️     | Niet uitgevoerd: Snyk 401 (SNYK-0005) |
+| F-18  | Geen client-side encryptie      | ✅     | Geen `crypto.subtle`/`VITE_ENCRYPTION_KEY` in `src/` |
+
+### Overige gates
+
+- `npx tsc --noEmit`: 0 fouten.
+- `npm run build`: groen (chunk-size waarschuwing pre-existing).
+- `npx eslint src/ tests/ --max-warnings 0`: 0 fouten/warnings.
+- Gitleaks (pre-commit): geen secrets.
+- Playwright: `tests/e2e/assistant-archive.spec.ts` **6/6 groen** met het bestaande lidaccount en gemockte platformbeheerder; de volledige suite is niet gedraaid omdat `E2E_EMAIL`/`E2E_PLATFORM_ADMIN_*` ontbreken.
+- Migratie 025 is toegepast (remote `20261106083907`); `platform-admin` v4, `rag-chat` v12 en `analysis-run-submit` v4 zijn gedeployed met JWT-verificatie.
+- Anoniem 401 en lid-JWT 403 geverifieerd; transactionele RPC-test archiveerde 2 rijen en herstelde ze weer (rollback, 0 gearchiveerd).
+
+### Failures requiring fix before next feature
+
+Geen.
+
+### Warnings (non-blocking)
+
+- F-14: bestaande/intentionele DOM-calls in de focus-trap en React-root.
+- F-15: merge- en docs-commits in de laatste vijf; de featurecommits zijn conventioneel.
+- F-16/F-17: Snyk-key niet provisioned; opnieuw draaien zodra toegang bestaat.
+
+### Verdict
+
+**SHIP met verificatieachterstand**: migratie, functies en de gemockte UI-tests zijn groen. Open: de positieve archive/restore-acceptatie met een platformbeheerder (quickstart §5), de volledige Playwright-suite met E2E-accounts, Snyk SAST/SCA en de productie-release `develop` → `main`.

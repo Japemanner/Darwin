@@ -1,7 +1,7 @@
 # FEATURES.md — Application Feature Registry
 
-_Last updated: 2026-10-31_
-_Total features: 25_
+_Last updated: 2026-11-06_
+_Total features: 28_
 
 ---
 
@@ -386,6 +386,50 @@ handmatige n8n-aanpassingen (Header Auth op `darwin-risicoanalyse`, twee placeho
 RLS-verificatie uit quickstart §5. De vijf analyse-specs zijn lokaal **23/23 groen**
 met het bestaande E2E-lidaccount als `E2E_EMAIL`; zonder credentials skippen ze met
 reden.
+
+---
+
+## AI-assistenten
+
+### Assistenten verwijderen en herstellen (archief) 🧪
+
+**Route / location:** `/assistants` → `AssistantsPage`  
+**Supabase surface:** Database | Edge Function  
+**Edge Function name:** `platform-admin`  
+**Storage bucket:** —
+
+**Description:**  
+De platformbeheerder verwijdert een assistent uit de platformbrede catalogus. De assistent verdwijnt voor alle organisaties uit AI-assistenten, het startscherm, de geschiedenis, de schakelaars en de koppelingen, maar bestaande gesprekken, analyses, feedback en kennisbronkoppelingen blijven bewaard. Via **Archief** is de assistent te herstellen met dezelfde aan/uit-stand per organisatie.
+
+**UI Elements & Actions:**
+
+| Element | Type | Action / Behaviour |
+|---------|------|--------------------|
+| Verwijderknop (prullenbak) | Button | Alleen voor de platformbeheerder; opent het bevestigingsvenster voor die assistent. |
+| Annuleren | Button | Sluit het venster zonder wijziging; de focus gaat terug naar de verwijderknop. |
+| Verwijderen | Button | Roept `platform-admin` actie `archive_catalog_assistant` aan; de kaart verdwijnt, een bevestiging verschijnt en de focus gaat naar **Archief**. |
+| Archief | Button | Opent het archiefvenster met de verwijderde assistenten, hun type en verwijderdatum. |
+| Herstellen | Button | Roept `restore_catalog_assistant` aan; de assistent is weer beschikbaar met de oude schakelaarstanden. |
+| Sluiten | Button | Sluit het archiefvenster. |
+
+**Supabase calls made:**
+- `supabase.from('ai_assistants').select(...).is('archived_at', null)` — filters in de lijst, opties, detailpagina's en dashboardtelling.
+- `supabase.from('assistant_knowledge_bases').select('ai_assistants(*)')` — gearchiveerde assistenten worden uit de kennisbronweergave gefilterd.
+- `supabase.functions.invoke('platform-admin', { action: 'list_archived_assistants' })` — archieflijst.
+- `supabase.functions.invoke('platform-admin', { action: 'archive_catalog_assistant' })` — verwijderen/archiveren.
+- `supabase.functions.invoke('platform-admin', { action: 'restore_catalog_assistant' })` — herstellen.
+
+**RLS policies active:** Yes  
+**Auth required:** Yes; verwijderen en herstellen alleen voor de platformbeheerder.
+
+**Known edge cases / limitations:**
+- Verwijderen is archiveren: er is geen definitieve purge of bewaartermijn.
+- Bestaande gesprekken en analyses blijven leesbaar; een nieuw bericht wordt geweigerd.
+- Een organisatie die tijdens het archief is aangemaakt, krijgt de assistent na herstel uit.
+- Migratie 025 is toegepast; `platform-admin` v4, `rag-chat` v12 en `analysis-run-submit` v4 zijn gedeployed.
+- De 6 gemockte Playwright-tests zijn groen; de volledige handmatige acceptatie met een platformbeheerder en de volledige suite met E2E-accounts staan nog open.
+
+**Files**: `supabase/migrations/025_assistant_archive.sql`, `supabase/functions/platform-admin/index.ts`, `supabase/functions/rag-chat/index.ts`, `supabase/functions/analysis-run-submit/index.ts`, `src/components/assistants/DeleteAssistantDialog.tsx`, `src/components/assistants/ArchiveDialog.tsx`, `src/components/ui/dialog.tsx`, `src/hooks/queries.ts`, `src/lib/platform-admin-client.ts`, `src/pages/AssistantsPage.tsx`, `src/types/database.types.ts`, `tests/e2e/assistant-archive.spec.ts`, `specs/023-delete-assistants/`
 
 ---
 
