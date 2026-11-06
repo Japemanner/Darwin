@@ -2,15 +2,16 @@
 
 **Feature**: `019-platform-assistant-catalog` | **Branch**: `019-platform-assistant-catalog`
 
-> **Er is nog niets toegepast of gedeployed.** Elke stap hieronder vraagt om uw expliciete
-> bevestiging in de chat. De migratie is pas toepasbaar nadat het e-mailadres van de
-> platformbeheerder is ingevuld.
+> **Stand 2026-11-01.** De migratie is toegepast (`platform_admin_catalog`,
+> `20261031174605`) en de vier Edge Functions zijn gedeployed; de frontend staat op `main`.
+> `flow-config` staat nog en verwijdert u zelf na de release (§5). De stappen hieronder
+> blijven de referentie voor een schone heruitrol en voor de resterende verificatie.
 
 ## 0. Voorwaarden
 
 | Voorwaarde | Controle |
 |---|---|
-| E-mailadres platformbeheerder bekend | vul `<PLATFORM_ADMIN_EMAIL>` in `021_platform_admin_catalog.sql` |
+| E-mailadres platformbeheerder bekend | aangeleverd en verwerkt in `021_platform_admin_catalog.sql` |
 | Dat account heeft een `profiles`-rij | `SELECT id, role FROM profiles WHERE id = (SELECT id FROM auth.users WHERE email = '<adres>');` |
 | Dat account is `role = 'admin'` in de eigen organisatie (nodig om kennisbronnen te koppelen) | zelfde query; `role` moet `admin` zijn |
 | Elke organisatie heeft minstens één admin (nodig voor `created_by` in de datavulling) | `SELECT o.name FROM organizations o WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.organization_id = o.id AND p.role = 'admin');` → moet leeg zijn |

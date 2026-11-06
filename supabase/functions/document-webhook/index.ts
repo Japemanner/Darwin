@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") ?? Deno.env.get("SUPABASE
 const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("VITE_SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Service-role client: flow_configs reads, org name lookup, signed URL creation.
+// Service-role client: platform_webhook_config reads, org name lookup, signed URL creation.
 const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Fail-closed CORS: only origins listed in ALLOWED_ORIGINS get an ACAO header.

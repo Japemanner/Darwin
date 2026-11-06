@@ -386,7 +386,23 @@ A feature is **Done** when:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/021-analysis-server-route/plan.md
+specs/023-delete-assistants/plan.md
+
+Status 2026-11-06 (023): **migration 025 is applied** (remote version
+`20261106083907`): `archived_at` on `assistant_catalog` and `ai_assistants`, the
+organisation/archive index, the archive/restore RPCs granted to `service_role` only,
+and the seed function that skips archived catalogue items. The apply left 0 archived
+rows and the security advisor shows no new executable function. `platform-admin` (v4),
+`rag-chat` (v12) and `analysis-run-submit` (v4) are **deployed** with JWT
+verification; anonymous calls return 401 and a member JWT returns 403 on the new
+actions. `tsc`, ESLint, build and the six mocked archive Playwright tests are green.
+Acceptance 2026-11-06: with a one-time platform-admin session, "Schade" was archived
+and restored through the real UI; the direct link returned "Assistent niet gevonden",
+history stayed readable, a new message returned the existing 403 message, the switch
+states were unchanged, and live idempotency returned already_archived/not_archived/
+not_found as expected. Still open: the full Playwright suite/E2E accounts, Snyk and
+the production release. The remote migration history lacks 005-017; that drift
+predates this feature.
 
 Status 2026-10-31 (021): **migration 023 is applied and verified** (remote version
 `20261031192912`): RLS on `analysis_runs` with one SELECT policy, private

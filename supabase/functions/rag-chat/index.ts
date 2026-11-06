@@ -16,8 +16,8 @@ const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") ?? Deno.env.get("SUPABASE
 const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("VITE_SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Service-role client: for flow_configs reads, auth.getUser and (v2) message/
-// conversation persistence after ownership checks.
+// Service-role client: for platform_webhook_config and assistant_catalog reads,
+// auth.getUser and (v2) message/conversation persistence after ownership checks.
 const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Fail-closed CORS: only origins listed in ALLOWED_ORIGINS get an ACAO header.
@@ -238,10 +238,13 @@ Deno.serve(async (req: Request) => {
     // --- AuthZ: assistant (RLS scopes to the caller's org), must be active.
     const { data: assistant } = await userClient
       .from("ai_assistants")
-      .select("id, name, system_prompt, type, is_active, catalog_id, organization_id")
+      .select("id, name, system_prompt, type, is_active, archived_at, catalog_id, organization_id")
       .eq("id", assistantId)
       .maybeSingle();
-    if (!assistant || !assistant.is_active || assistant.organization_id !== organizationId) {
+    if (
+      !assistant || !assistant.is_active || assistant.archived_at ||
+      assistant.organization_id !== organizationId
+    ) {
       return errorResponse("FORBIDDEN", cors);
     }
 
