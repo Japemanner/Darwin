@@ -1,4 +1,4 @@
--- 024_assistant_archive.sql
+-- 025_assistant_archive.sql
 -- Feature 023-delete-assistants (specs/023-delete-assistants/).
 --
 -- Deleting an assistant archives it: the catalogue item and every

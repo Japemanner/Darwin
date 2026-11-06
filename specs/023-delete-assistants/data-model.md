@@ -50,7 +50,7 @@ changes.
 | `platform_webhook_config` | Single row | Untouched; connection URLs of an archived assistant stay stored. |
 | `organizations` | Parent of `ai_assistants` | Untouched. |
 
-## 2. Database functions (migration 024)
+## 2. Database functions (migration 025)
 
 ### `platform_archive_catalog_assistant(p_id uuid) → void`
 
@@ -172,7 +172,7 @@ not change `is_active`, and restoring does not turn anything on or off.
 
 ## 7. Migration and backfill
 
-`024_assistant_archive.sql`:
+`025_assistant_archive.sql`:
 
 1. `ALTER TABLE public.assistant_catalog ADD COLUMN archived_at timestamptz;`
 2. `ALTER TABLE public.ai_assistants ADD COLUMN archived_at timestamptz;`

@@ -31,22 +31,22 @@ worden in Phase 8 volgens quickstart.md gecontroleerd.
 **Doel**: het archiefmodel, de beheerroute en de gedeelde frontend-bouwstenen staan
 voordat de verhalen verder bouwen.
 
-- [x] T003 Voeg in `supabase/migrations/024_assistant_archive.sql` de kolommen
+- [x] T003 Voeg in `supabase/migrations/025_assistant_archive.sql` de kolommen
   `archived_at timestamptz` toe aan `public.assistant_catalog` en
   `public.ai_assistants`, plus de index
   `ai_assistants_organization_archived_idx (organization_id, archived_at)`
   (data-model.md §1 en §7).
-- [x] T004 Voeg in `supabase/migrations/024_assistant_archive.sql` de functie
+- [x] T004 Voeg in `supabase/migrations/025_assistant_archive.sql` de functie
   `public.platform_archive_catalog_assistant(p_id uuid)` toe: `SECURITY DEFINER`,
   `search_path = public`, geconditioneerde `UPDATE ... RETURNING` op de catalogus,
   spiegel het tijdstip naar alle `ai_assistants`-rijen, `already_archived`/`not_found`
   bij een botsing, `EXECUTE` alleen voor `service_role` (data-model.md §2).
-- [x] T005 Voeg in `supabase/migrations/024_assistant_archive.sql` de functie
+- [x] T005 Voeg in `supabase/migrations/025_assistant_archive.sql` de functie
   `public.platform_restore_catalog_assistant(p_id uuid, p_actor uuid)` toe: wis beide
   `archived_at`-waarden, behoud `is_active`, voeg voor organisaties zonder rij een rij
   met `is_active = false` toe, `not_archived`/`not_found` bij een botsing, `EXECUTE`
   alleen voor `service_role` (data-model.md §2).
-- [x] T006 Vervang in `supabase/migrations/024_assistant_archive.sql` de functie
+- [x] T006 Vervang in `supabase/migrations/025_assistant_archive.sql` de functie
   `public.platform_seed_org_assistants(p_org uuid, p_actor uuid)` door de versie met
   `WHERE c.archived_at IS NULL`, zodat `create-tenant` nooit een gearchiveerde
   assistent zaait (data-model.md §2).
@@ -227,7 +227,7 @@ behouden.
 databank-, RLS- en autorisatiepaden bewijzen. **Vraag voor elke deploy expliciete
 bevestiging in de chat.**
 
-- [ ] T033 Pas `supabase/migrations/024_assistant_archive.sql` toe via de Supabase MCP
+- [ ] T033 Pas `supabase/migrations/025_assistant_archive.sql` toe via de Supabase MCP
   (`apply_migration`) en verifieer kolommen, index, functies en uitvoerrechten met de
   queries uit `specs/023-delete-assistants/quickstart.md` §1; draai de security- en
   performance-advisors.
