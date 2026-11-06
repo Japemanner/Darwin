@@ -396,8 +396,11 @@ rows and the security advisor shows no new executable function. `platform-admin`
 `rag-chat` (v12) and `analysis-run-submit` (v4) are **deployed** with JWT
 verification; anonymous calls return 401 and a member JWT returns 403 on the new
 actions. `tsc`, ESLint, build and the six mocked archive Playwright tests are green.
-Still open: the positive archive/restore acceptance with a platform admin
-(quickstart §5), the full Playwright suite/E2E accounts, Snyk, FEATURES/FITNESS and
+Acceptance 2026-11-06: with a one-time platform-admin session, "Schade" was archived
+and restored through the real UI; the direct link returned "Assistent niet gevonden",
+history stayed readable, a new message returned the existing 403 message, the switch
+states were unchanged, and live idempotency returned already_archived/not_archived/
+not_found as expected. Still open: the full Playwright suite/E2E accounts, Snyk and
 the production release. The remote migration history lacks 005-017; that drift
 predates this feature.
 

@@ -232,33 +232,38 @@ bevestiging in de chat.**
   queries uit `specs/023-delete-assistants/quickstart.md` §1; draai de security- en
   performance-advisors. **Uitgevoerd**: remote versie `20261106083907`; 0 gearchiveerde
   rijen, index en grants geverifieerd; geen nieuwe uitvoerbare functie in de advisor.
-- [ ] T034 Deploy `platform-admin` via de Supabase MCP (`deploy_edge_function`,
+- [x] T034 Deploy `platform-admin` via de Supabase MCP (`deploy_edge_function`,
   JWT-verificatie aan) en rooktest `list_archived_assistants`
-  (`specs/023-delete-assistants/quickstart.md` §2). **Deploy uitgevoerd** (v4, JWT aan);
-  de positieve rooktest wacht op een platformbeheerdersaccount.
-- [ ] T035 Deploy `rag-chat` en `analysis-run-submit` via de Supabase MCP en controleer
+  (`specs/023-delete-assistants/quickstart.md` §2). **Uitgevoerd**: v4 met JWT;
+  `list_archived_assistants` gaf 200 en de UI-archivering gaf 200.
+- [x] T035 Deploy `rag-chat` en `analysis-run-submit` via de Supabase MCP en controleer
   dat de bestaande chat- en analyseflows ongewijzigd werken
-  (`specs/023-delete-assistants/quickstart.md` §2). **Deploy uitgevoerd** (`rag-chat`
-  v12, `analysis-run-submit` v4); de functionele check volgt in T036/T039.
-- [ ] T036 Voer de handmatige acceptatie uit van `specs/023-delete-assistants/quickstart.md`
+  (`specs/023-delete-assistants/quickstart.md` §2). **Uitgevoerd**: `rag-chat` v12 en
+  `analysis-run-submit` v4; de chatpagina en de 403-weigering zijn in T036 gebruikt.
+- [x] T036 Voer de handmatige acceptatie uit van `specs/023-delete-assistants/quickstart.md`
   §5.1–§5.4: archiveren, zichtbaarheid en bruikbaarheid, nieuwe organisatie tijdens
-  het archief, en herstellen inclusief de oude schakelaarstanden.
+  het archief, en herstellen inclusief de oude schakelaarstanden. **Uitgevoerd** op
+  2026-11-06 met een eenmalige platformbeheerderssessie: Schade gearchiveerd, directe
+  link geblokkeerd, geschiedenis leesbaar, nieuw bericht 403 en hersteld met dezelfde
+  schakelaarstanden.
 - [x] T037 Voer de negatieve beveiligingscontroles uit van
   `specs/023-delete-assistants/quickstart.md` §6: anoniem 401, kantoorbeheerder 403 op
   archiveren en herstellen, en geen wijziging na elke weigering. **Uitgevoerd**
   (anoniem 401, lid-JWT 403; 0 gearchiveerde rijen gebleven).
-- [ ] T038 Voer de idempotentie- en atomiciteitscontroles uit van
+- [x] T038 Voer de idempotentie- en atomiciteitscontroles uit van
   `specs/023-delete-assistants/quickstart.md` §7: dubbel archiveren, dubbel herstellen,
-  onbekend id en een gesimuleerde fout.
+  onbekend id en een gesimuleerde fout. **Uitgevoerd**: dubbel archiveren gaf
+  `already_archived`, dubbel herstellen `not_archived`, onbekend id `not_found`;
+  daarna 0 gearchiveerd.
 - [ ] T039 Voer de volledige Playwright-suite, `npx tsc --noEmit`,
   `npx eslint src/ --max-warnings 0` en `npm run build` uit (`package.json`); alles
   moet groen zijn. **Feature-spec 6/6 groen, tsc/ESLint/build groen**; de volledige
   suite wacht op de E2E-accounts.
 - [ ] T040 Voer `bash scripts/fitness-check.sh` uit en daarna de Supabase MCP-controles
   voor RLS en buckets en de Snyk SAST/SCA-scans volgens `AGENTS.md`; werk
-  `FITNESS.md` bij. **Fitness: 0 fail en security-advisor gedraaid**; Snyk MCP is niet
-  beschikbaar en FEATURES/FITNESS moeten nog via de eigen agents.
-- [ ] T041 Werk `FEATURES.md` bij met de nieuwe mogelijkheid (verwijderen en herstellen
+  `FITNESS.md` bij. **Fitness: 0 fail en security-advisor gedraaid**; FEATURES/FITNESS
+  zijn bijgewerkt; Snyk blijft geblokkeerd (401).
+- [x] T041 Werk `FEATURES.md` bij met de nieuwe mogelijkheid (verwijderen en herstellen
   van assistenten) volgens het bestaande feature-trackerformaat.
 - [x] T042 Werk het statusblok tussen `<!-- SPECKIT START -->` en
   `<!-- SPECKIT END -->` in `AGENTS.md` bij met de toegepaste migratie, gedeployde
