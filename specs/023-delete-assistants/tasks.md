@@ -17,10 +17,10 @@ worden in Phase 8 volgens quickstart.md gecontroleerd.
 
 ## Phase 1: Setup
 
-- [ ] T001 Controleer de uitgangssituatie op branch `023-delete-assistants`:
+- [x] T001 Controleer de uitgangssituatie op branch `023-delete-assistants`:
   `npx tsc --noEmit`, `npx eslint src/ --max-warnings 0` en `npm run build`
   (`package.json`). Noteer de resultaten; bij een bestaande fout eerst stoppen.
-- [ ] T002 [P] Leg de acceptatiegegevens vast uit `specs/023-delete-assistants/quickstart.md`
+- [x] T002 [P] Leg de acceptatiegegevens vast uit `specs/023-delete-assistants/quickstart.md`
   §0: platformbeheerdersaccount, twee organisaties, een testassistent met een bestaand
   gesprek en een organisatie die tijdens het archief wordt aangemaakt.
 
@@ -31,46 +31,46 @@ worden in Phase 8 volgens quickstart.md gecontroleerd.
 **Doel**: het archiefmodel, de beheerroute en de gedeelde frontend-bouwstenen staan
 voordat de verhalen verder bouwen.
 
-- [ ] T003 Voeg in `supabase/migrations/024_assistant_archive.sql` de kolommen
+- [x] T003 Voeg in `supabase/migrations/024_assistant_archive.sql` de kolommen
   `archived_at timestamptz` toe aan `public.assistant_catalog` en
   `public.ai_assistants`, plus de index
   `ai_assistants_organization_archived_idx (organization_id, archived_at)`
   (data-model.md §1 en §7).
-- [ ] T004 Voeg in `supabase/migrations/024_assistant_archive.sql` de functie
+- [x] T004 Voeg in `supabase/migrations/024_assistant_archive.sql` de functie
   `public.platform_archive_catalog_assistant(p_id uuid)` toe: `SECURITY DEFINER`,
   `search_path = public`, geconditioneerde `UPDATE ... RETURNING` op de catalogus,
   spiegel het tijdstip naar alle `ai_assistants`-rijen, `already_archived`/`not_found`
   bij een botsing, `EXECUTE` alleen voor `service_role` (data-model.md §2).
-- [ ] T005 Voeg in `supabase/migrations/024_assistant_archive.sql` de functie
+- [x] T005 Voeg in `supabase/migrations/024_assistant_archive.sql` de functie
   `public.platform_restore_catalog_assistant(p_id uuid, p_actor uuid)` toe: wis beide
   `archived_at`-waarden, behoud `is_active`, voeg voor organisaties zonder rij een rij
   met `is_active = false` toe, `not_archived`/`not_found` bij een botsing, `EXECUTE`
   alleen voor `service_role` (data-model.md §2).
-- [ ] T006 Vervang in `supabase/migrations/024_assistant_archive.sql` de functie
+- [x] T006 Vervang in `supabase/migrations/024_assistant_archive.sql` de functie
   `public.platform_seed_org_assistants(p_org uuid, p_actor uuid)` door de versie met
   `WHERE c.archived_at IS NULL`, zodat `create-tenant` nooit een gearchiveerde
   assistent zaait (data-model.md §2).
-- [ ] T007 [P] Voeg `archived_at: string | null` toe aan de `Row`, `Insert` en `Update`
+- [x] T007 [P] Voeg `archived_at: string | null` toe aan de `Row`, `Insert` en `Update`
   van `ai_assistants` in `src/types/database.types.ts` (research.md #9).
-- [ ] T008 [P] Voeg in `src/lib/platform-admin-client.ts` de interface
+- [x] T008 [P] Voeg in `src/lib/platform-admin-client.ts` de interface
   `ArchivedAssistant` en de functies `listArchivedAssistants()`,
   `archiveCatalogAssistant(catalogId)` en `restoreCatalogAssistant(catalogId)` toe,
   met de bestaande foutmapping (contracts/platform-admin-archive.md).
-- [ ] T009 Voeg in `supabase/functions/platform-admin/index.ts` de acties
+- [x] T009 Voeg in `supabase/functions/platform-admin/index.ts` de acties
   `list_archived_assistants`, `archive_catalog_assistant` en
   `restore_catalog_assistant` toe, inclusief UUID-validatie, `p_actor = user.id`,
   de Nederlandse foutmeldingen voor `not_found`/`already_archived`/`not_archived` en
   logging zonder namen of URL's (contracts/platform-admin-archive.md).
-- [ ] T010 [P] Breid in `src/components/ui/dialog.tsx` de bestaande focusafhandeling
+- [x] T010 [P] Breid in `src/components/ui/dialog.tsx` de bestaande focusafhandeling
   uit: onthoud de opener bij de open-transitie en zet de focus bij sluiten terug als
   het element nog in het document staat (research.md #7).
-- [ ] T011 [P] Voeg in `src/hooks/queries.ts` de query `useArchivedAssistants(enabled)`
+- [x] T011 [P] Voeg in `src/hooks/queries.ts` de query `useArchivedAssistants(enabled)`
   en de mutaties `useArchiveAssistant(orgId)` en `useRestoreAssistant(orgId)` toe;
   invalideer `['assistants']`, `['archived-assistants']` en
   `['dashboard-counts', orgId]` na succes (plan.md §Frontend).
-- [ ] T012 Voeg in `src/hooks/queries.ts` `.is('archived_at', null)` toe aan
+- [x] T012 Voeg in `src/hooks/queries.ts` `.is('archived_at', null)` toe aan
   `useAssistants`, zodat een gearchiveerde assistent direct uit de lijst verdwijnt.
-- [ ] T013 **Checkpoint**: `npx tsc --noEmit`, `npx eslint src/ --max-warnings 0` en
+- [x] T013 **Checkpoint**: `npx tsc --noEmit`, `npx eslint src/ --max-warnings 0` en
   `npm run build` zijn groen (`package.json`).
 
 ---
@@ -84,22 +84,22 @@ bevestiging en ziet hem direct uit de lijst verdwijnen.
 annuleer de verwijdering (kaart blijft), bevestig daarna (kaart weg, bevestiging
 zichtbaar) en controleer de focus na sluiten.
 
-- [ ] T014 [US1] Maak `src/components/assistants/DeleteAssistantDialog.tsx`: titel
+- [x] T014 [US1] Maak `src/components/assistants/DeleteAssistantDialog.tsx`: titel
   "Assistent verwijderen", waarschuwing met naam, "voor alle organisaties",
   "gesprekken en analyses blijven leesbaar", "herstel via het archief",
   **Annuleren** eerst, **Verwijderen** destructief, wachtstand en uitgeschakelde knop
   tijdens opslaan, Nederlandse foutmelding bij mislukken (spec FR-001–FR-004,
   FR-011–FR-015).
-- [ ] T015 [US1] Werk `src/pages/AssistantsPage.tsx` bij: een prullenbak-knop per
+- [x] T015 [US1] Werk `src/pages/AssistantsPage.tsx` bij: een prullenbak-knop per
   kaart alleen voor `isPlatformAdmin`, met `aria-label="<naam> verwijderen"`; koppel
   het venster aan T014; na succes de toast "Assistent verwijderd" en de focus naar de
   **Archief**-knop; na annuleren/sluiten de focus terug naar de opener.
-- [ ] T016 [US1] Voeg in `tests/e2e/assistant-archive.spec.ts` de verwijderflow toe
+- [x] T016 [US1] Voeg in `tests/e2e/assistant-archive.spec.ts` de verwijderflow toe
   met gemockte `**/rest/v1/ai_assistants*` en `**/functions/v1/platform-admin`:
   knop aanwezig, venster met naam en gevolgen, annuleren laat de kaart staan,
   bevestigen stuurt `archive_catalog_assistant`, verwijdert de kaart en toont de
   bevestiging; controleer de focus na sluiten.
-- [ ] T017 [US1] Voer `npx playwright test tests/e2e/assistant-archive.spec.ts` uit en
+- [x] T017 [US1] Voer `npx playwright test tests/e2e/assistant-archive.spec.ts` uit en
   daarna `npx tsc --noEmit`, `npx eslint src/ --max-warnings 0` en `npm run build`
   (`package.json`); los alles op tot groen.
 
@@ -119,29 +119,29 @@ detail, dashboardtelling, startscherm, geschiedenis en directe links hem niet
 aanbieden; controleer daarnaast met een echte aanroep dat `rag-chat` en
 `analysis-run-submit` weigeren (Phase 8).
 
-- [ ] T018 [P] [US2] Voeg in `src/hooks/queries.ts` `.is('archived_at', null)` toe aan
+- [x] T018 [P] [US2] Voeg in `src/hooks/queries.ts` `.is('archived_at', null)` toe aan
   `useAssistantOptions` en `useAssistant`, filter gearchiveerde rijen uit
   `useLinkedAssistants`, en sluit ze uit van de assistententelling in
   `useDashboardCounts`.
-- [ ] T019 [P] [US2] Scherp in `supabase/functions/platform-admin/index.ts` de bestaande
+- [x] T019 [P] [US2] Scherp in `supabase/functions/platform-admin/index.ts` de bestaande
   acties aan: `list_org_assistants` en `get_connections` filteren
   `archived_at IS NULL`; `save_connections` weigert een gearchiveerde `catalog_id`;
   `set_assistant_active` raakt alleen niet-gearchiveerde rijen;
   `save_catalog_assistant` weigert een gearchiveerde id
   (contracts/platform-admin-archive.md).
-- [ ] T020 [P] [US2] Voeg in `supabase/functions/rag-chat/index.ts` `archived_at` toe
+- [x] T020 [P] [US2] Voeg in `supabase/functions/rag-chat/index.ts` `archived_at` toe
   aan de assistentselect en weiger een gezette waarde via de bestaande
   `FORBIDDEN`-route, vóór het opslaan van berichten of het aanroepen van n8n.
-- [ ] T021 [P] [US2] Voeg in `supabase/functions/analysis-run-submit/index.ts`
+- [x] T021 [P] [US2] Voeg in `supabase/functions/analysis-run-submit/index.ts`
   `archived_at` toe aan de assistentselect en weiger een gezette waarde naast de
   bestaande `is_active`-, type- en organisatiecontrole.
-- [ ] T022 [US2] Voeg in `tests/e2e/assistant-archive.spec.ts` de zichtbaarheidstests
+- [x] T022 [US2] Voeg in `tests/e2e/assistant-archive.spec.ts` de zichtbaarheidstests
   toe: de lijst- en detailrequest bevatten `archived_at=is.null`, een gearchiveerde
   assistent verschijnt niet op AI-assistenten, en `/chat/new/<id>` en
   `/analyse/new/<id>` tonen "Assistent niet gevonden".
 - [ ] T023 [US2] Voer de spec en de statische controles uit (`package.json`) en
   controleer handmatig met SQL dat gesprekken, berichten, analyses en
-  kennisbronkoppelingen ongewijzigd zijn (quickstart.md §5.2).
+  kennisbronkoppelingen ongewijzigd zijn (quickstart.md §5.2). De SQL-controle wacht op T033.
 
 **Checkpoint**: de assistent is voor gebruikers op alle aanbiedingen verdwenen en
 server-side onbruikbaar.
@@ -157,14 +157,14 @@ de server weigert hun directe aanroepen.
 prullenbak noch **Archief** bestaat; controleer in Phase 8 met echte JWT's dat de
 beheerroute 403 en anoniem 401 geeft.
 
-- [ ] T024 [P] [US3] Voeg in `tests/e2e/assistant-archive.spec.ts` de kantoorbeheerder-
+- [x] T024 [P] [US3] Voeg in `tests/e2e/assistant-archive.spec.ts` de kantoorbeheerder-
   test toe: mock `**/rest/v1/rpc/is_platform_admin` op `false` en
   `**/rest/v1/ai_assistants*`, open AI-assistenten en controleer dat er geen
   verwijderknop, geen **Archief**-knop en geen herstelknop bestaat.
-- [ ] T025 [US3] Controleer in `src/pages/AssistantsPage.tsx` dat beide besturingen
+- [x] T025 [US3] Controleer in `src/pages/AssistantsPage.tsx` dat beide besturingen
   uitsluitend op `isPlatformAdmin` staan en niet op `canManage`; leg dit vast in een
   korte comment boven de conditionele blokken.
-- [ ] T026 [US3] Voer `npx playwright test tests/e2e/assistant-archive.spec.ts` en de
+- [x] T026 [US3] Voer `npx playwright test tests/e2e/assistant-archive.spec.ts` en de
   statische controles uit (`package.json`).
 
 **Checkpoint**: de UI is rolgebaseerd afgeschermd; de serverafdwinging volgt in
@@ -181,13 +181,13 @@ de assistent of volledig bestaan of volledig verwijderd zijn.
 en controleer dat de kaart blijft staan, de fout zichtbaar is en de knop niet
 dubbel indient.
 
-- [ ] T027 [US4] Voeg in `tests/e2e/assistant-archive.spec.ts` de foutpaden toe: een
+- [x] T027 [US4] Voeg in `tests/e2e/assistant-archive.spec.ts` de foutpaden toe: een
   mislukte `archive_catalog_assistant` toont een Nederlandse foutmelding en laat de
   kaart staan; een `already_archived`-respons toont "Deze assistent is al verwijderd."
   en werkt de lijst bij; controleer dat de knop tijdens opslaan is uitgeschakeld.
 - [ ] T028 [US4] Voer de spec en de statische controles uit (`package.json`) en
   controleer dat een mislukte actie geen gedeeltelijke `archived_at`-waarde achterlaat
-  (quickstart.md §7).
+  (quickstart.md §7). De atomiciteitscontrole wacht op T033.
 
 **Checkpoint**: de UI faalt zichtbaar en zonder halve toestand.
 
@@ -202,19 +202,19 @@ ze met dezelfde aan/uit-standen als vóór het verwijderen.
 icoon/naam/type/datum, herstel en controleer dat de assistent weer in de lijst staat
 en het archief leeg is.
 
-- [ ] T029 [US5] Maak `src/components/assistants/ArchiveDialog.tsx`: haal de lijst op
+- [x] T029 [US5] Maak `src/components/assistants/ArchiveDialog.tsx`: haal de lijst op
   bij openen, toon icoon, naam, typelabel en de verwijderdatum in Nederlands formaat,
   een **Herstellen**-knop per rij met `aria-label="<naam> herstellen"`, een laadstand,
   een Nederlandse foutmelding en de lege toestand "Geen verwijderde assistenten"
   (spec FR-019–FR-026).
-- [ ] T030 [US5] Werk `src/pages/AssistantsPage.tsx` bij: een **Archief**-knop in de
+- [x] T030 [US5] Werk `src/pages/AssistantsPage.tsx` bij: een **Archief**-knop in de
   kop alleen voor `isPlatformAdmin`, gekoppeld aan T029; na herstel de toast
   "Assistent hersteld" en een ververste assistentenlijst.
-- [ ] T031 [US5] Voeg in `tests/e2e/assistant-archive.spec.ts` de archief- en
+- [x] T031 [US5] Voeg in `tests/e2e/assistant-archive.spec.ts` de archief- en
   herstelstroom toe: `list_archived_assistants` toont de rij, **Herstellen** stuurt
   `restore_catalog_assistant`, de rij verdwijnt en de assistent staat weer in de
   lijst; test ook de lege toestand.
-- [ ] T032 [US5] Voer de spec en de statische controles uit (`package.json`).
+- [x] T032 [US5] Voer de spec en de statische controles uit (`package.json`).
 
 **Checkpoint**: verwijderen is omkeerbaar en de oude schakelaarstanden blijven
 behouden.

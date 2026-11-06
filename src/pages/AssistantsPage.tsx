@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, useIsPlatformAdmin } from '@/hooks/useAuth'
 import { useToast } from '@/components/ui/toast'
@@ -23,7 +23,9 @@ import type { AIAssistant } from '@/types/database.types'
 import { saveCatalogAssistant } from '@/lib/platform-admin-client'
 import { assistantTypeLabel } from '@/lib/labels'
 import { supabase } from '@/lib/supabase'
-import { Bot, Plus, Pencil, MessagesSquare, ClipboardList } from 'lucide-react'
+import DeleteAssistantDialog from '@/components/assistants/DeleteAssistantDialog'
+import ArchiveDialog from '@/components/assistants/ArchiveDialog'
+import { Bot, Plus, Pencil, MessagesSquare, ClipboardList, Archive, Trash2 } from 'lucide-react'
 
 const ASSISTANT_TYPES = [
   { value: 'chat', label: '💬 Chat' },
@@ -56,6 +58,12 @@ function AssistantsPage() {
     : (assistants ?? []).filter((a) => a.is_active)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAssistant, setEditingAssistant] = useState<AIAssistant | null>(null)
+  const [deletingAssistant, setDeletingAssistant] = useState<AIAssistant | null>(null)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const archiveButtonRef = useRef<HTMLButtonElement>(null)
+  const handleDeleteOpenChange = useCallback((open: boolean) => {
+    if (!open) setDeletingAssistant(null)
+  }, [])
 
   if (isPending) {
     return (
@@ -86,10 +94,17 @@ function AssistantsPage() {
               : 'Start een gesprek met een assistent'}
           </p>
         </div>
+        {/* Platform-admin only: the catalogue delete action and the archive
+            list (feature 023). Office admins keep the knowledge-link pencil. */}
         {isPlatformAdmin && (
-          <Button onClick={() => { setEditingAssistant(null); setModalOpen(true) }}>
-            <Plus className="h-4 w-4 mr-2" /> Nieuwe assistent
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button ref={archiveButtonRef} variant="outline" onClick={() => setArchiveOpen(true)}>
+              <Archive className="h-4 w-4 mr-2" /> Archief
+            </Button>
+            <Button onClick={() => { setEditingAssistant(null); setModalOpen(true) }}>
+              <Plus className="h-4 w-4 mr-2" /> Nieuwe assistent
+            </Button>
+          </div>
         )}
       </div>
 
@@ -142,6 +157,17 @@ function AssistantsPage() {
                     <Pencil className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 )}
+                {isPlatformAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeletingAssistant(a)}
+                    aria-label={`${a.name} verwijderen`}
+                    title="Assistent verwijderen"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
@@ -154,6 +180,23 @@ function AssistantsPage() {
         assistant={editingAssistant}
         organizationId={profile?.organization_id ?? ''}
         isPlatformAdmin={isPlatformAdmin}
+      />
+
+      <DeleteAssistantDialog
+        assistant={deletingAssistant}
+        open={!!deletingAssistant}
+        onOpenChange={handleDeleteOpenChange}
+        organizationId={profile?.organization_id ?? ''}
+        onArchived={() => {
+          setDeletingAssistant(null)
+          requestAnimationFrame(() => archiveButtonRef.current?.focus())
+        }}
+      />
+
+      <ArchiveDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        organizationId={profile?.organization_id ?? ''}
       />
     </div>
   )

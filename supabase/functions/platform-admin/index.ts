@@ -225,7 +225,8 @@ Deno.serve(async (req: Request) => {
         const { data, error } = await serviceClient
           .from("ai_assistants")
           .select("id, catalog_id, is_active, assistant_catalog(name, icon, type)")
-          .eq("organization_id", organizationId);
+          .eq("organization_id", organizationId)
+          .is("archived_at", null);
         if (error) {
           logCode("INTERNAL_ERROR", action, started, organizationId);
           return errorResponse("INTERNAL_ERROR", cors);
@@ -268,6 +269,7 @@ Deno.serve(async (req: Request) => {
           .update({ is_active: isActive })
           .eq("organization_id", organizationId)
           .eq("catalog_id", catalogId)
+          .is("archived_at", null)
           .select("id");
         if (error) {
           logCode("INTERNAL_ERROR", action, started, organizationId, catalogId);
@@ -285,6 +287,7 @@ Deno.serve(async (req: Request) => {
         const { data: catalog, error } = await serviceClient
           .from("assistant_catalog")
           .select("id, name, type, test_webhook_url, prod_webhook_url")
+          .is("archived_at", null)
           .order("name", { ascending: true });
         if (error) {
           logCode("INTERNAL_ERROR", action, started);
@@ -345,7 +348,8 @@ Deno.serve(async (req: Request) => {
           const { data: existing, error: existingError } = await serviceClient
             .from("assistant_catalog")
             .select("id")
-            .in("id", catalogIds);
+            .in("id", catalogIds)
+            .is("archived_at", null);
           if (existingError) {
             logCode("INTERNAL_ERROR", action, started);
             return errorResponse("INTERNAL_ERROR", cors);
@@ -479,6 +483,24 @@ Deno.serve(async (req: Request) => {
           return errorResponse("VALIDATION", cors, "Deze assistent bestaat niet meer.");
         }
 
+        // An archived assistant can only come back through restore, never
+        // through a direct save_catalog_assistant call.
+        if (catalogId !== null) {
+          const { data: existing, error: existingError } = await serviceClient
+            .from("assistant_catalog")
+            .select("id")
+            .eq("id", catalogId)
+            .is("archived_at", null)
+            .maybeSingle();
+          if (existingError) {
+            logCode("INTERNAL_ERROR", action, started, undefined, catalogId);
+            return errorResponse("INTERNAL_ERROR", cors);
+          }
+          if (!existing) {
+            return errorResponse("VALIDATION", cors, "Deze assistent bestaat niet meer.");
+          }
+        }
+
         const name = asString(body?.name);
         if (!name) return errorResponse("VALIDATION", cors, "Vul een naam in.");
 
@@ -535,6 +557,94 @@ Deno.serve(async (req: Request) => {
         }
 
         return json({ catalog_id: savedId }, cors);
+      }
+
+      // ------------------------------------------------------------- archive
+      case "list_archived_assistants": {
+        const { data, error } = await serviceClient
+          .from("assistant_catalog")
+          .select("id, name, icon, type, archived_at")
+          .not("archived_at", "is", null)
+          .order("archived_at", { ascending: false });
+        if (error) {
+          logCode("INTERNAL_ERROR", action, started);
+          return errorResponse("INTERNAL_ERROR", cors);
+        }
+
+        return json(
+          (data ?? []).map((row) => ({
+            catalog_id: row.id,
+            name: row.name,
+            icon: row.icon,
+            type: row.type,
+            archived_at: row.archived_at,
+          })),
+          cors,
+        );
+      }
+
+      case "archive_catalog_assistant": {
+        const catalogId = asString(body?.catalog_id);
+        if (!UUID_RE.test(catalogId)) {
+          return errorResponse("VALIDATION", cors, "Deze assistent bestaat niet meer.");
+        }
+
+        const { error } = await serviceClient.rpc(
+          "platform_archive_catalog_assistant",
+          { p_id: catalogId },
+        );
+        if (error) {
+          const message = error.message ?? "";
+          const validation = message.includes("not_found")
+            ? "Deze assistent bestaat niet meer."
+            : message.includes("already_archived")
+            ? "Deze assistent is al verwijderd."
+            : null;
+          logCode(
+            validation ? "VALIDATION" : "INTERNAL_ERROR",
+            action,
+            started,
+            undefined,
+            catalogId,
+          );
+          return validation
+            ? errorResponse("VALIDATION", cors, validation)
+            : errorResponse("INTERNAL_ERROR", cors);
+        }
+
+        return json({ ok: true }, cors);
+      }
+
+      case "restore_catalog_assistant": {
+        const catalogId = asString(body?.catalog_id);
+        if (!UUID_RE.test(catalogId)) {
+          return errorResponse("VALIDATION", cors, "Deze assistent bestaat niet meer.");
+        }
+
+        const { error } = await serviceClient.rpc(
+          "platform_restore_catalog_assistant",
+          { p_id: catalogId, p_actor: user.id },
+        );
+        if (error) {
+          const message = error.message ?? "";
+          const validation = message.includes("not_found")
+            ? "Deze assistent bestaat niet meer."
+            : message.includes("not_archived")
+            ? "Deze assistent is niet verwijderd."
+            : null;
+          logCode(
+            validation ? "VALIDATION" : "INTERNAL_ERROR",
+            action,
+            started,
+            undefined,
+            catalogId,
+          );
+          return validation
+            ? errorResponse("VALIDATION", cors, validation)
+            : errorResponse("INTERNAL_ERROR", cors);
+        }
+
+        return json({ ok: true }, cors);
       }
 
       default:

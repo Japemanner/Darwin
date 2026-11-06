@@ -3,6 +3,21 @@ import { cn } from "@/lib/utils"
 
 const Dialog = ({ open, onOpenChange, children, ariaLabel }: { open: boolean; onOpenChange: (open: boolean) => void; children: React.ReactNode; ariaLabel?: string }) => {
   const dialogRef = React.useRef<HTMLDivElement>(null)
+  const openerRef = React.useRef<HTMLElement | null>(null)
+
+  // Remember what opened the dialog and return focus there on close (WCAG
+  // 2.1 AA). When the opener no longer exists (e.g. its card was removed
+  // after a successful delete), the caller decides where focus goes next.
+  React.useEffect(() => {
+    if (!open) return
+    openerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    return () => {
+      const opener = openerRef.current
+      openerRef.current = null
+      if (opener?.isConnected) opener.focus()
+    }
+  }, [open])
 
   React.useEffect(() => {
     if (!open) return
